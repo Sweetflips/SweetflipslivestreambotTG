@@ -10,6 +10,8 @@ const prisma = new PrismaClient();
 // Initialize bot
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
+// Force redeploy - /kick command now has personal message restriction
+
 // Global state for linking users
 global.linkingUsers = new Set();
 
