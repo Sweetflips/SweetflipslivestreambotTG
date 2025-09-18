@@ -198,6 +198,7 @@ let SPREADSHEET_ID = null;
 try {
   // Try environment variable first
   if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    console.log("🔑 Found GOOGLE_SERVICE_ACCOUNT_KEY environment variable");
     try {
       const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
       const auth = new google.auth.GoogleAuth({
@@ -206,36 +207,25 @@ try {
       });
       sheets = google.sheets({ version: "v4", auth });
       SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
-      console.log(
-        "✅ Google Sheets integration enabled (environment variable)"
-      );
+      console.log("✅ Google Sheets integration enabled (environment variable)");
+      console.log(`📊 Spreadsheet ID: ${SPREADSHEET_ID}`);
     } catch (envError) {
-      console.log("⚠️ Environment variable failed, trying file-based auth...");
-      throw envError; // This will trigger the file-based fallback
+      console.error("❌ Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY:", envError.message);
+      console.log("⚠️ Bot will run without Google Sheets integration");
+      sheets = null;
+      SPREADSHEET_ID = null;
     }
   } else {
-    throw new Error("No environment variable set");
-  }
-} catch (error) {
-  // Fallback to file-based authentication
-  try {
-    const auth = new google.auth.GoogleAuth({
-      keyFile: path.join(
-        __dirname,
-        "credentials",
-        "sweetflips-7086906ae249.json"
-      ),
-      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-    });
-    sheets = google.sheets({ version: "v4", auth });
-    SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
-    console.log("✅ Google Sheets integration enabled (file-based)");
-  } catch (fileError) {
-    console.error("❌ Google Sheets setup failed:", fileError.message);
+    console.log("⚠️ No GOOGLE_SERVICE_ACCOUNT_KEY environment variable found");
     console.log("⚠️ Bot will run without Google Sheets integration");
     sheets = null;
     SPREADSHEET_ID = null;
   }
+} catch (error) {
+  console.error("❌ Google Sheets setup failed:", error.message);
+  console.log("⚠️ Bot will run without Google Sheets integration");
+  sheets = null;
+  SPREADSHEET_ID = null;
 }
 
 // Helper functions
