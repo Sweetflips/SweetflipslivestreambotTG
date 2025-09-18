@@ -7,13 +7,16 @@
   "scripts": {
     "dev": "tsx watch src/dev.ts",
     "build": "tsc && tsc-alias",
-    "start": "node dist/index.js",
+    "start": "npx prisma generate && npx prisma db push --force-reset && node dist/index.js",
+    "start:with-db": "node start-with-db.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "node deploy-db.js",
+    "db:init": "node init-db.js",
     "prisma:seed": "tsx src/prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "type-check": "tsc --noEmit"
