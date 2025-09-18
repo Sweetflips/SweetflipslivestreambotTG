@@ -4,11 +4,12 @@
   "description": "A Telegram bot for Sweetflips livestream gaming features including balance and bonus guessing games",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js",
+    "start": "node start-bot.js",
     "dev": "nodemon bot.js",
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
-    "db:migrate": "npx prisma migrate dev"
+    "db:migrate": "npx prisma migrate dev",
+    "db:create-tables": "node create-tables.js"
   },
   "keywords": [
     "telegram",
