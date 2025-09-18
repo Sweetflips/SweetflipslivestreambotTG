@@ -17,8 +17,10 @@ try {
 
 // Check for required environment variables
 if (!process.env.TELEGRAM_BOT_TOKEN) {
-  console.error('❌ TELEGRAM_BOT_TOKEN environment variable is required!');
-  console.error('Please set TELEGRAM_BOT_TOKEN in your Railway environment variables.');
+  console.error("❌ TELEGRAM_BOT_TOKEN environment variable is required!");
+  console.error(
+    "Please set TELEGRAM_BOT_TOKEN in your Railway environment variables."
+  );
   process.exit(1);
 }
 
@@ -164,20 +166,45 @@ class LiveBalanceService {
 
 const liveBalanceService = new LiveBalanceService();
 
-// Google Sheets setup
-const auth = new google.auth.GoogleAuth({
-  keyFile: path.join(__dirname, "credentials", "google-service-account.json"),
-  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-});
+// Google Sheets setup (optional)
+let sheets = null;
+let SPREADSHEET_ID = null;
 
-const sheets = google.sheets({ version: "v4", auth });
-const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
+try {
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    // Use environment variable (Railway)
+    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+    const auth = new google.auth.GoogleAuth({
+      credentials: credentials,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+    sheets = google.sheets({ version: "v4", auth });
+    SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
+    console.log("✅ Google Sheets integration enabled");
+  } else {
+    // Try file-based auth (local development)
+    const auth = new google.auth.GoogleAuth({
+      keyFile: path.join(__dirname, "credentials", "google-service-account.json"),
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+    sheets = google.sheets({ version: "v4", auth });
+    SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
+    console.log("✅ Google Sheets integration enabled (file-based)");
+  }
+} catch (error) {
+  console.error("❌ Google Sheets setup failed:", error.message);
+  console.log("⚠️ Bot will run without Google Sheets integration");
+  sheets = null;
+  SPREADSHEET_ID = null;
+}
 
 // Helper functions
 async function getUserOrCreate(telegramId, telegramUser) {
   // If database is not available, return a mock user
   if (!prisma) {
-    console.log(`⚠️ Database unavailable - using mock user: ${telegramUser} (${telegramId})`);
+    console.log(
+      `⚠️ Database unavailable - using mock user: ${telegramUser} (${telegramId})`
+    );
     return {
       id: telegramId.toString(),
       telegramId: telegramId.toString(),
@@ -231,6 +258,12 @@ async function getUserOrCreate(telegramId, telegramUser) {
 }
 
 async function syncToGoogleSheets(user) {
+  // Skip if Google Sheets is not available
+  if (!sheets || !SPREADSHEET_ID) {
+    console.log("⚠️ Google Sheets not available - skipping sync");
+    return;
+  }
+
   try {
     const values = [
       [
@@ -333,7 +366,9 @@ bot.help(async (ctx) => {
 bot.command("kick", async (ctx) => {
   // Check if command is used in a group chat
   if (ctx.chat.type !== "private") {
-    await ctx.reply(`❌ This command can only be used in personal messages. [BOT.JS v2.0]`);
+    await ctx.reply(
+      `❌ This command can only be used in personal messages. [BOT.JS v2.0]`
+    );
     return;
   }
 
@@ -777,7 +812,7 @@ bot.command("setrole", async (ctx) => {
       await ctx.reply("❌ Database unavailable. Cannot set role.");
       return;
     }
-    
+
     const targetUser = await prisma.user.findUnique({
       where: { telegramId: targetId },
     });
@@ -813,7 +848,7 @@ bot.command("listusers", async (ctx) => {
       await ctx.reply("❌ Database unavailable. Cannot list users.");
       return;
     }
-    
+
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
     });
@@ -847,7 +882,7 @@ bot.on("text", async (ctx) => {
       await ctx.reply("❌ Database unavailable. Cannot link Kick account.");
       return;
     }
-    
+
     const existingUser = await prisma.user.findFirst({
       where: { kickName: kickUsername },
     });
@@ -896,13 +931,18 @@ bot.catch((err, ctx) => {
 
 // Start bot
 console.log("🤖 Starting SweetflipsStreamBot...");
-console.log("🔑 Bot token:", process.env.TELEGRAM_BOT_TOKEN ? "✅ Set" : "❌ Missing");
+console.log(
+  "🔑 Bot token:",
+  process.env.TELEGRAM_BOT_TOKEN ? "✅ Set" : "❌ Missing"
+);
 
 bot.launch().catch((error) => {
   console.error("❌ Failed to start bot:", error);
   if (error.response && error.response.error_code === 404) {
     console.error("❌ Bot token is invalid or bot doesn't exist!");
-    console.error("Please check your TELEGRAM_BOT_TOKEN in Railway environment variables.");
+    console.error(
+      "Please check your TELEGRAM_BOT_TOKEN in Railway environment variables."
+    );
   }
   process.exit(1);
 });
