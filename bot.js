@@ -15,6 +15,30 @@ try {
   prisma = null;
 }
 
+// Function to wait for database to be ready
+async function waitForDatabase() {
+  if (!prisma) return false;
+  
+  let retries = 0;
+  const maxRetries = 10;
+  
+  while (retries < maxRetries) {
+    try {
+      // Try to query a simple table to check if database is ready
+      await prisma.$queryRaw`SELECT 1`;
+      console.log("✅ Database is ready");
+      return true;
+    } catch (error) {
+      retries++;
+      console.log(`⏳ Waiting for database... (${retries}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+  
+  console.error("❌ Database not ready after maximum retries");
+  return false;
+}
+
 // Check for required environment variables
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.error("❌ TELEGRAM_BOT_TOKEN environment variable is required!");
@@ -184,7 +208,11 @@ try {
   } else {
     // Try file-based auth (local development)
     const auth = new google.auth.GoogleAuth({
-      keyFile: path.join(__dirname, "credentials", "google-service-account.json"),
+      keyFile: path.join(
+        __dirname,
+        "credentials",
+        "google-service-account.json"
+      ),
       scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
     sheets = google.sheets({ version: "v4", auth });
@@ -930,22 +958,35 @@ bot.catch((err, ctx) => {
 });
 
 // Start bot
-console.log("🤖 Starting SweetflipsStreamBot...");
-console.log(
-  "🔑 Bot token:",
-  process.env.TELEGRAM_BOT_TOKEN ? "✅ Set" : "❌ Missing"
-);
+async function startBot() {
+  console.log("🤖 Starting SweetflipsStreamBot...");
+  console.log(
+    "🔑 Bot token:",
+    process.env.TELEGRAM_BOT_TOKEN ? "✅ Set" : "❌ Missing"
+  );
 
-bot.launch().catch((error) => {
-  console.error("❌ Failed to start bot:", error);
-  if (error.response && error.response.error_code === 404) {
-    console.error("❌ Bot token is invalid or bot doesn't exist!");
-    console.error(
-      "Please check your TELEGRAM_BOT_TOKEN in Railway environment variables."
-    );
+  // Wait for database to be ready
+  console.log("⏳ Waiting for database to be ready...");
+  const dbReady = await waitForDatabase();
+  
+  if (!dbReady) {
+    console.log("⚠️ Database not ready, starting bot without database features");
   }
-  process.exit(1);
-});
+
+  bot.launch().catch((error) => {
+    console.error("❌ Failed to start bot:", error);
+    if (error.response && error.response.error_code === 404) {
+      console.error("❌ Bot token is invalid or bot doesn't exist!");
+      console.error(
+        "Please check your TELEGRAM_BOT_TOKEN in Railway environment variables."
+      );
+    }
+    process.exit(1);
+  });
+}
+
+// Start the bot
+startBot();
 
 // Graceful shutdown
 process.once("SIGINT", () => bot.stop("SIGINT"));
