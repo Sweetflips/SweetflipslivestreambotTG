@@ -4,8 +4,16 @@ const { google } = require("googleapis");
 const fs = require("fs");
 const path = require("path");
 
-// Initialize Prisma
-const prisma = new PrismaClient();
+// Initialize Prisma with error handling
+let prisma;
+try {
+  prisma = new PrismaClient();
+  console.log("✅ Database connection initialized");
+} catch (error) {
+  console.error("❌ Database connection failed:", error.message);
+  console.log("⚠️ Bot will run without database features");
+  prisma = null;
+}
 
 // Check for required environment variables
 if (!process.env.TELEGRAM_BOT_TOKEN) {
@@ -167,35 +175,59 @@ const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
 
 // Helper functions
 async function getUserOrCreate(telegramId, telegramUser) {
-  let user = await prisma.user.findUnique({
-    where: { telegramId: telegramId.toString() },
-  });
-
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        telegramId: telegramId.toString(),
-        telegramUser: telegramUser,
-        role: "VIEWER",
-      },
-    });
-    console.log(
-      `✅ User created: ${telegramUser} (${telegramId}) - Role: ${user.role}`
-    );
-  } else {
-    // Update username if changed
-    if (user.telegramUser !== telegramUser) {
-      user = await prisma.user.update({
-        where: { telegramId: telegramId.toString() },
-        data: { telegramUser: telegramUser },
-      });
-    }
-    console.log(
-      `✅ User found: ${telegramUser} (${telegramId}) - Role: ${user.role}`
-    );
+  // If database is not available, return a mock user
+  if (!prisma) {
+    console.log(`⚠️ Database unavailable - using mock user: ${telegramUser} (${telegramId})`);
+    return {
+      id: telegramId.toString(),
+      telegramId: telegramId.toString(),
+      telegramUser: telegramUser,
+      role: "VIEWER",
+      kickName: null,
+    };
   }
 
-  return user;
+  try {
+    let user = await prisma.user.findUnique({
+      where: { telegramId: telegramId.toString() },
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          telegramId: telegramId.toString(),
+          telegramUser: telegramUser,
+          role: "VIEWER",
+        },
+      });
+      console.log(
+        `✅ User created: ${telegramUser} (${telegramId}) - Role: ${user.role}`
+      );
+    } else {
+      // Update username if changed
+      if (user.telegramUser !== telegramUser) {
+        user = await prisma.user.update({
+          where: { telegramId: telegramId.toString() },
+          data: { telegramUser: telegramUser },
+        });
+      }
+      console.log(
+        `✅ User found: ${telegramUser} (${telegramId}) - Role: ${user.role}`
+      );
+    }
+
+    return user;
+  } catch (error) {
+    console.error("❌ Database error in getUserOrCreate:", error);
+    // Return mock user if database fails
+    return {
+      id: telegramId.toString(),
+      telegramId: telegramId.toString(),
+      telegramUser: telegramUser,
+      role: "VIEWER",
+      kickName: null,
+    };
+  }
 }
 
 async function syncToGoogleSheets(user) {
@@ -741,6 +773,11 @@ bot.command("setrole", async (ctx) => {
   }
 
   try {
+    if (!prisma) {
+      await ctx.reply("❌ Database unavailable. Cannot set role.");
+      return;
+    }
+    
     const targetUser = await prisma.user.findUnique({
       where: { telegramId: targetId },
     });
@@ -772,6 +809,11 @@ bot.command("listusers", async (ctx) => {
   }
 
   try {
+    if (!prisma) {
+      await ctx.reply("❌ Database unavailable. Cannot list users.");
+      return;
+    }
+    
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
     });
@@ -801,6 +843,11 @@ bot.on("text", async (ctx) => {
     }
 
     // Check if Kick username is already linked to another user
+    if (!prisma) {
+      await ctx.reply("❌ Database unavailable. Cannot link Kick account.");
+      return;
+    }
+    
     const existingUser = await prisma.user.findFirst({
       where: { kickName: kickUsername },
     });
