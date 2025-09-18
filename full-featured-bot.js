@@ -291,6 +291,12 @@ bot.help(async (ctx) => {
 });
 
 bot.command("kick", async (ctx) => {
+  // Check if command is used in a group chat
+  if (ctx.chat.type !== "private") {
+    await ctx.reply(`❌ This command can only be used in personal messages.`);
+    return;
+  }
+
   const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
 
   if (user.kickName) {

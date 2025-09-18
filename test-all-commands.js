@@ -133,6 +133,12 @@ bot.command("help", async (ctx) => {
 
 // Kick command
 bot.command("kick", async (ctx) => {
+  // Check if command is used in a group chat
+  if (ctx.chat.type !== "private") {
+    await ctx.reply(`❌ This command can only be used in personal messages.`);
+    return;
+  }
+
   console.log(
     `🔗 Kick linking requested by: ${ctx.from.username} (${ctx.from.id})`
   );

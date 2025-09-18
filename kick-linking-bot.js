@@ -137,7 +137,14 @@ ${
 }`;
   },
 
-  "/kick": (chatId, username, firstName, args) => {
+  "/kick": (chatId, username, firstName, args, chatType) => {
+    // Check if command is used in a group chat
+    if (chatType !== "private") {
+      return `❌ <b>Personal Message Only</b>
+
+This command can only be used in personal messages. Please send this command directly to the bot.`;
+    }
+
     // Check if already linked
     if (accounts[chatId]) {
       return `❌ <b>Already Linked!</b>
@@ -288,6 +295,7 @@ function getUpdates() {
 
               if (update.message) {
                 const chatId = update.message.chat.id;
+                const chatType = update.message.chat.type;
                 const text = update.message.text;
                 const username = update.message.from.username;
                 const firstName = update.message.from.first_name;
@@ -378,7 +386,8 @@ function getUpdates() {
                     chatId,
                     username,
                     firstName,
-                    args
+                    args,
+                    chatType
                   );
                   sendMessage(chatId, response);
                 } else {
