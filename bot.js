@@ -5,23 +5,16 @@ const fs = require("fs");
 const path = require("path");
 
 // Initialize Prisma with error handling
-let prisma;
-try {
-  prisma = new PrismaClient();
-  console.log("✅ Database connection initialized");
-} catch (error) {
-  console.error("❌ Database connection failed:", error.message);
-  console.log("⚠️ Bot will run without database features");
-  prisma = null;
-}
+let prisma = null; // Disable database, use Google Sheets only
+console.log("⚠️ Database disabled - using Google Sheets for user storage");
 
 // Function to wait for database to be ready
 async function waitForDatabase() {
   if (!prisma) return false;
-  
+
   let retries = 0;
   const maxRetries = 10;
-  
+
   while (retries < maxRetries) {
     try {
       // Try to query a simple table to check if database is ready
@@ -31,10 +24,10 @@ async function waitForDatabase() {
     } catch (error) {
       retries++;
       console.log(`⏳ Waiting for database... (${retries}/${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
-  
+
   console.error("❌ Database not ready after maximum retries");
   return false;
 }
@@ -968,9 +961,11 @@ async function startBot() {
   // Wait for database to be ready
   console.log("⏳ Waiting for database to be ready...");
   const dbReady = await waitForDatabase();
-  
+
   if (!dbReady) {
-    console.log("⚠️ Database not ready, starting bot without database features");
+    console.log(
+      "⚠️ Database not ready, starting bot without database features"
+    );
   }
 
   bot.launch().catch((error) => {
