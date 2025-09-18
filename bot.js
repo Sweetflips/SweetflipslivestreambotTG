@@ -7,6 +7,13 @@ const path = require("path");
 // Initialize Prisma
 const prisma = new PrismaClient();
 
+// Check for required environment variables
+if (!process.env.TELEGRAM_BOT_TOKEN) {
+  console.error('❌ TELEGRAM_BOT_TOKEN environment variable is required!');
+  console.error('Please set TELEGRAM_BOT_TOKEN in your Railway environment variables.');
+  process.exit(1);
+}
+
 // Initialize bot
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -842,7 +849,16 @@ bot.catch((err, ctx) => {
 
 // Start bot
 console.log("🤖 Starting SweetflipsStreamBot...");
-bot.launch();
+console.log("🔑 Bot token:", process.env.TELEGRAM_BOT_TOKEN ? "✅ Set" : "❌ Missing");
+
+bot.launch().catch((error) => {
+  console.error("❌ Failed to start bot:", error);
+  if (error.response && error.response.error_code === 404) {
+    console.error("❌ Bot token is invalid or bot doesn't exist!");
+    console.error("Please check your TELEGRAM_BOT_TOKEN in Railway environment variables.");
+  }
+  process.exit(1);
+});
 
 // Graceful shutdown
 process.once("SIGINT", () => bot.stop("SIGINT"));
