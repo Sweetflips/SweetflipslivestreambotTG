@@ -1,72 +1,60 @@
-const { google } = require("googleapis");
-require("dotenv").config();
+#!/usr/bin/env node
+
+/**
+ * Test Google Sheets connection
+ */
+
+const { google } = require('googleapis');
 
 async function testGoogleSheets() {
   console.log("🧪 Testing Google Sheets connection...");
-
-  const GOOGLE_SHEETS_ID = process.env.GOOGLE_SHEETS_ID;
-  const GOOGLE_SERVICE_ACCOUNT_KEY_FILE =
-    process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE;
-
-  console.log("📊 Spreadsheet ID:", GOOGLE_SHEETS_ID);
-  console.log("🔑 Key file:", GOOGLE_SERVICE_ACCOUNT_KEY_FILE);
-
-  if (!GOOGLE_SHEETS_ID || !GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
-    console.log("❌ Missing environment variables!");
-    console.log("Make sure .env file contains:");
-    console.log(
-      "GOOGLE_SHEETS_ID=1giec5bb4Pmjywhfn_oy3aIESJ25XHi5kDwjXyoQbglQ"
-    );
-    console.log(
-      "GOOGLE_SERVICE_ACCOUNT_KEY_FILE=./credentials/sweetflips-7086906ae249.json"
-    );
-    return;
-  }
-
+  
   try {
+    // Check environment variables
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+      console.error("❌ GOOGLE_SERVICE_ACCOUNT_KEY not set");
+      return;
+    }
+    
+    if (!process.env.GOOGLE_SPREADSHEET_ID) {
+      console.error("❌ GOOGLE_SPREADSHEET_ID not set");
+      return;
+    }
+    
+    // Parse the service account key
+    let credentials;
+    try {
+      credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+      console.log("✅ Service account key parsed successfully");
+    } catch (error) {
+      console.error("❌ Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY:", error.message);
+      return;
+    }
+    
+    // Initialize Google Sheets
     const auth = new google.auth.GoogleAuth({
-      keyFile: GOOGLE_SERVICE_ACCOUNT_KEY_FILE,
-      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+      credentials: credentials,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
-
-    const sheets = google.sheets({ version: "v4", auth });
-
-    // Test access to the spreadsheet
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // Test connection by reading the spreadsheet
+    console.log("🔍 Testing spreadsheet access...");
     const response = await sheets.spreadsheets.get({
-      spreadsheetId: GOOGLE_SHEETS_ID,
+      spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
     });
-
-    console.log("✅ Google Sheets access successful!");
-    console.log("📋 Spreadsheet title:", response.data.properties.title);
-
-    // Test adding a row
-    const testData = [
-      [
-        "Test Telegram ID",
-        "Test Username",
-        "Test Kick",
-        "2024-01-18",
-        "VIEWER",
-        new Date().toISOString(),
-      ],
-    ];
-
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: GOOGLE_SHEETS_ID,
-      range: "Sheet1!A:F",
-      valueInputOption: "RAW",
-      requestBody: { values: testData },
-    });
-
-    console.log("✅ Test data added successfully!");
-    console.log("🎉 Google Sheets integration is working!");
+    
+    console.log("✅ Google Sheets connection successful!");
+    console.log("📊 Spreadsheet title:", response.data.properties.title);
+    console.log("📋 Sheets:", response.data.sheets.map(sheet => sheet.properties.title).join(', '));
+    
   } catch (error) {
-    console.log("❌ Google Sheets test failed:");
-    console.log(error.message);
-
-    if (error.message.includes("Permission denied")) {
-      console.log("\n🔧 Fix: Share your spreadsheet with this email:");
-      console.log("sweetflipskick@sweetflips.iam.gserviceaccount.com");
+    console.error("❌ Google Sheets connection failed:", error.message);
+    
+    if (error.message.includes('Unexpected token')) {
+      console.error("\n🔧 This looks like a JSON parsing error.");
+      console.error("Make sure your GOOGLE_SERVICE_ACCOUNT_KEY is valid JSON.");
     }
   }
 }
