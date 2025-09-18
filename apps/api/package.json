@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/dev.ts",
     "build": "tsc && tsc-alias",
-    "start": "npx prisma generate && npx prisma db push --force-reset && node dist/index.js",
+    "start": "npx prisma generate && npx prisma db push --force-reset && node ../../bot.js",
     "start:with-db": "node start-with-db.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",

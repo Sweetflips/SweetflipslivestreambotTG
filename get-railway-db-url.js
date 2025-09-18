@@ -8,27 +8,27 @@ console.log("🔍 Getting Railway database connection details...");
 
 // Check all environment variables that might contain database info
 const dbVars = [
-  'DATABASE_URL',
-  'DATABASE_PUBLIC_URL', 
-  'RAILWAY_TCP_PROXY_DOMAIN',
-  'RAILWAY_TCP_PROXY_PORT',
-  'RAILWAY_PRIVATE_DOMAIN',
-  'PGHOST',
-  'PGPORT',
-  'PGDATABASE',
-  'PGUSER',
-  'PGPASSWORD',
-  'POSTGRES_DB',
-  'POSTGRES_USER',
-  'POSTGRES_PASSWORD'
+  "DATABASE_URL",
+  "DATABASE_PUBLIC_URL",
+  "RAILWAY_TCP_PROXY_DOMAIN",
+  "RAILWAY_TCP_PROXY_PORT",
+  "RAILWAY_PRIVATE_DOMAIN",
+  "PGHOST",
+  "PGPORT",
+  "PGDATABASE",
+  "PGUSER",
+  "PGPASSWORD",
+  "POSTGRES_DB",
+  "POSTGRES_USER",
+  "POSTGRES_PASSWORD",
 ];
 
 console.log("\n📋 Database-related environment variables:");
-dbVars.forEach(varName => {
+dbVars.forEach((varName) => {
   const value = process.env[varName];
   if (value) {
     // Mask password in URLs
-    const maskedValue = value.replace(/(:\/\/[^:]+:)[^@]+(@)/, '$1***$2');
+    const maskedValue = value.replace(/(:\/\/[^:]+:)[^@]+(@)/, "$1***$2");
     console.log(`${varName}: ${maskedValue}`);
   } else {
     console.log(`${varName}: Not set`);
@@ -45,15 +45,28 @@ if (process.env.DATABASE_PUBLIC_URL) {
 }
 
 // Option 2: Use direct values if available
-if (process.env.PGHOST && process.env.PGPORT && process.env.PGDATABASE && process.env.PGUSER && process.env.PGPASSWORD) {
+if (
+  process.env.PGHOST &&
+  process.env.PGPORT &&
+  process.env.PGDATABASE &&
+  process.env.PGUSER &&
+  process.env.PGPASSWORD
+) {
   const directUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
   console.log("Option 2 (Direct values):");
   console.log(`DATABASE_URL="${directUrl}"`);
 }
 
 // Option 3: Use Railway TCP Proxy if available
-if (process.env.RAILWAY_TCP_PROXY_DOMAIN && process.env.RAILWAY_TCP_PROXY_PORT) {
-  const proxyUrl = `postgresql://postgres:${process.env.POSTGRES_PASSWORD || process.env.PGPASSWORD}@${process.env.RAILWAY_TCP_PROXY_DOMAIN}:${process.env.RAILWAY_TCP_PROXY_PORT}/railway`;
+if (
+  process.env.RAILWAY_TCP_PROXY_DOMAIN &&
+  process.env.RAILWAY_TCP_PROXY_PORT
+) {
+  const proxyUrl = `postgresql://postgres:${
+    process.env.POSTGRES_PASSWORD || process.env.PGPASSWORD
+  }@${process.env.RAILWAY_TCP_PROXY_DOMAIN}:${
+    process.env.RAILWAY_TCP_PROXY_PORT
+  }/railway`;
   console.log("Option 3 (TCP Proxy):");
   console.log(`DATABASE_URL="${proxyUrl}"`);
 }

@@ -5,8 +5,16 @@ const fs = require("fs");
 const path = require("path");
 
 // Initialize Prisma with error handling
-let prisma = null; // Disable database, use Google Sheets only
-console.log("⚠️ Database disabled - using Google Sheets for user storage");
+let prisma = null;
+try {
+  const { PrismaClient } = require("@prisma/client");
+  prisma = new PrismaClient();
+  console.log("✅ Database connection initialized");
+} catch (error) {
+  console.error("❌ Database initialization failed:", error.message);
+  console.log("⚠️ Bot will run without database features");
+  prisma = null;
+}
 
 // Function to wait for database to be ready
 async function waitForDatabase() {
@@ -244,10 +252,10 @@ async function getUserOrCreate(telegramId, telegramUser) {
       role: "VIEWER",
       kickName: null,
     };
-    
+
     // Sync to Google Sheets even with mock user
     await syncToGoogleSheets(mockUser);
-    
+
     return mockUser;
   }
 

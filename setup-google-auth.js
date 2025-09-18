@@ -10,8 +10,16 @@ console.log("=" * 50);
 // Check current environment variables
 console.log("\n📋 Current Google Sheets Environment Variables:");
 console.log("GOOGLE_SHEETS_ID:", process.env.GOOGLE_SHEETS_ID || "Not set");
-console.log("GOOGLE_SPREADSHEET_ID:", process.env.GOOGLE_SPREADSHEET_ID || "Not set");
-console.log("GOOGLE_SERVICE_ACCOUNT_KEY:", process.env.GOOGLE_SERVICE_ACCOUNT_KEY ? "Set (but may be malformed)" : "Not set");
+console.log(
+  "GOOGLE_SPREADSHEET_ID:",
+  process.env.GOOGLE_SPREADSHEET_ID || "Not set"
+);
+console.log(
+  "GOOGLE_SERVICE_ACCOUNT_KEY:",
+  process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+    ? "Set (but may be malformed)"
+    : "Not set"
+);
 
 // Check if the JSON is valid
 if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
@@ -26,7 +34,9 @@ if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
     console.log("\n🔧 To fix this:");
     console.log("1. Get the complete Google Service Account JSON file");
     console.log("2. Copy the entire JSON content");
-    console.log("3. Paste it as the value for GOOGLE_SERVICE_ACCOUNT_KEY in Railway");
+    console.log(
+      "3. Paste it as the value for GOOGLE_SERVICE_ACCOUNT_KEY in Railway"
+    );
     console.log("4. Make sure it's all on one line (no line breaks)");
   }
 }
@@ -43,4 +53,6 @@ console.log("3. Go to IAM & Admin > Service Accounts");
 console.log("4. Find your service account");
 console.log("5. Click on it > Keys tab > Add Key > Create new key");
 console.log("6. Download the JSON file");
-console.log("7. Copy the entire content and paste it as GOOGLE_SERVICE_ACCOUNT_KEY");
+console.log(
+  "7. Copy the entire content and paste it as GOOGLE_SERVICE_ACCOUNT_KEY"
+);
