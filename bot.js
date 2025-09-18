@@ -198,7 +198,9 @@ try {
       });
       sheets = google.sheets({ version: "v4", auth });
       SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
-      console.log("✅ Google Sheets integration enabled (environment variable)");
+      console.log(
+        "✅ Google Sheets integration enabled (environment variable)"
+      );
     } catch (envError) {
       console.log("⚠️ Environment variable failed, trying file-based auth...");
       throw envError; // This will trigger the file-based fallback
@@ -210,7 +212,11 @@ try {
   // Fallback to file-based authentication
   try {
     const auth = new google.auth.GoogleAuth({
-      keyFile: path.join(__dirname, "credentials", "sweetflips-7086906ae249.json"),
+      keyFile: path.join(
+        __dirname,
+        "credentials",
+        "sweetflips-7086906ae249.json"
+      ),
       scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
     sheets = google.sheets({ version: "v4", auth });
@@ -226,18 +232,23 @@ try {
 
 // Helper functions
 async function getUserOrCreate(telegramId, telegramUser) {
-  // If database is not available, return a mock user
+  // If database is not available, return a mock user and sync to Google Sheets
   if (!prisma) {
     console.log(
       `⚠️ Database unavailable - using mock user: ${telegramUser} (${telegramId})`
     );
-    return {
+    const mockUser = {
       id: telegramId.toString(),
       telegramId: telegramId.toString(),
       telegramUser: telegramUser,
       role: "VIEWER",
       kickName: null,
     };
+    
+    // Sync to Google Sheets even with mock user
+    await syncToGoogleSheets(mockUser);
+    
+    return mockUser;
   }
 
   try {
@@ -946,6 +957,17 @@ bot.on("text", async (ctx) => {
       await ctx.reply(`❌ Error linking account. Please try again.`);
       global.linkingUsers.delete(ctx.from.id);
     }
+  }
+});
+
+// Test command to sync data to Google Sheets
+bot.command("testsync", async (ctx) => {
+  try {
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+    await ctx.reply("✅ Test sync completed! Check your Google Sheets.");
+  } catch (error) {
+    console.error("❌ Test sync error:", error);
+    await ctx.reply("❌ Test sync failed. Check logs.");
   }
 });
 
