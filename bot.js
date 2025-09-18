@@ -291,8 +291,10 @@ bot.help(async (ctx) => {
 
 bot.command("kick", async (ctx) => {
   // Debug: Log chat type
-  console.log(`🔍 /kick command - Chat type: ${ctx.chat.type}, Chat ID: ${ctx.chat.id}`);
-  
+  console.log(
+    `🔍 /kick command - Chat type: ${ctx.chat.type}, Chat ID: ${ctx.chat.id}`
+  );
+
   // Check if command is used in a group chat
   if (ctx.chat.type !== "private") {
     await ctx.reply(`❌ This command can only be used in personal messages.`);
