@@ -1,0 +1,129 @@
+// Simplified Prisma schema for SQLite
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  telegramId  String   @unique
+  telegramUser String?
+  kickName    String?
+  role        String   @default("VIEWER") // "VIEWER", "MOD", "OWNER"
+  linkedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  guesses     Guess[]
+  auditLogs   AuditLog[]
+
+  @@map("users")
+}
+
+model GameRound {
+  id          String   @id @default(cuid())
+  type        String   // "BONUS", "TRIVIA", "GUESS_BALANCE", "GUESS_BONUS"
+  phase       String   @default("IDLE") // "IDLE", "OPEN", "CLOSED", "REVEALED"
+  finalValue  Int?
+  graceWindow Int      @default(30) // seconds
+  windowMin   Int      @default(0)  // minutes, 0 = manual close only
+  minRange    Int      @default(1)
+  maxRange    Int      @default(1000000)
+  createdAt   DateTime @default(now())
+  closedAt    DateTime?
+  revealedAt  DateTime?
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  guesses   Guess[]
+  bonusItems BonusItem[]
+  auditLogs AuditLog[]
+
+  @@map("game_rounds")
+}
+
+model Guess {
+  id        String   @id @default(cuid())
+  gameRoundId String
+  userId    String
+  value     Int
+  createdAt DateTime @default(now())
+  editedAt  DateTime?
+
+  // Relations
+  gameRound GameRound @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gameRoundId, userId])
+  @@map("guesses")
+}
+
+model BonusItem {
+  id        String   @id @default(cuid())
+  gameRoundId String
+  name      String
+  payoutX   Int?     // multiplier, null if not yet paid out
+  createdAt DateTime @default(now())
+
+  // Relations
+  gameRound GameRound @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
+
+  @@map("bonus_items")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  gameRoundId String?
+  userId    String
+  command   String
+  params    String?  // JSON as string instead of Json type
+  createdAt DateTime @default(now())
+
+  // Relations
+  gameRound GameRound? @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
+
+// Legacy models for existing functionality
+model BonusHunt {
+  id        String   @id @default(cuid())
+  isActive  Boolean  @default(false)
+  guesses   Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bonus_hunts")
+}
+
+model TriviaGame {
+  id        String   @id @default(cuid())
+  isActive  Boolean  @default(false)
+  questions Json     @default("[]")
+  answers   Json     @default("{}")
+  scores    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("trivia_games")
+}
+
+model LinkCode {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  telegramId String
+  kickName  String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("link_codes")
+}

@@ -1,0 +1,38 @@
+{
+  "name": "sweetflips-livestream-bot-tg",
+  "version": "1.0.0",
+  "description": "A Telegram bot for Sweetflips livestream gaming features including balance and bonus guessing games",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "nodemon bot.js",
+    "db:generate": "npx prisma generate",
+    "db:push": "npx prisma db push",
+    "db:migrate": "npx prisma migrate dev"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "livestream",
+    "gaming",
+    "sweetflips",
+    "balance",
+    "bonus",
+    "guessing"
+  ],
+  "author": "Sweetflips",
+  "license": "MIT",
+  "dependencies": {
+    "telegraf": "^4.15.6",
+    "@prisma/client": "^5.22.0",
+    "googleapis": "^144.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prisma": "^5.22.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
