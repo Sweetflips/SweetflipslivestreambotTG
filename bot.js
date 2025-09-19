@@ -386,8 +386,8 @@ bot.help(async (ctx) => {
       `/bonus show - Show current bonus standings\n\n` +
       `/add <bonus name> - Add a bonus (counts as +1)\n` +
       `/remove <bonus name> - Remove a bonus (counts as -1)\n\n` +
-      `/live - Send live announcement to all admin groups\n` +
-      `/findgroups - Find group chats where bot is admin\n\n` +
+      `/live - Send live announcement to all groups\n` +
+      `/findgroups - Find all group chats where bot is a member\n\n` +
       `/setrole <telegram_id> <MOD|OWNER> - Set user role\n` +
       `/listusers - List all users\n\n`;
 
@@ -914,8 +914,8 @@ bot.command("listusers", async (ctx) => {
   }
 });
 
-// Function to check if bot is admin in a specific chat
-async function isBotAdmin(chatId) {
+// Function to check if bot is a member of a specific chat
+async function isBotMember(chatId) {
   try {
     const response = await fetch(
       `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getChatMember`,
@@ -926,7 +926,7 @@ async function isBotAdmin(chatId) {
         },
         body: JSON.stringify({
           chat_id: chatId,
-          user_id: process.env.TELEGRAM_BOT_TOKEN.split(':')[0], // Bot's user ID
+          user_id: process.env.TELEGRAM_BOT_TOKEN.split(":")[0], // Bot's user ID
         }),
       }
     );
@@ -937,25 +937,26 @@ async function isBotAdmin(chatId) {
 
     const data = await response.json();
     const status = data.result?.status;
-    
-    return status === 'administrator' || status === 'creator';
+
+    // Bot is a member if it has any status (member, administrator, creator, etc.)
+    return status && status !== "left" && status !== "kicked";
   } catch (error) {
-    console.error(`❌ Error checking admin status for chat ${chatId}:`, error);
+    console.error(`❌ Error checking membership status for chat ${chatId}:`, error);
     return false;
   }
 }
 
-// Function to get all group chats where bot is admin
-async function getAdminGroups() {
-  const adminGroups = [];
-  
+// Function to get all group chats where bot is a member
+async function getAllGroups() {
+  const allGroups = [];
+
   // First, try to get groups from environment variable (if configured)
   const configuredGroups = process.env.ADMIN_GROUP_IDS;
   if (configuredGroups) {
-    const groupIds = configuredGroups.split(',').map(id => id.trim());
+    const groupIds = configuredGroups.split(",").map((id) => id.trim());
     for (const groupId of groupIds) {
-      if (await isBotAdmin(groupId)) {
-        adminGroups.push(groupId);
+      if (await isBotMember(groupId)) {
+        allGroups.push(groupId);
       }
     }
   }
@@ -980,12 +981,15 @@ async function getAdminGroups() {
       for (const update of data.result || []) {
         if (update.message && update.message.chat) {
           const chat = update.message.chat;
-          if ((chat.type === "group" || chat.type === "supergroup") && !seenGroups.has(chat.id)) {
+          if (
+            (chat.type === "group" || chat.type === "supergroup") &&
+            !seenGroups.has(chat.id)
+          ) {
             seenGroups.add(chat.id);
-            
-            // Check if bot is admin in this group
-            if (await isBotAdmin(chat.id)) {
-              adminGroups.push(chat.id);
+
+            // Check if bot is a member of this group
+            if (await isBotMember(chat.id)) {
+              allGroups.push(chat.id);
             }
           }
         }
@@ -995,19 +999,19 @@ async function getAdminGroups() {
     console.error("❌ Error getting groups from updates:", error);
   }
 
-  return adminGroups;
+  return allGroups;
 }
 
-// Function to send live announcement to all admin groups
+// Function to send live announcement to all groups
 async function sendLiveAnnouncement() {
   const liveMessage = `Sweetflips is now live on Kick
 @https://kick.com/sweetflips`;
 
   try {
-    const adminGroups = await getAdminGroups();
+    const allGroups = await getAllGroups();
 
-    if (adminGroups.length === 0) {
-      console.log("⚠️ No admin groups found to send live announcement");
+    if (allGroups.length === 0) {
+      console.log("⚠️ No groups found to send live announcement");
       return { success: 0, failed: 0, groups: [] };
     }
 
@@ -1015,7 +1019,7 @@ async function sendLiveAnnouncement() {
     let failedCount = 0;
     const results = [];
 
-    for (const groupId of adminGroups) {
+    for (const groupId of allGroups) {
       try {
         await bot.telegram.sendMessage(groupId, liveMessage);
         successCount++;
@@ -1043,32 +1047,32 @@ bot.command("findgroups", async (ctx) => {
     return;
   }
 
-  await ctx.reply("🔍 Finding group chats where bot is admin...");
+  await ctx.reply("🔍 Finding all group chats where bot is a member...");
 
   try {
-    const adminGroups = await getAdminGroups();
-    
-    if (adminGroups.length > 0) {
-      let message = `✅ **Found ${adminGroups.length} admin groups:**\n\n`;
-      adminGroups.forEach((groupId, index) => {
+    const allGroups = await getAllGroups();
+
+    if (allGroups.length > 0) {
+      let message = `✅ **Found ${allGroups.length} groups where bot is a member:**\n\n`;
+      allGroups.forEach((groupId, index) => {
         message += `${index + 1}. Group ID: \`${groupId}\`\n`;
       });
-      
+
       message += `\n💡 **To configure these groups:**\n`;
       message += `Add this to your Railway environment variables:\n`;
-      message += `\`ADMIN_GROUP_IDS=${adminGroups.join(',')}\`\n\n`;
+      message += `\`ADMIN_GROUP_IDS=${allGroups.join(",")}\`\n\n`;
       message += `This will make the /live command more reliable.`;
-      
+
       await ctx.reply(message);
     } else {
       await ctx.reply(
-        `❌ No admin groups found.\n\n` +
-        `**To fix this:**\n` +
-        `1. Make sure the bot is added as admin to group chats\n` +
-        `2. Send some messages in those groups to generate updates\n` +
-        `3. Try this command again\n\n` +
-        `**Alternative:** You can manually set group IDs in Railway environment variables:\n` +
-        `\`ADMIN_GROUP_IDS=group_id_1,group_id_2\``
+        `❌ No groups found.\n\n` +
+          `**To fix this:**\n` +
+          `1. Make sure the bot is added to group chats\n` +
+          `2. Send some messages in those groups to generate updates\n` +
+          `3. Try this command again\n\n` +
+          `**Alternative:** You can manually set group IDs in Railway environment variables:\n` +
+          `\`ADMIN_GROUP_IDS=group_id_1,group_id_2\``
       );
     }
   } catch (error) {
@@ -1085,7 +1089,7 @@ bot.command("live", async (ctx) => {
     return;
   }
 
-  await ctx.reply("📢 Sending live announcement to all admin groups...");
+  await ctx.reply("📢 Sending live announcement to all groups...");
 
   try {
     const result = await sendLiveAnnouncement();
@@ -1108,7 +1112,7 @@ bot.command("live", async (ctx) => {
           `**Try this:**\n` +
           `1. Use /findgroups to discover group IDs\n` +
           `2. Set ADMIN_GROUP_IDS in Railway environment variables\n` +
-          `3. Make sure bot is admin in group chats`
+          `3. Make sure bot is added to group chats`
       );
     }
   } catch (error) {
