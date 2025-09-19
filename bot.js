@@ -57,6 +57,10 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 // Global state for linking users
 global.linkingUsers = new Set();
 
+// Global state for group management
+global.addingGroups = new Set();
+global.knownGroups = new Set();
+
 // Game state
 const gameState = {
   balance: {
@@ -387,7 +391,8 @@ bot.help(async (ctx) => {
       `/add <bonus name> - Add a bonus (counts as +1)\n` +
       `/remove <bonus name> - Remove a bonus (counts as -1)\n\n` +
       `/live - Send live announcement to all groups\n` +
-      `/findgroups - Find all group chats where bot is a member\n\n` +
+      `/findgroups - Find all group chats where bot is a member\n` +
+      `/addgroup - Manually add a group ID for live announcements\n\n` +
       `/setrole <telegram_id> <MOD|OWNER> - Set user role\n` +
       `/listusers - List all users\n\n`;
 
@@ -941,22 +946,32 @@ async function isBotMember(chatId) {
     // Bot is a member if it has any status (member, administrator, creator, etc.)
     return status && status !== "left" && status !== "kicked";
   } catch (error) {
-    console.error(`❌ Error checking membership status for chat ${chatId}:`, error);
+    console.error(
+      `❌ Error checking membership status for chat ${chatId}:`,
+      error
+    );
     return false;
   }
 }
 
 // Function to get all group chats where bot is a member
 async function getAllGroups() {
-  const allGroups = [];
+  const allGroups = new Set();
 
-  // First, try to get groups from environment variable (if configured)
+  // First, add manually added groups from memory
+  for (const groupId of global.knownGroups) {
+    if (await isBotMember(groupId)) {
+      allGroups.add(groupId);
+    }
+  }
+
+  // Then, try to get groups from environment variable (if configured)
   const configuredGroups = process.env.ADMIN_GROUP_IDS;
   if (configuredGroups) {
     const groupIds = configuredGroups.split(",").map((id) => id.trim());
     for (const groupId of groupIds) {
       if (await isBotMember(groupId)) {
-        allGroups.push(groupId);
+        allGroups.add(groupId);
       }
     }
   }
@@ -975,21 +990,15 @@ async function getAllGroups() {
 
     if (response.ok) {
       const data = await response.json();
-      const seenGroups = new Set();
 
       // Process updates to find group chats
       for (const update of data.result || []) {
         if (update.message && update.message.chat) {
           const chat = update.message.chat;
-          if (
-            (chat.type === "group" || chat.type === "supergroup") &&
-            !seenGroups.has(chat.id)
-          ) {
-            seenGroups.add(chat.id);
-
+          if (chat.type === "group" || chat.type === "supergroup") {
             // Check if bot is a member of this group
             if (await isBotMember(chat.id)) {
-              allGroups.push(chat.id);
+              allGroups.add(chat.id);
             }
           }
         }
@@ -999,7 +1008,7 @@ async function getAllGroups() {
     console.error("❌ Error getting groups from updates:", error);
   }
 
-  return allGroups;
+  return Array.from(allGroups);
 }
 
 // Function to send live announcement to all groups
@@ -1039,6 +1048,35 @@ async function sendLiveAnnouncement() {
   }
 }
 
+bot.command("addgroup", async (ctx) => {
+  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+
+  if (!isAdmin(user)) {
+    await ctx.reply(`⛔️ Mods only.`);
+    return;
+  }
+
+  if (global.addingGroups.has(ctx.from.id)) {
+    await ctx.reply(
+      `⏳ You're already in the process of adding a group. Please send the group ID now.`
+    );
+    return;
+  }
+
+  global.addingGroups.add(ctx.from.id);
+  await ctx.reply(
+    `🔗 **Add Group for Live Announcements**\n\n` +
+      `Please send the group ID you want to add.\n\n` +
+      `**How to get a group ID:**\n` +
+      `1. Add @userinfobot to your group\n` +
+      `2. Send any message in the group\n` +
+      `3. The bot will reply with the group ID\n` +
+      `4. Copy the group ID and send it here\n\n` +
+      `**Example:** \`-1001234567890\`\n\n` +
+      `Type \`cancel\` to cancel this operation.`
+  );
+});
+
 bot.command("findgroups", async (ctx) => {
   const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
 
@@ -1066,13 +1104,17 @@ bot.command("findgroups", async (ctx) => {
       await ctx.reply(message);
     } else {
       await ctx.reply(
-        `❌ No groups found.\n\n` +
-          `**To fix this:**\n` +
-          `1. Make sure the bot is added to group chats\n` +
-          `2. Send some messages in those groups to generate updates\n` +
-          `3. Try this command again\n\n` +
-          `**Alternative:** You can manually set group IDs in Railway environment variables:\n` +
-          `\`ADMIN_GROUP_IDS=group_id_1,group_id_2\``
+        `❌ No groups found automatically.\n\n` +
+          `**Try these solutions:**\n\n` +
+          `1. **Manual Group Addition:**\n` +
+          `   Use /addgroup to manually add group IDs\n\n` +
+          `2. **Generate Activity:**\n` +
+          `   - Send messages in groups where bot is added\n` +
+          `   - Try this command again\n\n` +
+          `3. **Environment Variable:**\n` +
+          `   Set \`ADMIN_GROUP_IDS=group_id_1,group_id_2\` in Railway\n\n` +
+          `4. **Get Group ID:**\n` +
+          `   Add @userinfobot to your group to get the group ID`
       );
     }
   } catch (error) {
@@ -1121,8 +1163,9 @@ bot.command("live", async (ctx) => {
   }
 });
 
-// Handle text messages for Kick linking
+// Handle text messages for Kick linking and group management
 bot.on("text", async (ctx) => {
+  // Handle Kick account linking
   if (global.linkingUsers.has(ctx.from.id)) {
     const kickUsername = ctx.message.text.trim();
 
@@ -1173,6 +1216,65 @@ bot.on("text", async (ctx) => {
       console.error("❌ Error linking account:", error);
       await ctx.reply(`❌ Error linking account. Please try again.`);
       global.linkingUsers.delete(ctx.from.id);
+    }
+  }
+  // Handle group ID addition
+  else if (global.addingGroups.has(ctx.from.id)) {
+    const groupId = ctx.message.text.trim();
+
+    if (groupId.toLowerCase() === "cancel") {
+      global.addingGroups.delete(ctx.from.id);
+      await ctx.reply("❌ Group addition cancelled.");
+      return;
+    }
+
+    // Validate group ID format (should start with - and be numeric)
+    if (!groupId.match(/^-\d+$/)) {
+      await ctx.reply(
+        `❌ Invalid group ID format. Group ID should start with - and contain only numbers.\n\n` +
+          `Example: \`-1001234567890\`\n\n` +
+          `Type \`cancel\` to cancel this operation.`
+      );
+      return;
+    }
+
+    try {
+      // Check if bot is a member of this group
+      const isMember = await isBotMember(groupId);
+      
+      if (!isMember) {
+        await ctx.reply(
+          `❌ Bot is not a member of this group or group doesn't exist.\n\n` +
+            `Make sure:\n` +
+            `1. The group ID is correct\n` +
+            `2. The bot is added to the group\n` +
+            `3. The bot hasn't been removed from the group\n\n` +
+            `Type \`cancel\` to cancel this operation.`
+        );
+        return;
+      }
+
+      // Add to known groups
+      global.knownGroups.add(groupId);
+
+      global.addingGroups.delete(ctx.from.id);
+
+      await ctx.reply(
+        `✅ **Group Added Successfully!**\n\n` +
+          `Group ID: \`${groupId}\`\n\n` +
+          `This group will now receive live announcements when you use /live.\n\n` +
+          `**To make this permanent:**\n` +
+          `Add this to your Railway environment variables:\n` +
+          `\`ADMIN_GROUP_IDS=${Array.from(global.knownGroups).join(",")}\``
+      );
+
+      console.log(`✅ Group ${groupId} added by user ${ctx.from.id}`);
+    } catch (error) {
+      console.error("❌ Error adding group:", error);
+      await ctx.reply(
+        `❌ Error adding group. Please try again.\n\n` +
+          `Type \`cancel\` to cancel this operation.`
+      );
     }
   }
 });
