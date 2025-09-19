@@ -503,6 +503,10 @@ bot.command("guess", async (ctx) => {
       timestamp: Date.now(),
     });
 
+    console.log(`✅ Balance guess recorded for user ${ctx.from.id}: ${guess}`);
+    console.log(`📊 Total balance guesses: ${gameState.balance.guesses.size}`);
+    console.log(`📊 Game state balance guesses:`, Array.from(gameState.balance.guesses.entries()));
+
     await ctx.reply(`✅ Balance guess recorded: ${guess}`);
   } else if (gameType === "bonus") {
     if (!gameState.bonus.isOpen) {
@@ -542,6 +546,9 @@ bot.command("balanceboard", async (ctx) => {
     ) {
       leaderboardText = `🏁 **Final Balance: ${gameState.balance.finalBalance.toLocaleString()}**\n\n`;
     }
+
+    console.log(`📊 Balanceboard - Total guesses: ${gameState.balance.guesses.size}`);
+    console.log(`📊 Balanceboard - Game state guesses:`, Array.from(gameState.balance.guesses.entries()));
 
     if (gameState.balance.guesses.size === 0) {
       leaderboardText += `No guesses recorded yet. Use /guess balance <number> to make a guess!`;
@@ -686,6 +693,9 @@ bot.command("balance", async (ctx) => {
       break;
 
     case "show":
+      console.log(`📊 Balance show - Total guesses: ${gameState.balance.guesses.size}`);
+      console.log(`📊 Balance show - Game state guesses:`, Array.from(gameState.balance.guesses.entries()));
+      
       const balanceGuesses = Array.from(gameState.balance.guesses.values());
       if (balanceGuesses.length === 0) {
         await ctx.reply(`📊 No balance guesses recorded yet.`);
@@ -1241,7 +1251,7 @@ bot.on("text", async (ctx) => {
     try {
       // Check if bot is a member of this group
       const isMember = await isBotMember(groupId);
-      
+
       if (!isMember) {
         await ctx.reply(
           `❌ Bot is not a member of this group or group doesn't exist.\n\n` +
