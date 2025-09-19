@@ -919,9 +919,9 @@ async function getAdminGroups() {
     const response = await fetch(
       `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getUpdates`,
       {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       }
     );
@@ -937,7 +937,7 @@ async function getAdminGroups() {
     for (const update of data.result || []) {
       if (update.message && update.message.chat) {
         const chat = update.message.chat;
-        if (chat.type === 'group' || chat.type === 'supergroup') {
+        if (chat.type === "group" || chat.type === "supergroup") {
           adminGroups.add(chat.id);
         }
       }
@@ -957,7 +957,7 @@ async function sendLiveAnnouncement() {
 
   try {
     const adminGroups = await getAdminGroups();
-    
+
     if (adminGroups.length === 0) {
       console.log("⚠️ No admin groups found to send live announcement");
       return { success: 0, failed: 0, groups: [] };
@@ -971,11 +971,11 @@ async function sendLiveAnnouncement() {
       try {
         await bot.telegram.sendMessage(groupId, liveMessage);
         successCount++;
-        results.push({ groupId, status: 'success' });
+        results.push({ groupId, status: "success" });
         console.log(`✅ Live announcement sent to group ${groupId}`);
       } catch (error) {
         failedCount++;
-        results.push({ groupId, status: 'failed', error: error.message });
+        results.push({ groupId, status: "failed", error: error.message });
         console.error(`❌ Failed to send to group ${groupId}:`, error.message);
       }
     }
@@ -999,22 +999,22 @@ bot.command("live", async (ctx) => {
 
   try {
     const result = await sendLiveAnnouncement();
-    
+
     if (result.success > 0) {
       await ctx.reply(
         `✅ Live announcement sent successfully!\n\n` +
-        `📊 **Results:**\n` +
-        `✅ Success: ${result.success} groups\n` +
-        `❌ Failed: ${result.failed} groups\n\n` +
-        `🎉 Sweetflips is now live on Kick!`
+          `📊 **Results:**\n` +
+          `✅ Success: ${result.success} groups\n` +
+          `❌ Failed: ${result.failed} groups\n\n` +
+          `🎉 Sweetflips is now live on Kick!`
       );
     } else {
       await ctx.reply(
         `❌ Failed to send live announcement.\n\n` +
-        `📊 **Results:**\n` +
-        `✅ Success: ${result.success} groups\n` +
-        `❌ Failed: ${result.failed} groups\n\n` +
-        `⚠️ No groups were reached. Make sure the bot is admin in group chats.`
+          `📊 **Results:**\n` +
+          `✅ Success: ${result.success} groups\n` +
+          `❌ Failed: ${result.failed} groups\n\n` +
+          `⚠️ No groups were reached. Make sure the bot is admin in group chats.`
       );
     }
   } catch (error) {
