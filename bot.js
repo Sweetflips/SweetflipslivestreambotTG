@@ -198,7 +198,6 @@ let SPREADSHEET_ID = null;
 try {
   // Try environment variable first
   if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-    console.log("🔑 Found GOOGLE_SERVICE_ACCOUNT_KEY environment variable");
     try {
       const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
       const auth = new google.auth.GoogleAuth({
@@ -207,25 +206,36 @@ try {
       });
       sheets = google.sheets({ version: "v4", auth });
       SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
-      console.log("✅ Google Sheets integration enabled (environment variable)");
-      console.log(`📊 Spreadsheet ID: ${SPREADSHEET_ID}`);
+      console.log(
+        "✅ Google Sheets integration enabled (environment variable)"
+      );
     } catch (envError) {
-      console.error("❌ Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY:", envError.message);
-      console.log("⚠️ Bot will run without Google Sheets integration");
-      sheets = null;
-      SPREADSHEET_ID = null;
+      console.log("⚠️ Environment variable failed, trying file-based auth...");
+      throw envError; // This will trigger the file-based fallback
     }
   } else {
-    console.log("⚠️ No GOOGLE_SERVICE_ACCOUNT_KEY environment variable found");
+    throw new Error("No environment variable set");
+  }
+} catch (error) {
+  // Fallback to file-based authentication
+  try {
+    const auth = new google.auth.GoogleAuth({
+      keyFile: path.join(
+        __dirname,
+        "credentials",
+        "sweetflips-7086906ae249.json"
+      ),
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+    sheets = google.sheets({ version: "v4", auth });
+    SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
+    console.log("✅ Google Sheets integration enabled (file-based)");
+  } catch (fileError) {
+    console.error("❌ Google Sheets setup failed:", fileError.message);
     console.log("⚠️ Bot will run without Google Sheets integration");
     sheets = null;
     SPREADSHEET_ID = null;
   }
-} catch (error) {
-  console.error("❌ Google Sheets setup failed:", error.message);
-  console.log("⚠️ Bot will run without Google Sheets integration");
-  sheets = null;
-  SPREADSHEET_ID = null;
 }
 
 // Helper functions
@@ -376,6 +386,7 @@ bot.help(async (ctx) => {
       `/bonus show - Show current bonus standings\n\n` +
       `/add <bonus name> - Add a bonus (counts as +1)\n` +
       `/remove <bonus name> - Remove a bonus (counts as -1)\n\n` +
+      `/live - Send live announcement to all admin groups\n\n` +
       `/setrole <telegram_id> <MOD|OWNER> - Set user role\n` +
       `/listusers - List all users\n\n`;
 
@@ -899,6 +910,116 @@ bot.command("listusers", async (ctx) => {
     await ctx.reply(userList);
   } catch (error) {
     await ctx.reply(`❌ Error listing users.`);
+  }
+});
+
+// Function to get all group chats where bot is admin
+async function getAdminGroups() {
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getUpdates`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const adminGroups = new Set();
+
+    // Process updates to find group chats where bot is admin
+    for (const update of data.result || []) {
+      if (update.message && update.message.chat) {
+        const chat = update.message.chat;
+        if (chat.type === 'group' || chat.type === 'supergroup') {
+          adminGroups.add(chat.id);
+        }
+      }
+    }
+
+    return Array.from(adminGroups);
+  } catch (error) {
+    console.error("❌ Error getting admin groups:", error);
+    return [];
+  }
+}
+
+// Function to send live announcement to all admin groups
+async function sendLiveAnnouncement() {
+  const liveMessage = `Sweetflips is now live on Kick
+@https://kick.com/sweetflips`;
+
+  try {
+    const adminGroups = await getAdminGroups();
+    
+    if (adminGroups.length === 0) {
+      console.log("⚠️ No admin groups found to send live announcement");
+      return { success: 0, failed: 0, groups: [] };
+    }
+
+    let successCount = 0;
+    let failedCount = 0;
+    const results = [];
+
+    for (const groupId of adminGroups) {
+      try {
+        await bot.telegram.sendMessage(groupId, liveMessage);
+        successCount++;
+        results.push({ groupId, status: 'success' });
+        console.log(`✅ Live announcement sent to group ${groupId}`);
+      } catch (error) {
+        failedCount++;
+        results.push({ groupId, status: 'failed', error: error.message });
+        console.error(`❌ Failed to send to group ${groupId}:`, error.message);
+      }
+    }
+
+    return { success: successCount, failed: failedCount, groups: results };
+  } catch (error) {
+    console.error("❌ Error sending live announcement:", error);
+    return { success: 0, failed: 0, groups: [], error: error.message };
+  }
+}
+
+bot.command("live", async (ctx) => {
+  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+
+  if (!isAdmin(user)) {
+    await ctx.reply(`⛔️ Mods only.`);
+    return;
+  }
+
+  await ctx.reply("📢 Sending live announcement to all admin groups...");
+
+  try {
+    const result = await sendLiveAnnouncement();
+    
+    if (result.success > 0) {
+      await ctx.reply(
+        `✅ Live announcement sent successfully!\n\n` +
+        `📊 **Results:**\n` +
+        `✅ Success: ${result.success} groups\n` +
+        `❌ Failed: ${result.failed} groups\n\n` +
+        `🎉 Sweetflips is now live on Kick!`
+      );
+    } else {
+      await ctx.reply(
+        `❌ Failed to send live announcement.\n\n` +
+        `📊 **Results:**\n` +
+        `✅ Success: ${result.success} groups\n` +
+        `❌ Failed: ${result.failed} groups\n\n` +
+        `⚠️ No groups were reached. Make sure the bot is admin in group chats.`
+      );
+    }
+  } catch (error) {
+    console.error("❌ Error in live command:", error);
+    await ctx.reply("❌ Error sending live announcement. Please try again.");
   }
 });
 
