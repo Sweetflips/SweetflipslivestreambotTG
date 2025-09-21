@@ -151,7 +151,12 @@ async function updateGroupInfo(groupId, groupInfo) {
 }
 
 // Schedule management functions
-async function addScheduleEntry(dayOfWeek, streamNumber, eventTitle, createdBy) {
+async function addScheduleEntry(
+  dayOfWeek,
+  streamNumber,
+  eventTitle,
+  createdBy
+) {
   if (!prisma) {
     console.log("⚠️ Database not available, skipping schedule add");
     return false;
@@ -180,7 +185,9 @@ async function addScheduleEntry(dayOfWeek, streamNumber, eventTitle, createdBy) 
       },
     });
 
-    console.log(`✅ Schedule entry added: Day ${dayOfWeek}, Stream ${streamNumber}, Title: ${eventTitle}`);
+    console.log(
+      `✅ Schedule entry added: Day ${dayOfWeek}, Stream ${streamNumber}, Title: ${eventTitle}`
+    );
     return true;
   } catch (error) {
     console.error(`❌ Error adding schedule entry:`, error.message);
@@ -208,7 +215,9 @@ async function removeScheduleEntry(dayOfWeek, streamNumber) {
       },
     });
 
-    console.log(`🗑️ Schedule entry removed: Day ${dayOfWeek}, Stream ${streamNumber}`);
+    console.log(
+      `🗑️ Schedule entry removed: Day ${dayOfWeek}, Stream ${streamNumber}`
+    );
     return true;
   } catch (error) {
     console.error(`❌ Error removing schedule entry:`, error.message);
@@ -225,10 +234,7 @@ async function getScheduleForWeek() {
   try {
     const schedules = await prisma.schedule.findMany({
       where: { isActive: true },
-      orderBy: [
-        { dayOfWeek: "asc" },
-        { streamNumber: "asc" },
-      ],
+      orderBy: [{ dayOfWeek: "asc" }, { streamNumber: "asc" }],
     });
 
     console.log(`📅 Loaded ${schedules.length} schedule entries from database`);
@@ -241,7 +247,15 @@ async function getScheduleForWeek() {
 
 // Helper function to get day name from day of week number
 function getDayName(dayOfWeek) {
-  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
   return days[dayOfWeek] || "Unknown";
 }
 
@@ -249,13 +263,13 @@ function getDayName(dayOfWeek) {
 function getStreamTimes(streamNumber) {
   const stream1UTC = "09:00"; // 9 AM UTC
   const stream2UTC = "17:00"; // 5 PM UTC
-  
+
   const utcTime = streamNumber === 1 ? stream1UTC : stream2UTC;
-  
+
   // Convert to different timezones
   const istTime = streamNumber === 1 ? "14:30" : "22:30"; // +5:30 from UTC
   const pstTime = streamNumber === 1 ? "01:00" : "09:00"; // -8 from UTC (PST)
-  
+
   return {
     utc: utcTime,
     ist: istTime,
@@ -481,7 +495,12 @@ async function getUserOrCreate(telegramId, telegramUser) {
     };
 
     // Sync to Google Sheets even with mock user
-    await syncToGoogleSheets(mockUser);
+    try {
+      await syncToGoogleSheets(mockUser);
+    } catch (error) {
+      console.error("❌ Error syncing mock user to Google Sheets:", error);
+      // Continue with mock user even if Google Sheets fails
+    }
 
     return mockUser;
   }
@@ -515,17 +534,35 @@ async function getUserOrCreate(telegramId, telegramUser) {
       );
     }
 
+    // Sync to Google Sheets
+    try {
+      await syncToGoogleSheets(user);
+    } catch (error) {
+      console.error("❌ Error syncing user to Google Sheets:", error);
+      // Continue with user even if Google Sheets fails
+    }
+
     return user;
   } catch (error) {
     console.error("❌ Database error in getUserOrCreate:", error);
     // Return mock user if database fails
-    return {
+    const mockUser = {
       id: telegramId.toString(),
       telegramId: telegramId.toString(),
       telegramUser: telegramUser,
       role: "VIEWER",
       kickName: null,
     };
+    
+    // Try to sync mock user to Google Sheets
+    try {
+      await syncToGoogleSheets(mockUser);
+    } catch (error) {
+      console.error("❌ Error syncing mock user to Google Sheets:", error);
+      // Continue with mock user even if Google Sheets fails
+    }
+    
+    return mockUser;
   }
 }
 
@@ -566,205 +603,235 @@ function isAdmin(user) {
 
 // Bot commands
 bot.start(async (ctx) => {
-  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+  try {
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
 
-  await ctx.reply(
-    `🎉 Welcome to SweetflipsStreamBot!\n\n` +
-      `You are: ${user.telegramUser || "Unknown"} (${user.telegramId})\n` +
-      `Role: ${user.role}\n\n` +
-      `🎮 **Gaming Commands:**\n` +
-      `/guess balance <number> - Guess the end balance\n` +
-      `/guess bonus <number> - Guess the bonus total\n` +
-      `/balanceboard - View balance leaderboard\n` +
-      `/bonusboard - View bonus leaderboard\n\n` +
-      `🔗 **Account Commands:**\n` +
-      `/kick - Link your Kick account\n` +
-      `/help - Show all commands\n\n` +
-      `Ready to play? Link your Kick account first with /kick!`
-  );
+    await ctx.reply(
+      `🎉 Welcome to SweetflipsStreamBot!\n\n` +
+        `You are: ${user.telegramUser || "Unknown"} (${user.telegramId})\n` +
+        `Role: ${user.role}\n\n` +
+        `🎮 <b>Gaming Commands:</b>\n` +
+        `/guess balance <number> - Guess the end balance\n` +
+        `/guess bonus <number> - Guess the bonus total\n` +
+        `/balanceboard - View balance leaderboard\n` +
+        `/bonusboard - View bonus leaderboard\n\n` +
+        `🔗 <b>Account Commands:</b>\n` +
+        `/kick - Link your Kick account\n` +
+        `/help - Show all commands\n\n` +
+        `Ready to play? Link your Kick account first with /kick!`,
+      { parse_mode: "HTML" }
+    );
+  } catch (error) {
+    console.error("❌ Error in start command:", error);
+    await ctx.reply(`❌ An error occurred. Please try again.`);
+  }
 });
 
 bot.help(async (ctx) => {
-  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+  try {
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
 
-  if (isAdmin(user)) {
-    // Admin/Mod help - shows all commands
-    let helpText =
-      `🤖 **SweetflipsStreamBot Commands**\n\n` +
-      `🎮 **Gaming Commands:**\n` +
-      `/guess balance <number> - Guess the end balance (requires linked Kick account)\n` +
-      `/guess bonus <number> - Guess the bonus total (requires linked Kick account)\n` +
-      `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
-      `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
-      `📅 **Schedule Commands:**\n` +
-      `/schedule - View stream schedule for next 7 days\n\n` +
-      `🔗 **Account Commands:**\n` +
-      `/start - Welcome message and setup\n` +
-      `/help - Show this help\n` +
-      `/kick - Link your Kick account (one-time setup)\n\n` +
-      `⚙️ **Admin Commands:**\n` +
-      `/balance open - Open balance guessing\n` +
-      `/balance close - Close balance guessing\n` +
-      `/balance finalize - Finalize balance game with live balance\n` +
-      `/balance reset - Reset balance game\n` +
-      `/balance show - Show current balance standings\n\n` +
-      `/bonus open - Open bonus guessing\n` +
-      `/bonus close - Close bonus guessing\n` +
-      `/bonus finalize - Finalize bonus game with active bonus\n` +
-      `/bonus reset - Reset bonus game\n` +
-      `/bonus show - Show current bonus standings\n\n` +
-      `/add <bonus name> - Add a bonus (counts as +1)\n` +
-      `/remove <bonus name> - Remove a bonus (counts as -1)\n\n` +
-      `/live - Send live announcement to all groups\n` +
-      `/findgroups - Find all group chats where bot is a member\n` +
-      `/groupstats - Show detailed group management statistics\n` +
-      `/testgroups - Test group detection functionality\n` +
-      `/addgroup - Manually add a group ID for live announcements\n\n` +
-      `/schedule add <day> <stream> <title> - Add schedule entry\n` +
-      `/schedule remove <day> <stream> - Remove schedule entry\n\n` +
-      `/setrole <telegram_id> <MOD|OWNER> - Set user role\n` +
-      `/listusers - List all users\n\n`;
+    if (isAdmin(user)) {
+      // Admin/Mod help - shows all commands
+      let helpText =
+        `🤖 <b>SweetflipsStreamBot Commands</b>\n\n` +
+        `🎮 <b>Gaming Commands:</b>\n` +
+        `/guess balance <number> - Guess the end balance (requires linked Kick account)\n` +
+        `/guess bonus <number> - Guess the bonus total (requires linked Kick account)\n` +
+        `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
+        `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
+        `📅 <b>Schedule Commands:</b>\n` +
+        `/schedule - View stream schedule for next 7 days\n\n` +
+        `🔗 <b>Account Commands:</b>\n` +
+        `/start - Welcome message and setup\n` +
+        `/help - Show this help\n` +
+        `/kick - Link your Kick account (one-time setup)\n\n` +
+        `⚙️ <b>Admin Commands:</b>\n` +
+        `/balance open - Open balance guessing\n` +
+        `/balance close - Close balance guessing\n` +
+        `/balance finalize - Finalize balance game with live balance\n` +
+        `/balance reset - Reset balance game\n` +
+        `/balance show - Show current balance standings\n\n` +
+        `/bonus open - Open bonus guessing\n` +
+        `/bonus close - Close bonus guessing\n` +
+        `/bonus finalize - Finalize bonus game with active bonus\n` +
+        `/bonus reset - Reset bonus game\n` +
+        `/bonus show - Show current bonus standings\n\n` +
+        `/add <bonus name> - Add a bonus (counts as +1)\n` +
+        `/remove <bonus name> - Remove a bonus (counts as -1)\n\n` +
+        `/live - Send live announcement to all groups\n` +
+        `/findgroups - Find all group chats where bot is a member\n` +
+        `/groupstats - Show detailed group management statistics\n` +
+        `/testgroups - Test group detection functionality\n` +
+        `/addgroup - Manually add a group ID for live announcements\n\n` +
+        `/schedule add <day> <stream> <title> - Add schedule entry\n` +
+        `/schedule remove <day> <stream> - Remove schedule entry\n\n` +
+        `/setrole <telegram_id> <MOD|OWNER> - Set user role\n` +
+        `/listusers - List all users\n\n`;
 
-    await ctx.reply(helpText);
-  } else {
-    // Viewer help - shows only gaming and account commands
-    let helpText =
-      `🤖 **SweetflipsStreamBot Commands**\n\n` +
-      `🎮 **Gaming Commands:**\n` +
-      `/guess balance <number> - Guess the end balance (requires linked Kick account)\n` +
-      `/guess bonus <number> - Guess the bonus total (requires linked Kick account)\n` +
-      `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
-      `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
-      `📅 **Schedule Commands:**\n` +
-      `/schedule - View stream schedule for next 7 days\n\n` +
-      `🔗 **Account Commands:**\n` +
-      `/start - Welcome message and setup\n` +
-      `/help - Show this help\n` +
-      `/kick - Link your Kick account (one-time setup)\n\n`;
+      await ctx.reply(helpText, { parse_mode: "HTML" });
+    } else {
+      // Viewer help - shows only gaming and account commands
+      let helpText =
+        `🤖 <b>SweetflipsStreamBot Commands</b>\n\n` +
+        `🎮 <b>Gaming Commands:</b>\n` +
+        `/guess balance <number> - Guess the end balance (requires linked Kick account)\n` +
+        `/guess bonus <number> - Guess the bonus total (requires linked Kick account)\n` +
+        `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
+        `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
+        `📅 <b>Schedule Commands:</b>\n` +
+        `/schedule - View stream schedule for next 7 days\n\n` +
+        `🔗 <b>Account Commands:</b>\n` +
+        `/start - Welcome message and setup\n` +
+        `/help - Show this help\n` +
+        `/kick - Link your Kick account (one-time setup)\n\n`;
 
-    await ctx.reply(helpText);
+      await ctx.reply(helpText, { parse_mode: "HTML" });
+    }
+  } catch (error) {
+    console.error("❌ Error in help command:", error);
+    await ctx.reply(`❌ An error occurred. Please try again.`);
   }
 });
 
 bot.command("kick", async (ctx) => {
-  // Check if command is used in a group chat
-  if (ctx.chat.type !== "private") {
+  try {
+    // Check if command is used in a group chat
+    if (ctx.chat.type !== "private") {
+      await ctx.reply(
+        `❌ This command can only be used in personal messages. [BOT.JS v2.0]`
+      );
+      return;
+    }
+
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+
+    if (user.kickName) {
+      await ctx.reply(
+        `✅ You already linked a Kick account: @${user.kickName}`
+      );
+      return;
+    }
+
+    if (global.linkingUsers.has(ctx.from.id)) {
+      await ctx.reply(
+        `⏳ You're already in the linking process. Please send your Kick username now.`
+      );
+      return;
+    }
+
+    global.linkingUsers.add(ctx.from.id);
     await ctx.reply(
-      `❌ This command can only be used in personal messages. [BOT.JS v2.0]`
+      `🔗 <b>Kick Account Linking</b>\n\n` +
+        `Please send your Kick username (without @).\n` +
+        `Example: sweetflips\n\n` +
+        `This will link your Telegram account to your Kick account for gaming features.`,
+      { parse_mode: "HTML" }
     );
-    return;
+  } catch (error) {
+    console.error("❌ Error in kick command:", error);
+    await ctx.reply(`❌ An error occurred. Please try again.`);
   }
-
-  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
-
-  if (user.kickName) {
-    await ctx.reply(`✅ You already linked a Kick account: @${user.kickName}`);
-    return;
-  }
-
-  if (global.linkingUsers.has(ctx.from.id)) {
-    await ctx.reply(
-      `⏳ You're already in the linking process. Please send your Kick username now.`
-    );
-    return;
-  }
-
-  global.linkingUsers.add(ctx.from.id);
-  await ctx.reply(
-    `🔗 **Kick Account Linking**\n\n` +
-      `Please send your Kick username (without @).\n` +
-      `Example: sweetflips\n\n` +
-      `This will link your Telegram account to your Kick account for gaming features.`
-  );
 });
 
 bot.command("guess", async (ctx) => {
-  // Check if command is used in a group chat
-  if (ctx.chat.type !== "private") {
-    await ctx.reply(`❌ This command can only be used in personal messages.`);
-    return;
-  }
+  try {
+    // Check if command is used in a group chat
+    if (ctx.chat.type !== "private") {
+      await ctx.reply(`❌ This command can only be used in personal messages.`);
+      return;
+    }
 
-  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
 
-  if (!user.kickName) {
-    await ctx.reply(
-      `❌ You need to link your Kick account first!\n\n` +
-        `Use /kick to link your account.`
-    );
-    return;
-  }
-
-  const args = ctx.message.text.split(" ").slice(1);
-  if (args.length < 2) {
-    await ctx.reply(
-      `❌ Usage: /guess <balance|bonus> <number>\n\n` +
-        `Examples:\n` +
-        `/guess balance 15000\n` +
-        `/guess bonus 500`
-    );
-    return;
-  }
-
-  const gameType = args[0].toLowerCase();
-  const guess = parseFloat(args[1]);
-
-  if (isNaN(guess) || guess <= 0) {
-    await ctx.reply(`❌ Please enter a valid positive number.`);
-    return;
-  }
-
-  if (gameType === "balance") {
-    if (!gameState.balance.isOpen) {
+    if (!user.kickName) {
       await ctx.reply(
-        `❌ Balance guessing is not open. Wait for an admin to open it.`
+        `❌ You need to link your Kick account first!\n\n` +
+          `Use /kick to link your account.`
       );
       return;
     }
 
-    if (gameState.balance.isFinalized) {
-      await ctx.reply(`❌ Balance game is finalized. Wait for the next round.`);
-      return;
-    }
-
-    gameState.balance.guesses.set(ctx.from.id, {
-      user: user.telegramUser,
-      kickName: user.kickName,
-      guess: guess,
-      timestamp: Date.now(),
-    });
-
-    console.log(`✅ Balance guess recorded for user ${ctx.from.id}: ${guess}`);
-    console.log(`📊 Total balance guesses: ${gameState.balance.guesses.size}`);
-    console.log(
-      `📊 Game state balance guesses:`,
-      Array.from(gameState.balance.guesses.entries())
-    );
-
-    await ctx.reply(`✅ Balance guess recorded: ${guess}`);
-  } else if (gameType === "bonus") {
-    if (!gameState.bonus.isOpen) {
+    const args = ctx.message.text.split(" ").slice(1);
+    if (args.length < 2) {
       await ctx.reply(
-        `❌ Bonus guessing is not open. Wait for an admin to open it.`
+        `❌ Usage: /guess <balance|bonus> <number>\n\n` +
+          `Examples:\n` +
+          `/guess balance 15000\n` +
+          `/guess bonus 500`
       );
       return;
     }
 
-    if (gameState.bonus.isFinalized) {
-      await ctx.reply(`❌ Bonus game is finalized. Wait for the next round.`);
+    const gameType = args[0].toLowerCase();
+    const guess = parseFloat(args[1]);
+
+    if (isNaN(guess) || guess <= 0) {
+      await ctx.reply(`❌ Please enter a valid positive number.`);
       return;
     }
 
-    gameState.bonus.guesses.set(ctx.from.id, {
-      user: user.telegramUser,
-      kickName: user.kickName,
-      guess: guess,
-      timestamp: Date.now(),
-    });
+    if (gameType === "balance") {
+      if (!gameState.balance.isOpen) {
+        await ctx.reply(
+          `❌ Balance guessing is not open. Wait for an admin to open it.`
+        );
+        return;
+      }
 
-    await ctx.reply(`✅ Bonus guess recorded: ${guess}`);
-  } else {
-    await ctx.reply(`❌ Invalid game type. Use 'balance' or 'bonus'.`);
+      if (gameState.balance.isFinalized) {
+        await ctx.reply(
+          `❌ Balance game is finalized. Wait for the next round.`
+        );
+        return;
+      }
+
+      gameState.balance.guesses.set(ctx.from.id, {
+        user: user.telegramUser,
+        kickName: user.kickName,
+        guess: guess,
+        timestamp: Date.now(),
+      });
+
+      console.log(
+        `✅ Balance guess recorded for user ${ctx.from.id}: ${guess}`
+      );
+      console.log(
+        `📊 Total balance guesses: ${gameState.balance.guesses.size}`
+      );
+      console.log(
+        `📊 Game state balance guesses:`,
+        Array.from(gameState.balance.guesses.entries())
+      );
+
+      await ctx.reply(`✅ Balance guess recorded: ${guess}`);
+    } else if (gameType === "bonus") {
+      if (!gameState.bonus.isOpen) {
+        await ctx.reply(
+          `❌ Bonus guessing is not open. Wait for an admin to open it.`
+        );
+        return;
+      }
+
+      if (gameState.bonus.isFinalized) {
+        await ctx.reply(`❌ Bonus game is finalized. Wait for the next round.`);
+        return;
+      }
+
+      gameState.bonus.guesses.set(ctx.from.id, {
+        user: user.telegramUser,
+        kickName: user.kickName,
+        guess: guess,
+        timestamp: Date.now(),
+      });
+
+      await ctx.reply(`✅ Bonus guess recorded: ${guess}`);
+    } else {
+      await ctx.reply(`❌ Invalid game type. Use 'balance' or 'bonus'.`);
+    }
+  } catch (error) {
+    console.error("❌ Error in guess command:", error);
+    await ctx.reply(`❌ An error occurred. Please try again.`);
   }
 });
 
@@ -772,13 +839,27 @@ bot.command("balanceboard", async (ctx) => {
   try {
     const liveBalance = await liveBalanceService.fetchCurrentBalance();
 
-    let leaderboardText = `💰 **Live Balance: ${liveBalance.toLocaleString()}**\n\n`;
+    if (liveBalance === null) {
+      await ctx.reply(
+        `💰 <b>Balance Leaderboard</b>\n\n` +
+          `Unable to fetch live balance at the moment.\n\n` +
+          `This could be due to:\n` +
+          `• Network connectivity issues\n` +
+          `• API service temporarily unavailable\n` +
+          `• Missing or invalid API credentials\n\n` +
+          `Please try again later or contact an admin.`,
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
+
+    let leaderboardText = `💰 <b>Live Balance: ${liveBalance.toLocaleString()}</b>\n\n`;
 
     if (
       gameState.balance.isFinalized &&
       gameState.balance.finalBalance !== null
     ) {
-      leaderboardText = `🏁 **Final Balance: ${gameState.balance.finalBalance.toLocaleString()}**\n\n`;
+      leaderboardText = `🏁 <b>Final Balance: ${gameState.balance.finalBalance.toLocaleString()}</b>\n\n`;
     }
 
     console.log(
@@ -804,7 +885,7 @@ bot.command("balanceboard", async (ctx) => {
         return diffA - diffB;
       });
 
-      leaderboardText += `**Top 5 Closest Guessers:**\n`;
+      leaderboardText += `<b>Top 5 Closest Guessers:</b>\n`;
       guesses.slice(0, 5).forEach((guess, index) => {
         const diff = Math.abs(guess.guess - targetBalance);
         const emoji =
@@ -821,7 +902,7 @@ bot.command("balanceboard", async (ctx) => {
       });
     }
 
-    await ctx.reply(leaderboardText);
+    await ctx.reply(leaderboardText, { parse_mode: "HTML" });
   } catch (error) {
     console.error("❌ Error showing balance leaderboard:", error);
     await ctx.reply(
@@ -831,53 +912,60 @@ bot.command("balanceboard", async (ctx) => {
 });
 
 bot.command("bonusboard", async (ctx) => {
-  let leaderboardText = `🎁 **Active Bonuses: ${gameState.bonus.bonusAmount}**\n\n`;
+  try {
+    let leaderboardText = `🎁 <b>Active Bonuses: ${gameState.bonus.bonusAmount}</b>\n\n`;
 
-  if (gameState.bonus.bonusList.length > 0) {
-    leaderboardText += `**Bonus List:**\n`;
-    gameState.bonus.bonusList.forEach((bonus, index) => {
-      leaderboardText += `${index + 1}. ${bonus}\n`;
-    });
-    leaderboardText += `\n`;
+    if (gameState.bonus.bonusList.length > 0) {
+      leaderboardText += `<b>Bonus List:</b>\n`;
+      gameState.bonus.bonusList.forEach((bonus, index) => {
+        leaderboardText += `${index + 1}. ${bonus}\n`;
+      });
+      leaderboardText += `\n`;
+    }
+
+    if (gameState.bonus.isFinalized && gameState.bonus.finalBonus !== null) {
+      leaderboardText = `🏆 <b>Final Bonus Total: ${gameState.bonus.finalBonus}</b>\n\n`;
+    }
+
+    if (gameState.bonus.guesses.size === 0) {
+      leaderboardText += `No guesses recorded yet. Use /guess bonus <number> to make a guess!`;
+    } else {
+      const guesses = Array.from(gameState.bonus.guesses.values());
+      const targetBonus = gameState.bonus.isFinalized
+        ? gameState.bonus.finalBonus
+        : gameState.bonus.bonusAmount;
+
+      guesses.sort((a, b) => {
+        const diffA = Math.abs(a.guess - targetBonus);
+        const diffB = Math.abs(b.guess - targetBonus);
+        if (diffA === diffB) return a.timestamp - b.timestamp;
+        return diffA - diffB;
+      });
+
+      leaderboardText += `<b>Top 5 Closest Guessers:</b>\n`;
+      guesses.slice(0, 5).forEach((guess, index) => {
+        const diff = Math.abs(guess.guess - targetBonus);
+        const emoji =
+          index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅";
+
+        let prizeText = "";
+        if (index === 0) prizeText = " - $12.50";
+        else if (index === 1) prizeText = " - $7.50";
+        else if (index === 2) prizeText = " - $5.00";
+
+        leaderboardText += `${emoji} ${index + 1}. @${
+          guess.kickName
+        } - ${guess.guess.toLocaleString()} (Δ ${diff.toLocaleString()})${prizeText}\n`;
+      });
+    }
+
+    await ctx.reply(leaderboardText, { parse_mode: "HTML" });
+  } catch (error) {
+    console.error("❌ Error showing bonus leaderboard:", error);
+    await ctx.reply(
+      `❌ Error loading bonus leaderboard. Please try again later.`
+    );
   }
-
-  if (gameState.bonus.isFinalized && gameState.bonus.finalBonus !== null) {
-    leaderboardText = `🏆 **Final Bonus Total: ${gameState.bonus.finalBonus}**\n\n`;
-  }
-
-  if (gameState.bonus.guesses.size === 0) {
-    leaderboardText += `No guesses recorded yet. Use /guess bonus <number> to make a guess!`;
-  } else {
-    const guesses = Array.from(gameState.bonus.guesses.values());
-    const targetBonus = gameState.bonus.isFinalized
-      ? gameState.bonus.finalBonus
-      : gameState.bonus.bonusAmount;
-
-    guesses.sort((a, b) => {
-      const diffA = Math.abs(a.guess - targetBonus);
-      const diffB = Math.abs(b.guess - targetBonus);
-      if (diffA === diffB) return a.timestamp - b.timestamp;
-      return diffA - diffB;
-    });
-
-    leaderboardText += `**Top 5 Closest Guessers:**\n`;
-    guesses.slice(0, 5).forEach((guess, index) => {
-      const diff = Math.abs(guess.guess - targetBonus);
-      const emoji =
-        index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅";
-
-      let prizeText = "";
-      if (index === 0) prizeText = " - $12.50";
-      else if (index === 1) prizeText = " - $7.50";
-      else if (index === 2) prizeText = " - $5.00";
-
-      leaderboardText += `${emoji} ${index + 1}. @${
-        guess.kickName
-      } - ${guess.guess.toLocaleString()} (Δ ${diff.toLocaleString()})${prizeText}\n`;
-    });
-  }
-
-  await ctx.reply(leaderboardText);
 });
 
 // Admin commands
@@ -944,13 +1032,13 @@ bot.command("balance", async (ctx) => {
       if (balanceGuesses.length === 0) {
         await ctx.reply(`📊 No balance guesses recorded yet.`);
       } else {
-        let showText = `📊 **Balance Guesses (${balanceGuesses.length}):**\n\n`;
+        let showText = `📊 <b>Balance Guesses (${balanceGuesses.length}):</b>\n\n`;
         balanceGuesses.forEach((guess, index) => {
           showText += `${index + 1}. @${
             guess.kickName
           } - ${guess.guess.toLocaleString()}\n`;
         });
-        await ctx.reply(showText);
+        await ctx.reply(showText, { parse_mode: "HTML" });
       }
       break;
 
@@ -1013,13 +1101,13 @@ bot.command("bonus", async (ctx) => {
       if (bonusGuesses.length === 0) {
         await ctx.reply(`📊 No bonus guesses recorded yet.`);
       } else {
-        let showText = `📊 **Bonus Guesses (${bonusGuesses.length}):**\n\n`;
+        let showText = `📊 <b>Bonus Guesses (${bonusGuesses.length}):</b>\n\n`;
         bonusGuesses.forEach((guess, index) => {
           showText += `${index + 1}. @${
             guess.kickName
           } - ${guess.guess.toLocaleString()}\n`;
         });
-        await ctx.reply(showText);
+        await ctx.reply(showText, { parse_mode: "HTML" });
       }
       break;
 
@@ -1159,7 +1247,7 @@ bot.command("listusers", async (ctx) => {
       orderBy: { createdAt: "desc" },
     });
 
-    let userList = `👥 **All Users (${users.length}):**\n\n`;
+    let userList = `👥 <b>All Users (${users.length}):</b>\n\n`;
     users.forEach((u, index) => {
       const kickStatus = u.kickName ? `✅ @${u.kickName}` : "❌ Not linked";
       userList += `${index + 1}. ${u.telegramUser || "Unknown"} (${
@@ -1167,7 +1255,7 @@ bot.command("listusers", async (ctx) => {
       }) - ${u.role} - ${kickStatus}\n`;
     });
 
-    await ctx.reply(userList);
+    await ctx.reply(userList, { parse_mode: "HTML" });
   } catch (error) {
     await ctx.reply(`❌ Error listing users.`);
   }
@@ -1176,6 +1264,10 @@ bot.command("listusers", async (ctx) => {
 // Function to check if bot is a member of a specific chat
 async function isBotMember(chatId) {
   try {
+    // Get bot's actual user ID
+    const botInfo = await bot.telegram.getMe();
+    const botUserId = botInfo.id;
+    
     const response = await fetch(
       `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getChatMember`,
       {
@@ -1185,7 +1277,7 @@ async function isBotMember(chatId) {
         },
         body: JSON.stringify({
           chat_id: chatId,
-          user_id: process.env.TELEGRAM_BOT_TOKEN.split(":")[0], // Bot's user ID
+          user_id: botUserId, // Bot's actual user ID
         }),
       }
     );
@@ -1579,23 +1671,23 @@ async function sendLiveAnnouncement() {
     timeZoneName: "short",
   });
 
-  const liveMessage = `🔴 **SWEETFLIPS IS LIVE!** 🔴
+  const liveMessage = `🔴 <b>SWEETFLIPS IS LIVE!</b> 🔴
 
-🎮 **Join the stream now:**
+🎮 <b>Join the stream now:</b>
 👉 https://kick.com/sweetflips
 
-⏰ **Started:**
+⏰ <b>Started:</b>
 🌍 UTC: ${utcTime}
 🇮🇳 IST: ${istTime}
 🇺🇸 PST: ${pstTime}
 
-💬 **Get involved:**
+💬 <b>Get involved:</b>
 • Link your Kick account with /kick
 • Participate in live games
 • Chat with the community
 • Win rewards!
 
-🚀 **Don't miss out - join now!**
+🚀 <b>Don't miss out - join now!</b>
 #SweetflipsLive #KickStreaming #GamingCommunity`;
 
   try {
@@ -1619,7 +1711,7 @@ async function sendLiveAnnouncement() {
     for (const groupId of allGroups) {
       try {
         await bot.telegram.sendMessage(groupId, liveMessage, {
-          parse_mode: "Markdown",
+          parse_mode: "HTML",
           disable_web_page_preview: false,
         });
         successCount++;
@@ -1657,7 +1749,7 @@ async function sendLiveAnnouncement() {
       for (const { groupId, error: originalError } of failedGroups) {
         try {
           await bot.telegram.sendMessage(groupId, liveMessage, {
-            parse_mode: "Markdown",
+            parse_mode: "HTML",
             disable_web_page_preview: false,
           });
           successCount++;
@@ -1763,15 +1855,16 @@ bot.command("addgroup", async (ctx) => {
 
   global.addingGroups.add(ctx.from.id);
   await ctx.reply(
-    `🔗 **Add Group for Live Announcements**\n\n` +
+    `🔗 <b>Add Group for Live Announcements</b>\n\n` +
       `Please send the group ID you want to add.\n\n` +
-      `**How to get a group ID:**\n` +
+      `<b>How to get a group ID:</b>\n` +
       `1. Add @userinfobot to your group\n` +
       `2. Send any message in the group\n` +
       `3. The bot will reply with the group ID\n` +
       `4. Copy the group ID and send it here\n\n` +
-      `**Example:** \`-1001234567890\`\n\n` +
-      `Type \`cancel\` to cancel this operation.`
+      `<b>Example:</b> <code>-1001234567890</code>\n\n` +
+      `Type <code>cancel</code> to cancel this operation.`,
+    { parse_mode: "HTML" }
   );
 });
 
@@ -1789,7 +1882,7 @@ bot.command("findgroups", async (ctx) => {
     const allGroups = await getAllGroups();
 
     if (allGroups.length > 0) {
-      let message = `✅ **Found ${allGroups.length} groups where bot is a member:**\n\n`;
+      let message = `✅ <b>Found ${allGroups.length} groups where bot is a member:</b>\n\n`;
 
       // Get detailed info for each group
       for (let i = 0; i < allGroups.length; i++) {
@@ -1797,8 +1890,8 @@ bot.command("findgroups", async (ctx) => {
         try {
           const chatInfo = await bot.telegram.getChat(groupId);
           const memberCount = await bot.telegram.getChatMemberCount(groupId);
-          message += `${i + 1}. **${chatInfo.title || "Unknown"}**\n`;
-          message += `   ID: \`${groupId}\`\n`;
+          message += `${i + 1}. <b>${chatInfo.title || "Unknown"}</b>\n`;
+          message += `   ID: <code>${groupId}</code>\n`;
           message += `   Type: ${chatInfo.type}\n`;
           message += `   Members: ${memberCount}\n\n`;
         } catch (error) {
@@ -1808,25 +1901,26 @@ bot.command("findgroups", async (ctx) => {
         }
       }
 
-      message += `💡 **To configure these groups:**\n`;
+      message += `💡 <b>To configure these groups:</b>\n`;
       message += `Add this to your Railway environment variables:\n`;
       message += `\`ADMIN_GROUP_IDS=${allGroups.join(",")}\`\n\n`;
       message += `This will make the /live command more reliable.`;
 
-      await ctx.reply(message);
+      await ctx.reply(message, { parse_mode: "HTML" });
     } else {
       await ctx.reply(
         `❌ No groups found automatically.\n\n` +
-          `**Try these solutions:**\n\n` +
-          `1. **Manual Group Addition:**\n` +
+          `<b>Try these solutions:</b>\n\n` +
+          `1. <b>Manual Group Addition:</b>\n` +
           `   Use /addgroup to manually add group IDs\n\n` +
-          `2. **Generate Activity:**\n` +
+          `2. <b>Generate Activity:</b>\n` +
           `   - Send messages in groups where bot is added\n` +
           `   - Try this command again\n\n` +
-          `3. **Environment Variable:**\n` +
-          `   Set \`ADMIN_GROUP_IDS=group_id_1,group_id_2\` in Railway\n\n` +
-          `4. **Get Group ID:**\n` +
-          `   Add @userinfobot to your group to get the group ID`
+          `3. <b>Environment Variable:</b>\n` +
+          `   Set <code>ADMIN_GROUP_IDS=group_id_1,group_id_2</code> in Railway\n\n` +
+          `4. <b>Get Group ID:</b>\n` +
+          `   Add @userinfobot to your group to get the group ID`,
+        { parse_mode: "HTML" }
       );
     }
   } catch (error) {
@@ -1844,21 +1938,22 @@ bot.command("schedule", async (ctx) => {
   if (args.length === 0) {
     try {
       const schedules = await getScheduleForWeek();
-      
+
       if (schedules.length === 0) {
         await ctx.reply(
-          `📅 **Stream Schedule**\n\n` +
-          `No scheduled streams found for the next 7 days.\n\n` +
-          `**Stream Times:**\n` +
-          `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n` +
-          `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
-          `Check back later for updates!`
+          `📅 <b>Stream Schedule</b>\n\n` +
+            `No scheduled streams found for the next 7 days.\n\n` +
+            `<b>Stream Times:</b>\n` +
+            `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n` +
+            `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
+            `Check back later for updates!`,
+          { parse_mode: "HTML" }
         );
         return;
       }
 
-      let message = `📅 **Stream Schedule - Next 7 Days**\n\n`;
-      
+      let message = `📅 <b>Stream Schedule - Next 7 Days</b>\n\n`;
+
       // Group schedules by day
       const schedulesByDay = {};
       for (const schedule of schedules) {
@@ -1872,10 +1967,10 @@ bot.command("schedule", async (ctx) => {
       for (let day = 0; day < 7; day++) {
         const dayName = getDayName(day);
         const daySchedules = schedulesByDay[day] || [];
-        
+
         if (daySchedules.length > 0) {
-          message += `**${dayName}**\n`;
-          
+          message += `<b>${dayName}</b>\n`;
+
           for (const schedule of daySchedules) {
             const times = getStreamTimes(schedule.streamNumber);
             message += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
@@ -1885,12 +1980,12 @@ bot.command("schedule", async (ctx) => {
         }
       }
 
-      message += `**Stream Times:**\n`;
+      message += `<b>Stream Times:</b>\n`;
       message += `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n`;
       message += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
       message += `🎮 Join us at https://kick.com/sweetflips`;
 
-      await ctx.reply(message);
+      await ctx.reply(message, { parse_mode: "HTML" });
     } catch (error) {
       console.error("❌ Error in schedule command:", error);
       await ctx.reply("❌ Error loading schedule. Please try again.");
@@ -1910,13 +2005,14 @@ bot.command("schedule", async (ctx) => {
     // /schedule add <day> <stream> <title>
     if (args.length < 4) {
       await ctx.reply(
-        `❌ **Invalid format for /schedule add**\n\n` +
-        `**Usage:** \`/schedule add <day> <stream> <title>\`\n\n` +
-        `**Examples:**\n` +
-        `• \`/schedule add monday 1 Gaming Stream\`\n` +
-        `• \`/schedule add friday 2 Bonus Hunt\`\n\n` +
-        `**Days:** monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
-        `**Streams:** 1 (9AM UTC) or 2 (5PM UTC)`
+        `❌ <b>Invalid format for /schedule add</b>\n\n` +
+          `<b>Usage:</b> <code>/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt;</code>\n\n` +
+          `<b>Examples:</b>\n` +
+          `• <code>/schedule add monday 1 Gaming Stream</code>\n` +
+          `• <code>/schedule add friday 2 Bonus Hunt</code>\n\n` +
+          `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
+          `<b>Streams:</b> 1 (9AM UTC) or 2 (5PM UTC)`,
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -1927,15 +2023,21 @@ bot.command("schedule", async (ctx) => {
 
     // Validate day
     const dayMap = {
-      "sunday": 0, "monday": 1, "tuesday": 2, "wednesday": 3,
-      "thursday": 4, "friday": 5, "saturday": 6
+      sunday: 0,
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
     };
-    
+
     const dayOfWeek = dayMap[dayName];
     if (dayOfWeek === undefined) {
       await ctx.reply(
-        `❌ **Invalid day name.**\n\n` +
-        `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`
+        `❌ <b>Invalid day name.</b>\n\n` +
+          `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`,
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -1943,24 +2045,31 @@ bot.command("schedule", async (ctx) => {
     // Validate stream number
     if (streamNumber !== 1 && streamNumber !== 2) {
       await ctx.reply(
-        `❌ **Invalid stream number.**\n\n` +
-        `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`
+        `❌ <b>Invalid stream number.</b>\n\n` +
+          `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`,
+        { parse_mode: "HTML" }
       );
       return;
     }
 
     // Add schedule entry
-    const success = await addScheduleEntry(dayOfWeek, streamNumber, eventTitle, user.id);
-    
+    const success = await addScheduleEntry(
+      dayOfWeek,
+      streamNumber,
+      eventTitle,
+      user.id
+    );
+
     if (success) {
       const times = getStreamTimes(streamNumber);
       await ctx.reply(
-        `✅ **Schedule Entry Added!**\n\n` +
-        `**Day:** ${getDayName(dayOfWeek)}\n` +
-        `**Stream:** ${streamNumber}\n` +
-        `**Title:** ${eventTitle}\n` +
-        `**Times:**\n` +
-        `🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}`
+        `✅ <b>Schedule Entry Added!</b>\n\n` +
+          `<b>Day:</b> ${getDayName(dayOfWeek)}\n` +
+          `<b>Stream:</b> ${streamNumber}\n` +
+          `<b>Title:</b> ${eventTitle}\n` +
+          `<b>Times:</b>\n` +
+          `🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}`,
+        { parse_mode: "HTML" }
       );
     } else {
       await ctx.reply("❌ Failed to add schedule entry. Please try again.");
@@ -1969,13 +2078,14 @@ bot.command("schedule", async (ctx) => {
     // /schedule remove <day> <stream>
     if (args.length < 3) {
       await ctx.reply(
-        `❌ **Invalid format for /schedule remove**\n\n` +
-        `**Usage:** \`/schedule remove <day> <stream>\`\n\n` +
-        `**Examples:**\n` +
-        `• \`/schedule remove monday 1\`\n` +
-        `• \`/schedule remove friday 2\`\n\n` +
-        `**Days:** monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
-        `**Streams:** 1 (9AM UTC) or 2 (5PM UTC)`
+        `❌ <b>Invalid format for /schedule remove</b>\n\n` +
+          `<b>Usage:</b> <code>/schedule remove &lt;day&gt; &lt;stream&gt;</code>\n\n` +
+          `<b>Examples:</b>\n` +
+          `• <code>/schedule remove monday 1</code>\n` +
+          `• <code>/schedule remove friday 2</code>\n\n` +
+          `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
+          `<b>Streams:</b> 1 (9AM UTC) or 2 (5PM UTC)`,
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -1985,15 +2095,21 @@ bot.command("schedule", async (ctx) => {
 
     // Validate day
     const dayMap = {
-      "sunday": 0, "monday": 1, "tuesday": 2, "wednesday": 3,
-      "thursday": 4, "friday": 5, "saturday": 6
+      sunday: 0,
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
     };
-    
+
     const dayOfWeek = dayMap[dayName];
     if (dayOfWeek === undefined) {
       await ctx.reply(
-        `❌ **Invalid day name.**\n\n` +
-        `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`
+        `❌ <b>Invalid day name.</b>\n\n` +
+          `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`,
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -2001,34 +2117,37 @@ bot.command("schedule", async (ctx) => {
     // Validate stream number
     if (streamNumber !== 1 && streamNumber !== 2) {
       await ctx.reply(
-        `❌ **Invalid stream number.**\n\n` +
-        `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`
+        `❌ <b>Invalid stream number.</b>\n\n` +
+          `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`,
+        { parse_mode: "HTML" }
       );
       return;
     }
 
     // Remove schedule entry
     const success = await removeScheduleEntry(dayOfWeek, streamNumber);
-    
+
     if (success) {
       await ctx.reply(
-        `✅ **Schedule Entry Removed!**\n\n` +
-        `**Day:** ${getDayName(dayOfWeek)}\n` +
-        `**Stream:** ${streamNumber}`
+        `✅ <b>Schedule Entry Removed!</b>\n\n` +
+          `<b>Day:</b> ${getDayName(dayOfWeek)}\n` +
+          `<b>Stream:</b> ${streamNumber}`,
+        { parse_mode: "HTML" }
       );
     } else {
       await ctx.reply("❌ Failed to remove schedule entry. Please try again.");
     }
   } else {
     await ctx.reply(
-      `❌ **Invalid schedule command.**\n\n` +
-      `**Available commands:**\n` +
-      `• \`/schedule\` - View schedule (everyone)\n` +
-      `• \`/schedule add <day> <stream> <title>\` - Add schedule entry (mods only)\n` +
-      `• \`/schedule remove <day> <stream>\` - Remove schedule entry (mods only)\n\n` +
-      `**Examples:**\n` +
-      `• \`/schedule add monday 1 Gaming Stream\`\n` +
-      `• \`/schedule remove friday 2\``
+      `❌ <b>Invalid schedule command.</b>\n\n` +
+        `<b>Available commands:</b>\n` +
+        `• <code>/schedule</code> - View schedule (everyone)\n` +
+        `• <code>/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt;</code> - Add schedule entry (mods only)\n` +
+        `• <code>/schedule remove &lt;day&gt; &lt;stream&gt;</code> - Remove schedule entry (mods only)\n\n` +
+        `<b>Examples:</b>\n` +
+        `• <code>/schedule add monday 1 Gaming Stream</code>\n` +
+        `• <code>/schedule remove friday 2</code>`,
+      { parse_mode: "HTML" }
     );
   }
 });
@@ -2046,8 +2165,8 @@ bot.command("testgroups", async (ctx) => {
 
   try {
     // Test 1: Check current known groups
-    let message = `🧪 **Group Detection Test Results**\n\n`;
-    message += `📝 **Known Groups (Memory):** ${global.knownGroups.size}\n`;
+    let message = `🧪 <b>Group Detection Test Results</b>\n\n`;
+    message += `📝 <b>Known Groups (Memory):</b> ${global.knownGroups.size}\n`;
     if (global.knownGroups.size > 0) {
       message += `Groups: ${Array.from(global.knownGroups).join(", ")}\n\n`;
     } else {
@@ -2056,7 +2175,7 @@ bot.command("testgroups", async (ctx) => {
 
     // Test 2: Check environment variable
     const configuredGroups = process.env.ADMIN_GROUP_IDS;
-    message += `⚙️ **Environment Variable:** ${
+    message += `⚙️ <b>Environment Variable:</b> ${
       configuredGroups ? "Set" : "Not set"
     }\n`;
     if (configuredGroups) {
@@ -2071,7 +2190,7 @@ bot.command("testgroups", async (ctx) => {
     }
 
     // Test 3: Test isBotMember function with a dummy ID
-    message += `🔍 **Bot Member Check Test:**\n`;
+    message += `🔍 <b>Bot Member Check Test:</b>\n`;
     try {
       const testResult = await isBotMember("-1000000000000"); // Dummy group ID
       message += `Dummy group test: ${
@@ -2089,14 +2208,14 @@ bot.command("testgroups", async (ctx) => {
       message += `Bot info: Error - ${error.message}\n\n`;
     }
 
-    message += `💡 **Next Steps:**\n`;
+    message += `💡 <b>Next Steps:</b>\n`;
     message += `1. Add bot to a test group\n`;
     message += `2. Send any message in the group\n`;
     message += `3. Run /findgroups to see if it's detected\n`;
     message += `4. Use /addgroup to manually add group IDs\n`;
     message += `5. Set ADMIN_GROUP_IDS environment variable for persistence`;
 
-    await ctx.reply(message);
+    await ctx.reply(message, { parse_mode: "HTML" });
   } catch (error) {
     console.error("❌ Error in testgroups command:", error);
     await ctx.reply("❌ Error running group detection test. Please try again.");
@@ -2121,13 +2240,13 @@ bot.command("groupstats", async (ctx) => {
       ? process.env.ADMIN_GROUP_IDS.split(",").length
       : 0;
 
-    let message = `📊 **Group Management Statistics**\n\n`;
-    message += `🔢 **Total Active Groups:** ${allGroups.length}\n`;
-    message += `💾 **Known Groups (Memory):** ${knownGroupsCount}\n`;
-    message += `⚙️ **Configured Groups (Env):** ${configuredGroups}\n\n`;
+    let message = `📊 <b>Group Management Statistics</b>\n\n`;
+    message += `🔢 <b>Total Active Groups:</b> ${allGroups.length}\n`;
+    message += `💾 <b>Known Groups (Memory):</b> ${knownGroupsCount}\n`;
+    message += `⚙️ <b>Configured Groups (Env):</b> ${configuredGroups}\n\n`;
 
     if (allGroups.length > 0) {
-      message += `📋 **Group Details:**\n`;
+      message += `📋 <b>Group Details:</b>\n`;
 
       let totalMembers = 0;
       for (let i = 0; i < Math.min(allGroups.length, 10); i++) {
@@ -2138,7 +2257,7 @@ bot.command("groupstats", async (ctx) => {
           const memberCount = await bot.telegram.getChatMemberCount(groupId);
           totalMembers += memberCount;
 
-          message += `${i + 1}. **${chatInfo.title || "Unknown"}**\n`;
+          message += `${i + 1}. <b>${chatInfo.title || "Unknown"}</b>\n`;
           message += `   👥 ${memberCount} members\n`;
           message += `   🆔 \`${groupId}\`\n\n`;
         } catch (error) {
@@ -2150,16 +2269,16 @@ bot.command("groupstats", async (ctx) => {
         message += `... and ${allGroups.length - 10} more groups\n\n`;
       }
 
-      message += `👥 **Total Members Across All Groups:** ${totalMembers}\n\n`;
+      message += `👥 <b>Total Members Across All Groups:</b> ${totalMembers}\n\n`;
     }
 
-    message += `💡 **Tips:**\n`;
+    message += `💡 <b>Tips:</b>\n`;
     message += `• Use /findgroups to see all group IDs\n`;
     message += `• Use /addgroup to manually add groups\n`;
     message += `• Set ADMIN_GROUP_IDS for persistent storage\n`;
     message += `• Groups are auto-detected when bot is added`;
 
-    await ctx.reply(message);
+    await ctx.reply(message, { parse_mode: "HTML" });
   } catch (error) {
     console.error("❌ Error in groupstats command:", error);
     await ctx.reply("❌ Error gathering group statistics. Please try again.");
@@ -2182,7 +2301,7 @@ bot.command("live", async (ctx) => {
     if (result.success > 0) {
       await ctx.reply(
         `✅ Live announcement sent successfully!\n\n` +
-          `📊 **Results:**\n` +
+          `📊 <b>Results:</b>\n` +
           `✅ Success: ${result.success} groups\n` +
           `❌ Failed: ${result.failed} groups\n\n` +
           `🎉 Sweetflips is now live on Kick!`
@@ -2190,11 +2309,11 @@ bot.command("live", async (ctx) => {
     } else {
       await ctx.reply(
         `❌ Failed to send live announcement.\n\n` +
-          `📊 **Results:**\n` +
+          `📊 <b>Results:</b>\n` +
           `✅ Success: ${result.success} groups\n` +
           `❌ Failed: ${result.failed} groups\n\n` +
           `⚠️ No groups were reached.\n\n` +
-          `**Try this:**\n` +
+          `<b>Try this:</b>\n` +
           `1. Use /findgroups to discover group IDs\n` +
           `2. Set ADMIN_GROUP_IDS in Railway environment variables\n` +
           `3. Make sure bot is added to group chats`
@@ -2257,16 +2376,17 @@ bot.on("my_chat_member", async (ctx) => {
       try {
         await ctx.telegram.sendMessage(
           chatId,
-          `🎉 **SweetflipsStreamBot is now active!**\n\n` +
+          `🎉 <b>SweetflipsStreamBot is now active!</b>\n\n` +
             `I'm here to help with live stream announcements and gaming features!\n\n` +
-            `**Available Commands:**\n` +
+            `<b>Available Commands:</b>\n` +
             `• /start - Get started\n` +
             `• /help - See all commands\n` +
             `• /kick <username> - Link your Kick account\n\n` +
-            `**For Admins:**\n` +
+            `<b>For Admins:</b>\n` +
             `• /live - Send live announcement to all groups\n` +
             `• /findgroups - Discover all groups\n\n` +
-            `Ready to enhance your stream experience! 🚀`
+            `Ready to enhance your stream experience! 🚀`,
+          { parse_mode: "HTML" }
         );
       } catch (error) {
         console.error(
@@ -2384,10 +2504,11 @@ bot.on("text", async (ctx) => {
       global.linkingUsers.delete(ctx.from.id);
 
       await ctx.reply(
-        `✅ **Account Linked Successfully!**\n\n` +
+        `✅ <b>Account Linked Successfully!</b>\n\n` +
           `Telegram: @${user.telegramUser}\n` +
           `Kick: @${kickUsername}\n\n` +
-          `You can now participate in gaming features!`
+          `You can now participate in gaming features!`,
+        { parse_mode: "HTML" }
       );
 
       // Sync to Google Sheets
@@ -2462,12 +2583,15 @@ bot.on("text", async (ctx) => {
       global.addingGroups.delete(ctx.from.id);
 
       await ctx.reply(
-        `✅ **Group Added Successfully!**\n\n` +
-          `Group ID: \`${groupId}\`\n\n` +
+        `✅ <b>Group Added Successfully!</b>\n\n` +
+          `Group ID: <code>${groupId}</code>\n\n` +
           `This group will now receive live announcements when you use /live.\n\n` +
-          `**To make this permanent:**\n` +
+          `<b>To make this permanent:</b>\n` +
           `Add this to your Railway environment variables:\n` +
-          `\`ADMIN_GROUP_IDS=${Array.from(global.knownGroups).join(",")}\``
+          `<code>ADMIN_GROUP_IDS=${Array.from(global.knownGroups).join(
+            ","
+          )}</code>`,
+        { parse_mode: "HTML" }
       );
 
       console.log(`✅ Group ${groupId} added by user ${ctx.from.id}`);
