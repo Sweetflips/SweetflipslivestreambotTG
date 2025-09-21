@@ -262,14 +262,14 @@ function getDayName(dayOfWeek) {
 
 // Helper function to get stream time in different timezones
 function getStreamTimes(streamNumber) {
-  const stream1UTC = "09:00"; // 9 AM UTC
+  const stream1UTC = "07:00"; // 7 AM UTC
   const stream2UTC = "17:00"; // 5 PM UTC
 
   const utcTime = streamNumber === 1 ? stream1UTC : stream2UTC;
 
   // Convert to different timezones
-  const istTime = streamNumber === 1 ? "14:30" : "22:30"; // +5:30 from UTC
-  const pstTime = streamNumber === 1 ? "01:00" : "09:00"; // -8 from UTC (PST)
+  const istTime = streamNumber === 1 ? "12:30" : "22:30"; // +5:30 from UTC
+  const pstTime = streamNumber === 1 ? "23:00" : "09:00"; // -8 from UTC (PST)
 
   return {
     utc: utcTime,
@@ -301,7 +301,7 @@ async function sendScheduleToAllGroups() {
       scheduleMessage = `📅 <b>Stream Schedule</b>\n\n` +
         `No scheduled streams found for the next 7 days.\n\n` +
         `<b>Stream Times:</b>\n` +
-        `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n` +
+        `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n` +
         `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
         `Check back later for updates!`;
     } else {
@@ -334,7 +334,7 @@ async function sendScheduleToAllGroups() {
       }
 
       scheduleMessage += `<b>Stream Times:</b>\n`;
-      scheduleMessage += `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n`;
+      scheduleMessage += `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n`;
       scheduleMessage += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
       scheduleMessage += `🎮 Join us at https://kick.com/sweetflips`;
     }
@@ -2044,7 +2044,7 @@ bot.command("schedule", async (ctx) => {
           `📅 <b>Stream Schedule</b>\n\n` +
             `No scheduled streams found for the next 7 days.\n\n` +
             `<b>Stream Times:</b>\n` +
-            `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n` +
+            `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n` +
             `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
             `Check back later for updates!`,
           { parse_mode: "HTML" }
@@ -2081,7 +2081,7 @@ bot.command("schedule", async (ctx) => {
       }
 
       message += `<b>Stream Times:</b>\n`;
-      message += `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n`;
+      message += `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n`;
       message += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
       message += `🎮 Join us at https://kick.com/sweetflips`;
 
@@ -2111,7 +2111,7 @@ bot.command("schedule", async (ctx) => {
           `• <code>/schedule add monday 1 Gaming Stream</code>\n` +
           `• <code>/schedule add friday 2 Bonus Hunt</code>\n\n` +
           `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
-          `<b>Streams:</b> 1 (9AM UTC) or 2 (5PM UTC)`,
+          `<b>Streams:</b> 1 (7AM UTC) or 2 (5PM UTC)`,
         { parse_mode: "HTML" }
       );
       return;
@@ -2146,7 +2146,7 @@ bot.command("schedule", async (ctx) => {
     if (streamNumber !== 1 && streamNumber !== 2) {
       await ctx.reply(
         `❌ <b>Invalid stream number.</b>\n\n` +
-          `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`,
+          `Valid streams: 1 (7AM UTC) or 2 (5PM UTC)`,
         { parse_mode: "HTML" }
       );
       return;
@@ -2184,7 +2184,7 @@ bot.command("schedule", async (ctx) => {
           `• <code>/schedule remove monday 1</code>\n` +
           `• <code>/schedule remove friday 2</code>\n\n` +
           `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
-          `<b>Streams:</b> 1 (9AM UTC) or 2 (5PM UTC)`,
+          `<b>Streams:</b> 1 (7AM UTC) or 2 (5PM UTC)`,
         { parse_mode: "HTML" }
       );
       return;
@@ -2218,7 +2218,7 @@ bot.command("schedule", async (ctx) => {
     if (streamNumber !== 1 && streamNumber !== 2) {
       await ctx.reply(
         `❌ <b>Invalid stream number.</b>\n\n` +
-          `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`,
+          `Valid streams: 1 (7AM UTC) or 2 (5PM UTC)`,
         { parse_mode: "HTML" }
       );
       return;
