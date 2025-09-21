@@ -282,10 +282,10 @@ function getStreamTimes(streamNumber) {
 async function sendScheduleToAllGroups() {
   try {
     console.log("📅 Starting automated schedule broadcast...");
-    
+
     // Get all active groups
     const allGroups = await getAllGroups();
-    
+
     if (allGroups.length === 0) {
       console.log("⚠️ No groups found for schedule broadcast");
       return { success: 0, failed: 0, groups: [] };
@@ -293,12 +293,13 @@ async function sendScheduleToAllGroups() {
 
     // Get current schedule
     const schedules = await getScheduleForWeek();
-    
+
     // Build schedule message (exactly like /schedule command)
     let scheduleMessage;
-    
+
     if (schedules.length === 0) {
-      scheduleMessage = `📅 <b>Stream Schedule</b>\n\n` +
+      scheduleMessage =
+        `📅 <b>Stream Schedule</b>\n\n` +
         `No scheduled streams found for the next 7 days.\n\n` +
         `<b>Stream Times:</b>\n` +
         `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n` +
@@ -361,14 +362,21 @@ async function sendScheduleToAllGroups() {
       } catch (error) {
         failedCount++;
         results.push({ groupId, status: "failed", error: error.message });
-        console.error(`❌ Failed to send schedule to group ${groupId}:`, error.message);
+        console.error(
+          `❌ Failed to send schedule to group ${groupId}:`,
+          error.message
+        );
       }
     }
 
     console.log(`\n📊 Schedule Broadcast Results:`);
     console.log(`✅ Successfully sent: ${successCount} groups`);
     console.log(`❌ Failed: ${failedCount} groups`);
-    console.log(`📈 Success rate: ${((successCount / allGroups.length) * 100).toFixed(1)}%`);
+    console.log(
+      `📈 Success rate: ${((successCount / allGroups.length) * 100).toFixed(
+        1
+      )}%`
+    );
 
     return { success: successCount, failed: failedCount, groups: results };
   } catch (error) {
@@ -939,16 +947,16 @@ bot.command("guess", async (ctx) => {
 bot.command("balanceboard", async (ctx) => {
   try {
     const liveBalance = await liveBalanceService.fetchCurrentBalance();
-    
+
     if (liveBalance === null) {
       await ctx.reply(
         `💰 <b>Balance Leaderboard</b>\n\n` +
-        `Unable to fetch live balance at the moment.\n\n` +
-        `This could be due to:\n` +
-        `• Network connectivity issues\n` +
-        `• API service temporarily unavailable\n` +
-        `• Missing or invalid API credentials\n\n` +
-        `Please try again later or contact an admin.`,
+          `Unable to fetch live balance at the moment.\n\n` +
+          `This could be due to:\n` +
+          `• Network connectivity issues\n` +
+          `• API service temporarily unavailable\n` +
+          `• Missing or invalid API credentials\n\n` +
+          `Please try again later or contact an admin.`,
         { parse_mode: "HTML" }
       );
       return;
@@ -2817,7 +2825,9 @@ async function gracefulRestart() {
   if (isShuttingDown) return;
 
   restartCount++;
-  console.log(`🔄 Attempting restart #${restartCount}/${AUTO_RESTART_CONFIG.maxRetries}`);
+  console.log(
+    `🔄 Attempting restart #${restartCount}/${AUTO_RESTART_CONFIG.maxRetries}`
+  );
 
   if (restartCount > AUTO_RESTART_CONFIG.maxRetries) {
     console.error("❌ Maximum restart attempts reached. Exiting...");
@@ -2836,18 +2846,20 @@ async function gracefulRestart() {
     await bot.stop();
 
     // Wait for graceful shutdown
-    await new Promise(resolve => setTimeout(resolve, AUTO_RESTART_CONFIG.gracefulShutdownTimeout));
+    await new Promise((resolve) =>
+      setTimeout(resolve, AUTO_RESTART_CONFIG.gracefulShutdownTimeout)
+    );
 
     // Restart the bot
     console.log("🚀 Restarting bot...");
     await startBot();
-
   } catch (error) {
     console.error("❌ Error during restart:", error);
 
     // Calculate delay with exponential backoff
     const delay = Math.min(
-      AUTO_RESTART_CONFIG.retryDelay * Math.pow(AUTO_RESTART_CONFIG.backoffMultiplier, restartCount - 1),
+      AUTO_RESTART_CONFIG.retryDelay *
+        Math.pow(AUTO_RESTART_CONFIG.backoffMultiplier, restartCount - 1),
       AUTO_RESTART_CONFIG.maxDelay
     );
 
@@ -2859,39 +2871,51 @@ async function gracefulRestart() {
 // Setup automated schedule messaging with cron jobs
 function setupAutomatedScheduleMessaging() {
   console.log("⏰ Setting up automated schedule messaging...");
-  
+
   // Schedule for 7:00 AM UTC (0 7 * * *)
-  const morningSchedule = cron.schedule('0 7 * * *', async () => {
-    console.log("🌅 Morning schedule broadcast triggered (7:00 AM UTC)");
-    try {
-      const result = await sendScheduleToAllGroups();
-      console.log(`🌅 Morning broadcast completed: ${result.success} success, ${result.failed} failed`);
-    } catch (error) {
-      console.error("❌ Error in morning schedule broadcast:", error);
+  const morningSchedule = cron.schedule(
+    "0 7 * * *",
+    async () => {
+      console.log("🌅 Morning schedule broadcast triggered (7:00 AM UTC)");
+      try {
+        const result = await sendScheduleToAllGroups();
+        console.log(
+          `🌅 Morning broadcast completed: ${result.success} success, ${result.failed} failed`
+        );
+      } catch (error) {
+        console.error("❌ Error in morning schedule broadcast:", error);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
     }
-  }, {
-    scheduled: true,
-    timezone: "UTC"
-  });
+  );
 
   // Schedule for 3:00 PM UTC (0 15 * * *)
-  const afternoonSchedule = cron.schedule('0 15 * * *', async () => {
-    console.log("🌆 Afternoon schedule broadcast triggered (3:00 PM UTC)");
-    try {
-      const result = await sendScheduleToAllGroups();
-      console.log(`🌆 Afternoon broadcast completed: ${result.success} success, ${result.failed} failed`);
-    } catch (error) {
-      console.error("❌ Error in afternoon schedule broadcast:", error);
+  const afternoonSchedule = cron.schedule(
+    "0 15 * * *",
+    async () => {
+      console.log("🌆 Afternoon schedule broadcast triggered (3:00 PM UTC)");
+      try {
+        const result = await sendScheduleToAllGroups();
+        console.log(
+          `🌆 Afternoon broadcast completed: ${result.success} success, ${result.failed} failed`
+        );
+      } catch (error) {
+        console.error("❌ Error in afternoon schedule broadcast:", error);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
     }
-  }, {
-    scheduled: true,
-    timezone: "UTC"
-  });
+  );
 
   console.log("✅ Automated schedule messaging configured:");
   console.log("   🌅 Morning broadcast: 7:00 AM UTC");
   console.log("   🌆 Afternoon broadcast: 3:00 PM UTC");
-  
+
   // Store references for cleanup
   global.morningSchedule = morningSchedule;
   global.afternoonSchedule = afternoonSchedule;
@@ -2931,7 +2955,6 @@ async function startBot() {
 
     // Set up graceful shutdown handlers
     setupGracefulShutdown();
-
   } catch (error) {
     console.error("❌ Failed to start bot:", error);
     if (error.response && error.response.error_code === 404) {
