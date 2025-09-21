@@ -139,7 +139,8 @@ export class TelegramBot {
 
     // Help command (no auth required)
     this.bot.command('help', async ctx => {
-      const helpText = `
+      try {
+        const helpText = `
 🤖 **SweetflipsStreamBot Commands**
 
 **Viewer Commands:**
@@ -149,6 +150,51 @@ export class TelegramBot {
 /unlink - Unlink your accounts
 
 **Mod Commands:**
+/balance \\<command\\> - Manage balance guessing game
+/bonus \\<command\\> - Manage bonus guessing game
+/game \\<command\\> - Generic game management
+
+/start_hunt - Start a new bonus hunt
+/add_bonus \\<name\\> - Add a bonus to the hunt
+/open_bonus \\<name\\> \\<amount\\> - Record a bonus payout
+/close_hunt - Close the hunt and compute results
+
+/start_trivia - Start a new trivia game
+/q \\<question\\> \\| \\<answer\\> - Post a trivia question
+/lock_round - Lock the current round
+/stop_trivia - End the trivia game
+
+/state - Show current game state
+/reset_game - Reset any active game
+/payout_preview - Generate payout instructions
+/link_status @username - Check user link status
+
+**Admin Management:**
+/setrole \\<telegram_id\\> \\<MOD\\|OWNER\\> - Set user role (OWNER only)
+/listusers [limit] - List all users (MOD+)
+
+**Kick Chat Commands:**
+!guess \\<number\\> - Submit a bonus hunt guess
+!link \\<code\\> - Link your accounts
+!answer \\<text\\> - Answer trivia question
+
+Use /help_admin for detailed admin command help.
+        `;
+
+        await ctx.reply(helpText, { parse_mode: 'Markdown' });
+      } catch (error) {
+        console.error('Error in help command:', error);
+        // Fallback to plain text if Markdown fails
+        const fallbackText = `
+🤖 SweetflipsStreamBot Commands
+
+Viewer Commands:
+/gtbalance [number] - Guess the balance (requires linked Kick account)
+/gtbonus [number] - Guess the bonus total (requires linked Kick account)
+/link - Generate account linking code
+/unlink - Unlink your accounts
+
+Mod Commands:
 /balance <command> - Manage balance guessing game
 /bonus <command> - Manage bonus guessing game
 /game <command> - Generic game management
@@ -168,27 +214,78 @@ export class TelegramBot {
 /payout_preview - Generate payout instructions
 /link_status @username - Check user link status
 
-**Admin Management:**
+Admin Management:
 /setrole <telegram_id> <MOD|OWNER> - Set user role (OWNER only)
 /listusers [limit] - List all users (MOD+)
 
-**Kick Chat Commands:**
+Kick Chat Commands:
 !guess <number> - Submit a bonus hunt guess
 !link <code> - Link your accounts
 !answer <text> - Answer trivia question
 
 Use /help_admin for detailed admin command help.
-      `;
-
-      await ctx.reply(helpText, { parse_mode: 'Markdown' });
+        `;
+        await ctx.reply(fallbackText);
+      }
     });
 
     // Admin help command
     this.bot.command('help_admin', modMiddleware, async ctx => {
-      const helpText = `
+      try {
+        const helpText = `
 🔧 **Admin Commands Help**
 
 **Balance Game Management:**
+/balance open - Open balance guessing
+/balance close - Close balance guessing
+/balance final \\<number\\> - Set final balance value
+/balance reveal [top=\\<n\\>] - Reveal results (default top 10)
+/balance show [top=\\<n\\>] - Show current standings
+/balance reset CONFIRM - Reset game (OWNER only)
+/balance export - Export guesses as CSV
+/balance grace \\<seconds\\> - Set edit window (default 30s)
+/balance window \\<minutes\\> - Set auto-close timer (0 = manual)
+/balance range \\<min\\> \\<max\\> - Set guess range (OWNER only)
+
+**Bonus Game Management:**
+/bonus open - Open bonus guessing
+/bonus close - Close bonus guessing
+/bonus final \\<number\\> - Set final bonus total directly
+/bonus reveal [top=\\<n\\>] - Reveal results
+/bonus show [top=\\<n\\>] - Show current standings
+/bonus reset CONFIRM - Reset game (OWNER only)
+/bonus export - Export guesses as CSV
+/bonus grace \\<seconds\\> - Set edit window
+/bonus window \\<minutes\\> - Set auto-close timer
+/bonus range \\<min\\> \\<max\\> - Set guess range (OWNER only)
+
+**Bonus Item Management:**
+/bonus add \\<name\\> - Add bonus item
+/bonus remove \\<name\\> - Remove bonus item
+/bonus list - List all bonus items
+/bonus payout \\<name\\> \\<x\\> - Record payout multiplier
+/bonus finalize - Calculate total from items
+
+**Generic Game Commands:**
+/game open \\<bonus\\|balance\\> - Open guessing
+/game close \\<bonus\\|balance\\> - Close guessing
+/game reset \\<bonus\\|balance\\> CONFIRM - Reset game (OWNER only)
+/game show \\<bonus\\|balance\\> [top=\\<n\\>] - Show standings
+/game export \\<bonus\\|balance\\> - Export guesses
+
+**Game Phases:** IDLE → OPEN → CLOSED → REVEALED
+**Default Ranges:** Balance: 1-1,000,000 \\| Bonus: 1-9,999
+**Grace Window:** 30 seconds for editing guesses
+        `;
+
+        await ctx.reply(helpText, { parse_mode: 'Markdown' });
+      } catch (error) {
+        console.error('Error in help_admin command:', error);
+        // Fallback to plain text if Markdown fails
+        const fallbackText = `
+🔧 Admin Commands Help
+
+Balance Game Management:
 /balance open - Open balance guessing
 /balance close - Close balance guessing
 /balance final <number> - Set final balance value
@@ -200,7 +297,7 @@ Use /help_admin for detailed admin command help.
 /balance window <minutes> - Set auto-close timer (0 = manual)
 /balance range <min> <max> - Set guess range (OWNER only)
 
-**Bonus Game Management:**
+Bonus Game Management:
 /bonus open - Open bonus guessing
 /bonus close - Close bonus guessing
 /bonus final <number> - Set final bonus total directly
@@ -212,26 +309,26 @@ Use /help_admin for detailed admin command help.
 /bonus window <minutes> - Set auto-close timer
 /bonus range <min> <max> - Set guess range (OWNER only)
 
-**Bonus Item Management:**
+Bonus Item Management:
 /bonus add <name> - Add bonus item
 /bonus remove <name> - Remove bonus item
 /bonus list - List all bonus items
 /bonus payout <name> <x> - Record payout multiplier
 /bonus finalize - Calculate total from items
 
-**Generic Game Commands:**
+Generic Game Commands:
 /game open <bonus|balance> - Open guessing
 /game close <bonus|balance> - Close guessing
 /game reset <bonus|balance> CONFIRM - Reset game (OWNER only)
 /game show <bonus|balance> [top=<n>] - Show standings
 /game export <bonus|balance> - Export guesses
 
-**Game Phases:** IDLE → OPEN → CLOSED → REVEALED
-**Default Ranges:** Balance: 1-1,000,000 | Bonus: 1-9,999
-**Grace Window:** 30 seconds for editing guesses
-      `;
-
-      await ctx.reply(helpText, { parse_mode: 'Markdown' });
+Game Phases: IDLE → OPEN → CLOSED → REVEALED
+Default Ranges: Balance: 1-1,000,000 | Bonus: 1-9,999
+Grace Window: 30 seconds for editing guesses
+        `;
+        await ctx.reply(fallbackText);
+      }
     });
   }
 
