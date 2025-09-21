@@ -595,7 +595,7 @@ bot.start(async (ctx) => {
       `/kick - Link your Kick account\n` +
       `/help - Show all commands\n\n` +
       `Ready to play? Link your Kick account first with /kick!`,
-    { parse_mode: 'HTML' }
+    { parse_mode: "HTML" }
   );
 });
 
@@ -640,7 +640,7 @@ bot.help(async (ctx) => {
       `/setrole <telegram_id> <MOD|OWNER> - Set user role\n` +
       `/listusers - List all users\n\n`;
 
-    await ctx.reply(helpText, { parse_mode: 'HTML' });
+    await ctx.reply(helpText, { parse_mode: "HTML" });
   } else {
     // Viewer help - shows only gaming and account commands
     let helpText =
@@ -657,7 +657,7 @@ bot.help(async (ctx) => {
       `/help - Show this help\n` +
       `/kick - Link your Kick account (one-time setup)\n\n`;
 
-    await ctx.reply(helpText, { parse_mode: 'HTML' });
+    await ctx.reply(helpText, { parse_mode: "HTML" });
   }
 });
 
@@ -690,7 +690,7 @@ bot.command("kick", async (ctx) => {
       `Please send your Kick username (without @).\n` +
       `Example: sweetflips\n\n` +
       `This will link your Telegram account to your Kick account for gaming features.`,
-    { parse_mode: 'HTML' }
+    { parse_mode: "HTML" }
   );
 });
 
@@ -837,7 +837,7 @@ bot.command("balanceboard", async (ctx) => {
       });
     }
 
-    await ctx.reply(leaderboardText);
+    await ctx.reply(leaderboardText, { parse_mode: "HTML" });
   } catch (error) {
     console.error("❌ Error showing balance leaderboard:", error);
     await ctx.reply(
@@ -893,7 +893,7 @@ bot.command("bonusboard", async (ctx) => {
     });
   }
 
-  await ctx.reply(leaderboardText);
+  await ctx.reply(leaderboardText, { parse_mode: "HTML" });
 });
 
 // Admin commands
@@ -966,7 +966,7 @@ bot.command("balance", async (ctx) => {
             guess.kickName
           } - ${guess.guess.toLocaleString()}\n`;
         });
-        await ctx.reply(showText);
+        await ctx.reply(showText, { parse_mode: "HTML" });
       }
       break;
 
@@ -1035,7 +1035,7 @@ bot.command("bonus", async (ctx) => {
             guess.kickName
           } - ${guess.guess.toLocaleString()}\n`;
         });
-        await ctx.reply(showText);
+        await ctx.reply(showText, { parse_mode: "HTML" });
       }
       break;
 
@@ -1183,7 +1183,7 @@ bot.command("listusers", async (ctx) => {
       }) - ${u.role} - ${kickStatus}\n`;
     });
 
-    await ctx.reply(userList);
+    await ctx.reply(userList, { parse_mode: "HTML" });
   } catch (error) {
     await ctx.reply(`❌ Error listing users.`);
   }
@@ -1788,7 +1788,7 @@ bot.command("addgroup", async (ctx) => {
       `4. Copy the group ID and send it here\n\n` +
       `<b>Example:</b> <code>-1001234567890</code>\n\n` +
       `Type <code>cancel</code> to cancel this operation.`,
-    { parse_mode: 'HTML' }
+    { parse_mode: "HTML" }
   );
 });
 
@@ -1830,7 +1830,7 @@ bot.command("findgroups", async (ctx) => {
       message += `\`ADMIN_GROUP_IDS=${allGroups.join(",")}\`\n\n`;
       message += `This will make the /live command more reliable.`;
 
-      await ctx.reply(message, { parse_mode: 'HTML' });
+      await ctx.reply(message, { parse_mode: "HTML" });
     } else {
       await ctx.reply(
         `❌ No groups found automatically.\n\n` +
@@ -1844,7 +1844,7 @@ bot.command("findgroups", async (ctx) => {
           `   Set <code>ADMIN_GROUP_IDS=group_id_1,group_id_2</code> in Railway\n\n` +
           `4. <b>Get Group ID:</b>\n` +
           `   Add @userinfobot to your group to get the group ID`,
-        { parse_mode: 'HTML' }
+        { parse_mode: "HTML" }
       );
     }
   } catch (error) {
@@ -1863,20 +1863,20 @@ bot.command("schedule", async (ctx) => {
     try {
       const schedules = await getScheduleForWeek();
 
-        if (schedules.length === 0) {
-          await ctx.reply(
-            `📅 <b>Stream Schedule</b>\n\n` +
-              `No scheduled streams found for the next 7 days.\n\n` +
-              `<b>Stream Times:</b>\n` +
-              `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n` +
-              `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
-              `Check back later for updates!`,
-            { parse_mode: 'HTML' }
-          );
-          return;
-        }
+      if (schedules.length === 0) {
+        await ctx.reply(
+          `📅 <b>Stream Schedule</b>\n\n` +
+            `No scheduled streams found for the next 7 days.\n\n` +
+            `<b>Stream Times:</b>\n` +
+            `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n` +
+            `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
+            `Check back later for updates!`,
+          { parse_mode: "HTML" }
+        );
+        return;
+      }
 
-        let message = `📅 <b>Stream Schedule - Next 7 Days</b>\n\n`;
+      let message = `📅 <b>Stream Schedule - Next 7 Days</b>\n\n`;
 
       // Group schedules by day
       const schedulesByDay = {};
@@ -1909,7 +1909,7 @@ bot.command("schedule", async (ctx) => {
       message += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
       message += `🎮 Join us at https://kick.com/sweetflips`;
 
-      await ctx.reply(message, { parse_mode: 'HTML' });
+      await ctx.reply(message, { parse_mode: "HTML" });
     } catch (error) {
       console.error("❌ Error in schedule command:", error);
       await ctx.reply("❌ Error loading schedule. Please try again.");
@@ -1936,7 +1936,7 @@ bot.command("schedule", async (ctx) => {
           `• <code>/schedule add friday 2 Bonus Hunt</code>\n\n` +
           `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
           `<b>Streams:</b> 1 (9AM UTC) or 2 (5PM UTC)`,
-        { parse_mode: 'HTML' }
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -1961,7 +1961,7 @@ bot.command("schedule", async (ctx) => {
       await ctx.reply(
         `❌ <b>Invalid day name.</b>\n\n` +
           `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`,
-        { parse_mode: 'HTML' }
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -1971,7 +1971,7 @@ bot.command("schedule", async (ctx) => {
       await ctx.reply(
         `❌ <b>Invalid stream number.</b>\n\n` +
           `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`,
-        { parse_mode: 'HTML' }
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -1993,7 +1993,7 @@ bot.command("schedule", async (ctx) => {
           `<b>Title:</b> ${eventTitle}\n` +
           `<b>Times:</b>\n` +
           `🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}`,
-        { parse_mode: 'HTML' }
+        { parse_mode: "HTML" }
       );
     } else {
       await ctx.reply("❌ Failed to add schedule entry. Please try again.");
@@ -2009,7 +2009,7 @@ bot.command("schedule", async (ctx) => {
           `• <code>/schedule remove friday 2</code>\n\n` +
           `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
           `<b>Streams:</b> 1 (9AM UTC) or 2 (5PM UTC)`,
-        { parse_mode: 'HTML' }
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -2033,7 +2033,7 @@ bot.command("schedule", async (ctx) => {
       await ctx.reply(
         `❌ <b>Invalid day name.</b>\n\n` +
           `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`,
-        { parse_mode: 'HTML' }
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -2043,7 +2043,7 @@ bot.command("schedule", async (ctx) => {
       await ctx.reply(
         `❌ <b>Invalid stream number.</b>\n\n` +
           `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`,
-        { parse_mode: 'HTML' }
+        { parse_mode: "HTML" }
       );
       return;
     }
@@ -2056,7 +2056,7 @@ bot.command("schedule", async (ctx) => {
         `✅ <b>Schedule Entry Removed!</b>\n\n` +
           `<b>Day:</b> ${getDayName(dayOfWeek)}\n` +
           `<b>Stream:</b> ${streamNumber}`,
-        { parse_mode: 'HTML' }
+        { parse_mode: "HTML" }
       );
     } else {
       await ctx.reply("❌ Failed to remove schedule entry. Please try again.");
@@ -2071,7 +2071,7 @@ bot.command("schedule", async (ctx) => {
         `<b>Examples:</b>\n` +
         `• <code>/schedule add monday 1 Gaming Stream</code>\n` +
         `• <code>/schedule remove friday 2</code>`,
-      { parse_mode: 'HTML' }
+      { parse_mode: "HTML" }
     );
   }
 });
@@ -2139,7 +2139,7 @@ bot.command("testgroups", async (ctx) => {
     message += `4. Use /addgroup to manually add group IDs\n`;
     message += `5. Set ADMIN_GROUP_IDS environment variable for persistence`;
 
-    await ctx.reply(message, { parse_mode: 'HTML' });
+    await ctx.reply(message, { parse_mode: "HTML" });
   } catch (error) {
     console.error("❌ Error in testgroups command:", error);
     await ctx.reply("❌ Error running group detection test. Please try again.");
@@ -2202,7 +2202,7 @@ bot.command("groupstats", async (ctx) => {
     message += `• Set ADMIN_GROUP_IDS for persistent storage\n`;
     message += `• Groups are auto-detected when bot is added`;
 
-    await ctx.reply(message, { parse_mode: 'HTML' });
+    await ctx.reply(message, { parse_mode: "HTML" });
   } catch (error) {
     console.error("❌ Error in groupstats command:", error);
     await ctx.reply("❌ Error gathering group statistics. Please try again.");
@@ -2310,7 +2310,7 @@ bot.on("my_chat_member", async (ctx) => {
             `• /live - Send live announcement to all groups\n` +
             `• /findgroups - Discover all groups\n\n` +
             `Ready to enhance your stream experience! 🚀`,
-          { parse_mode: 'HTML' }
+          { parse_mode: "HTML" }
         );
       } catch (error) {
         console.error(
@@ -2432,7 +2432,7 @@ bot.on("text", async (ctx) => {
           `Telegram: @${user.telegramUser}\n` +
           `Kick: @${kickUsername}\n\n` +
           `You can now participate in gaming features!`,
-        { parse_mode: 'HTML' }
+        { parse_mode: "HTML" }
       );
 
       // Sync to Google Sheets
@@ -2512,8 +2512,10 @@ bot.on("text", async (ctx) => {
           `This group will now receive live announcements when you use /live.\n\n` +
           `<b>To make this permanent:</b>\n` +
           `Add this to your Railway environment variables:\n` +
-          `<code>ADMIN_GROUP_IDS=${Array.from(global.knownGroups).join(",")}</code>`,
-        { parse_mode: 'HTML' }
+          `<code>ADMIN_GROUP_IDS=${Array.from(global.knownGroups).join(
+            ","
+          )}</code>`,
+        { parse_mode: "HTML" }
       );
 
       console.log(`✅ Group ${groupId} added by user ${ctx.from.id}`);
