@@ -589,6 +589,8 @@ try {
 
 // Helper functions
 async function getUserOrCreate(telegramId, telegramUser) {
+  console.log(`🔍 getUserOrCreate called for: ${telegramUser} (${telegramId})`);
+
   // If database is not available, return a mock user and sync to Google Sheets
   if (!prisma) {
     console.log(
@@ -799,7 +801,11 @@ bot.help(async (ctx) => {
     }
   } catch (error) {
     console.error("❌ Error in help command:", error);
-    await ctx.reply(`❌ An error occurred. Please try again.`);
+    console.error("❌ Error details:", error.message);
+    console.error("❌ Error stack:", error.stack);
+    await ctx.reply(
+      `❌ Error in help command: ${error.message}. Please try again.`
+    );
   }
 });
 
