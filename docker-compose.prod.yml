@@ -52,6 +52,9 @@ services:
       - DATABASE_URL=postgresql://sweetflips_user:${DB_PASSWORD}@postgres:5432/sweetflips_bot
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - RATE_LIMIT_REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+      - AUTO_RESTART_ENABLED=true
+      - HEALTH_CHECK_INTERVAL=30000
+      - MAX_RESTART_ATTEMPTS=10
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
@@ -59,20 +62,34 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    restart: unless-stopped
+    restart: always
     volumes:
       - ./logs:/app/logs
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:3000/healthz" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: "5"
+    stop_grace_period: 30s
 
   nginx:
     image: nginx:alpine
@@ -99,4 +116,3 @@ volumes:
     driver: local
   nginx_logs:
     driver: local
-

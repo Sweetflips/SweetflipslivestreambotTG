@@ -553,7 +553,7 @@ async function getUserOrCreate(telegramId, telegramUser) {
       role: "VIEWER",
       kickName: null,
     };
-    
+
     // Try to sync mock user to Google Sheets
     try {
       await syncToGoogleSheets(mockUser);
@@ -561,7 +561,7 @@ async function getUserOrCreate(telegramId, telegramUser) {
       console.error("❌ Error syncing mock user to Google Sheets:", error);
       // Continue with mock user even if Google Sheets fails
     }
-    
+
     return mockUser;
   }
 }
@@ -1267,7 +1267,7 @@ async function isBotMember(chatId) {
     // Get bot's actual user ID
     const botInfo = await bot.telegram.getMe();
     const botUserId = botInfo.id;
-    
+
     const response = await fetch(
       `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getChatMember`,
       {
@@ -2622,7 +2622,101 @@ bot.catch((err, ctx) => {
   ctx.reply("❌ An error occurred. Please try again.");
 });
 
-// Start bot
+// Auto-restart configuration
+const AUTO_RESTART_CONFIG = {
+  maxRetries: 10,
+  retryDelay: 5000, // 5 seconds
+  backoffMultiplier: 1.5,
+  maxDelay: 60000, // 1 minute
+  healthCheckInterval: 30000, // 30 seconds
+  gracefulShutdownTimeout: 10000, // 10 seconds
+};
+
+let restartCount = 0;
+let isShuttingDown = false;
+let healthCheckInterval = null;
+
+// Health check function
+async function performHealthCheck() {
+  try {
+    // Check if bot is running
+    if (!bot.botInfo) {
+      throw new Error("Bot not initialized");
+    }
+
+    // Check database connection if available
+    if (prisma) {
+      await prisma.$queryRaw`SELECT 1`;
+    }
+
+    console.log("✅ Health check passed");
+    return true;
+  } catch (error) {
+    console.error("❌ Health check failed:", error.message);
+    return false;
+  }
+}
+
+// Start health monitoring
+function startHealthMonitoring() {
+  if (healthCheckInterval) {
+    clearInterval(healthCheckInterval);
+  }
+
+  healthCheckInterval = setInterval(async () => {
+    const isHealthy = await performHealthCheck();
+    if (!isHealthy && !isShuttingDown) {
+      console.log("🔄 Health check failed, attempting restart...");
+      await gracefulRestart();
+    }
+  }, AUTO_RESTART_CONFIG.healthCheckInterval);
+}
+
+// Graceful restart function
+async function gracefulRestart() {
+  if (isShuttingDown) return;
+
+  restartCount++;
+  console.log(`🔄 Attempting restart #${restartCount}/${AUTO_RESTART_CONFIG.maxRetries}`);
+
+  if (restartCount > AUTO_RESTART_CONFIG.maxRetries) {
+    console.error("❌ Maximum restart attempts reached. Exiting...");
+    process.exit(1);
+  }
+
+  try {
+    // Stop health monitoring
+    if (healthCheckInterval) {
+      clearInterval(healthCheckInterval);
+      healthCheckInterval = null;
+    }
+
+    // Gracefully stop the bot
+    console.log("🛑 Gracefully stopping bot...");
+    await bot.stop();
+
+    // Wait for graceful shutdown
+    await new Promise(resolve => setTimeout(resolve, AUTO_RESTART_CONFIG.gracefulShutdownTimeout));
+
+    // Restart the bot
+    console.log("🚀 Restarting bot...");
+    await startBot();
+
+  } catch (error) {
+    console.error("❌ Error during restart:", error);
+
+    // Calculate delay with exponential backoff
+    const delay = Math.min(
+      AUTO_RESTART_CONFIG.retryDelay * Math.pow(AUTO_RESTART_CONFIG.backoffMultiplier, restartCount - 1),
+      AUTO_RESTART_CONFIG.maxDelay
+    );
+
+    console.log(`⏳ Waiting ${delay}ms before next restart attempt...`);
+    setTimeout(() => gracefulRestart(), delay);
+  }
+}
+
+// Start bot with auto-restart capabilities
 async function startBot() {
   console.log("🤖 Starting SweetflipsStreamBot...");
   console.log(
@@ -2630,17 +2724,31 @@ async function startBot() {
     process.env.TELEGRAM_BOT_TOKEN ? "✅ Set" : "❌ Missing"
   );
 
-  // Wait for database to be ready
-  console.log("⏳ Waiting for database to be ready...");
-  const dbReady = await waitForDatabase();
+  try {
+    // Wait for database to be ready
+    console.log("⏳ Waiting for database to be ready...");
+    const dbReady = await waitForDatabase();
 
-  if (!dbReady) {
-    console.log(
-      "⚠️ Database not ready, starting bot without database features"
-    );
-  }
+    if (!dbReady) {
+      console.log(
+        "⚠️ Database not ready, starting bot without database features"
+      );
+    }
 
-  bot.launch().catch((error) => {
+    // Launch the bot
+    await bot.launch();
+    console.log("✅ Bot launched successfully");
+
+    // Reset restart count on successful start
+    restartCount = 0;
+
+    // Start health monitoring
+    startHealthMonitoring();
+
+    // Set up graceful shutdown handlers
+    setupGracefulShutdown();
+
+  } catch (error) {
     console.error("❌ Failed to start bot:", error);
     if (error.response && error.response.error_code === 404) {
       console.error("❌ Bot token is invalid or bot doesn't exist!");
@@ -2648,13 +2756,52 @@ async function startBot() {
         "Please check your TELEGRAM_BOT_TOKEN in Railway environment variables."
       );
     }
-    process.exit(1);
-  });
+
+    // Attempt restart if not shutting down
+    if (!isShuttingDown) {
+      await gracefulRestart();
+    } else {
+      process.exit(1);
+    }
+  }
+}
+
+// Setup graceful shutdown handlers
+function setupGracefulShutdown() {
+  const shutdown = async (signal) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    console.log(`🛑 Received ${signal}, shutting down gracefully...`);
+
+    // Stop health monitoring
+    if (healthCheckInterval) {
+      clearInterval(healthCheckInterval);
+      healthCheckInterval = null;
+    }
+
+    try {
+      // Stop the bot
+      await bot.stop(signal);
+      console.log("✅ Bot stopped gracefully");
+
+      // Close database connection
+      if (prisma) {
+        await prisma.$disconnect();
+        console.log("✅ Database connection closed");
+      }
+
+      process.exit(0);
+    } catch (error) {
+      console.error("❌ Error during shutdown:", error);
+      process.exit(1);
+    }
+  };
+
+  process.once("SIGINT", () => shutdown("SIGINT"));
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
+  process.once("SIGUSR2", () => shutdown("SIGUSR2")); // For nodemon
 }
 
 // Start the bot
 startBot();
-
-// Graceful shutdown
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));

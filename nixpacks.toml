@@ -1,8 +1,11 @@
 [phases.setup]
-nixPkgs = ["nodejs", "npm"]
+nixPkgs = ["nodejs", "npm", "curl"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm install", "npm install -g pm2 forever"]
+
+[phases.build]
+cmds = ["npx prisma generate"]
 
 [start]
 cmd = "node bot.js"

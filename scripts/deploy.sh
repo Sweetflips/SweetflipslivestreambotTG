@@ -131,8 +131,11 @@ apt install postgresql postgresql-contrib redis-server -y
 # Install Git
 apt install git -y
 
-# Install additional tools
+# Install additional tools and process managers
 apt install htop iotop nethogs fail2ban ufw -y
+
+# Install PM2 and Forever for process management
+npm install -g pm2 forever
 
 print_success "Software installed"
 
@@ -281,24 +284,33 @@ systemctl enable nginx
 
 print_success "Nginx configured"
 
-# Step 8: Create systemd service
-print_status "Creating systemd service..."
+# Step 8: Create systemd service with auto-restart
+print_status "Creating systemd service with auto-restart..."
 cat > /etc/systemd/system/sweetflips-bot.service << EOF
 [Unit]
-Description=SweetflipsStreamBot API Service
+Description=SweetflipsStreamBot Service
 After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=$APP_DIR
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/node apps/api/dist/index.js
+Environment=AUTO_RESTART_ENABLED=true
+Environment=HEALTH_CHECK_INTERVAL=30000
+Environment=MAX_RESTART_ATTEMPTS=10
+ExecStart=/usr/bin/node bot.js
 Restart=always
-RestartSec=10
+RestartSec=5
+StartLimitInterval=60s
+StartLimitBurst=10
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=sweetflips-bot
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target
@@ -309,6 +321,36 @@ systemctl daemon-reload
 systemctl enable sweetflips-bot
 
 print_success "Systemd service created"
+
+# Create PM2 ecosystem file for additional process management
+print_status "Creating PM2 ecosystem configuration..."
+cat > "$APP_DIR/ecosystem.config.js" << EOF
+module.exports = {
+  apps: [{
+    name: 'sweetflips-bot',
+    script: 'bot.js',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '500M',
+    env: {
+      NODE_ENV: 'production',
+      AUTO_RESTART_ENABLED: 'true',
+      HEALTH_CHECK_INTERVAL: '30000',
+      MAX_RESTART_ATTEMPTS: '10'
+    },
+    error_file: './logs/err.log',
+    out_file: './logs/out.log',
+    log_file: './logs/combined.log',
+    time: true,
+    restart_delay: 5000,
+    max_restarts: 10,
+    min_uptime: '10s'
+  }]
+};
+EOF
+
+print_success "PM2 ecosystem configuration created"
 
 # Step 9: Configure firewall
 print_status "Configuring firewall..."
@@ -419,4 +461,3 @@ EOF
 
 print_success "Configuration saved to $APP_DIR/deployment-config.txt"
 print_success "Deployment completed successfully! 🎉"
-

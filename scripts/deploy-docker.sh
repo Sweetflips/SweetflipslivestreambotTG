@@ -123,6 +123,12 @@ else
     print_warning "Docker Compose already installed"
 fi
 
+# Install Node.js and process managers for monitoring
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt-get install -y nodejs
+npm install -g pm2 forever
+print_success "Node.js and process managers installed"
+
 # Step 3: Clone repository (if not already present)
 if [ ! -d "$APP_DIR" ]; then
     print_status "Cloning repository..."
@@ -307,4 +313,3 @@ EOF
 
 print_success "Configuration saved to $APP_DIR/docker-deployment-config.txt"
 print_success "Docker deployment completed successfully! 🎉"
-
