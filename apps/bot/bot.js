@@ -611,8 +611,8 @@ bot.start(async (ctx) => {
         `You are: ${user.telegramUser || "Unknown"} (${user.telegramId})\n` +
         `Role: ${user.role}\n\n` +
         `🎮 <b>Gaming Commands:</b>\n` +
-        `/guess balance <number> - Guess the end balance\n` +
-        `/guess bonus <number> - Guess the bonus total\n` +
+        `/guess balance &lt;number&gt; - Guess the end balance\n` +
+        `/guess bonus &lt;number&gt; - Guess the bonus total\n` +
         `/balanceboard - View balance leaderboard\n` +
         `/bonusboard - View bonus leaderboard\n\n` +
         `🔗 <b>Account Commands:</b>\n` +
@@ -636,8 +636,8 @@ bot.help(async (ctx) => {
       let helpText =
         `🤖 <b>SweetflipsStreamBot Commands</b>\n\n` +
         `🎮 <b>Gaming Commands:</b>\n` +
-        `/guess balance <number> - Guess the end balance (requires linked Kick account)\n` +
-        `/guess bonus <number> - Guess the bonus total (requires linked Kick account)\n` +
+        `/guess balance &lt;number&gt; - Guess the end balance (requires linked Kick account)\n` +
+        `/guess bonus &lt;number&gt; - Guess the bonus total (requires linked Kick account)\n` +
         `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
         `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
         `📅 <b>Schedule Commands:</b>\n` +
@@ -675,8 +675,8 @@ bot.help(async (ctx) => {
       let helpText =
         `🤖 <b>SweetflipsStreamBot Commands</b>\n\n` +
         `🎮 <b>Gaming Commands:</b>\n` +
-        `/guess balance <number> - Guess the end balance (requires linked Kick account)\n` +
-        `/guess bonus <number> - Guess the bonus total (requires linked Kick account)\n` +
+        `/guess balance &lt;number&gt; - Guess the end balance (requires linked Kick account)\n` +
+        `/guess bonus &lt;number&gt; - Guess the bonus total (requires linked Kick account)\n` +
         `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
         `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
         `📅 <b>Schedule Commands:</b>\n` +
@@ -755,7 +755,7 @@ bot.command("guess", async (ctx) => {
     const args = ctx.message.text.split(" ").slice(1);
     if (args.length < 2) {
       await ctx.reply(
-        `❌ Usage: /guess <balance|bonus> <number>\n\n` +
+        `❌ Usage: /guess <balance|bonus> &lt;number&gt;\n\n` +
           `Examples:\n` +
           `/guess balance 15000\n` +
           `/guess bonus 500`
@@ -870,7 +870,7 @@ bot.command("balanceboard", async (ctx) => {
     );
 
     if (gameState.balance.guesses.size === 0) {
-      leaderboardText += `No guesses recorded yet. Use /guess balance <number> to make a guess!`;
+      leaderboardText += `No guesses recorded yet. Use /guess balance &lt;number&gt; to make a guess!`;
     } else {
       const guesses = Array.from(gameState.balance.guesses.values());
       const targetBalance = gameState.balance.isFinalized
@@ -927,7 +927,7 @@ bot.command("bonusboard", async (ctx) => {
     }
 
     if (gameState.bonus.guesses.size === 0) {
-      leaderboardText += `No guesses recorded yet. Use /guess bonus <number> to make a guess!`;
+      leaderboardText += `No guesses recorded yet. Use /guess bonus &lt;number&gt; to make a guess!`;
     } else {
       const guesses = Array.from(gameState.bonus.guesses.values());
       const targetBonus = gameState.bonus.isFinalized
