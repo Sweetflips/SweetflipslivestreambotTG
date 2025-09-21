@@ -294,12 +294,19 @@ async function sendScheduleToAllGroups() {
     // Get current schedule
     const schedules = await getScheduleForWeek();
     
-    // Build schedule message
-    let scheduleMessage = `📅 <b>Daily Stream Schedule</b>\n\n`;
+    // Build schedule message (exactly like /schedule command)
+    let scheduleMessage;
     
     if (schedules.length === 0) {
-      scheduleMessage += `No scheduled streams for today.\n\n`;
+      scheduleMessage = `📅 <b>Stream Schedule</b>\n\n` +
+        `No scheduled streams found for the next 7 days.\n\n` +
+        `<b>Stream Times:</b>\n` +
+        `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n` +
+        `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
+        `Check back later for updates!`;
     } else {
+      scheduleMessage = `📅 <b>Stream Schedule - Next 7 Days</b>\n\n`;
+
       // Group schedules by day
       const schedulesByDay = {};
       for (const schedule of schedules) {
@@ -309,40 +316,28 @@ async function sendScheduleToAllGroups() {
         schedulesByDay[schedule.dayOfWeek].push(schedule);
       }
 
-      // Get today's day of week (0 = Sunday, 1 = Monday, etc.)
-      const today = new Date().getDay();
-      
-      // Show today's schedule
-      if (schedulesByDay[today] && schedulesByDay[today].length > 0) {
-        scheduleMessage += `<b>Today's Streams:</b>\n`;
-        for (const schedule of schedulesByDay[today]) {
-          const times = getStreamTimes(schedule.streamNumber);
-          scheduleMessage += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
-          scheduleMessage += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
+      // Display schedule for each day
+      for (let day = 0; day < 7; day++) {
+        const dayName = getDayName(day);
+        const daySchedules = schedulesByDay[day] || [];
+
+        if (daySchedules.length > 0) {
+          scheduleMessage += `<b>${dayName}</b>\n`;
+
+          for (const schedule of daySchedules) {
+            const times = getStreamTimes(schedule.streamNumber);
+            scheduleMessage += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
+            scheduleMessage += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
+          }
+          scheduleMessage += `\n`;
         }
-        scheduleMessage += `\n`;
-      } else {
-        scheduleMessage += `No streams scheduled for today.\n\n`;
       }
 
-      // Show tomorrow's schedule
-      const tomorrow = (today + 1) % 7;
-      if (schedulesByDay[tomorrow] && schedulesByDay[tomorrow].length > 0) {
-        scheduleMessage += `<b>Tomorrow's Streams:</b>\n`;
-        for (const schedule of schedulesByDay[tomorrow]) {
-          const times = getStreamTimes(schedule.streamNumber);
-          scheduleMessage += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
-          scheduleMessage += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
-        }
-        scheduleMessage += `\n`;
-      }
+      scheduleMessage += `<b>Stream Times:</b>\n`;
+      scheduleMessage += `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n`;
+      scheduleMessage += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
+      scheduleMessage += `🎮 Join us at https://kick.com/sweetflips`;
     }
-
-    scheduleMessage += `<b>Regular Stream Times:</b>\n`;
-    scheduleMessage += `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n`;
-    scheduleMessage += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
-    scheduleMessage += `🎮 Join us at https://kick.com/sweetflips\n`;
-    scheduleMessage += `💬 Use /kick to link your account and participate in games!`;
 
     // Send to all groups
     let successCount = 0;
