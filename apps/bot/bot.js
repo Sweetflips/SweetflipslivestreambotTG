@@ -838,21 +838,20 @@ bot.command("guess", async (ctx) => {
 bot.command("balanceboard", async (ctx) => {
   try {
     const liveBalance = await liveBalanceService.fetchCurrentBalance();
-
+    
     if (liveBalance === null) {
       await ctx.reply(
         `💰 <b>Balance Leaderboard</b>\n\n` +
-          `Unable to fetch live balance at the moment.\n\n` +
-          `This could be due to:\n` +
-          `• Network connectivity issues\n` +
-          `• API service temporarily unavailable\n` +
-          `• Missing or invalid API credentials\n\n` +
-          `Please try again later or contact an admin.`,
+        `Unable to fetch live balance at the moment.\n\n` +
+        `This could be due to:\n` +
+        `• Network connectivity issues\n` +
+        `• API service temporarily unavailable\n` +
+        `• Missing or invalid API credentials\n\n` +
+        `Please try again later or contact an admin.`,
         { parse_mode: "HTML" }
       );
       return;
     }
-
     let leaderboardText = `💰 <b>Live Balance: ${liveBalance.toLocaleString()}</b>\n\n`;
 
     if (
