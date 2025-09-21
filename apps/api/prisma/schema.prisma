@@ -142,3 +142,17 @@ model TelegramGroup {
 
   @@map("telegram_groups")
 }
+
+model Schedule {
+  id          String   @id @default(cuid())
+  dayOfWeek   Int      // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  streamNumber Int     // 1 or 2 (9AM UTC or 5PM UTC)
+  eventTitle  String   // Title of the stream/event
+  isActive    Boolean  @default(true) // Whether this schedule entry is active
+  createdBy   String?  // User ID who created this schedule entry
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dayOfWeek, streamNumber])
+  @@map("schedules")
+}

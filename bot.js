@@ -150,6 +150,119 @@ async function updateGroupInfo(groupId, groupInfo) {
   }
 }
 
+// Schedule management functions
+async function addScheduleEntry(dayOfWeek, streamNumber, eventTitle, createdBy) {
+  if (!prisma) {
+    console.log("⚠️ Database not available, skipping schedule add");
+    return false;
+  }
+
+  try {
+    await prisma.schedule.upsert({
+      where: {
+        dayOfWeek_streamNumber: {
+          dayOfWeek: dayOfWeek,
+          streamNumber: streamNumber,
+        },
+      },
+      update: {
+        eventTitle: eventTitle,
+        isActive: true,
+        createdBy: createdBy,
+        updatedAt: new Date(),
+      },
+      create: {
+        dayOfWeek: dayOfWeek,
+        streamNumber: streamNumber,
+        eventTitle: eventTitle,
+        isActive: true,
+        createdBy: createdBy,
+      },
+    });
+
+    console.log(`✅ Schedule entry added: Day ${dayOfWeek}, Stream ${streamNumber}, Title: ${eventTitle}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error adding schedule entry:`, error.message);
+    return false;
+  }
+}
+
+async function removeScheduleEntry(dayOfWeek, streamNumber) {
+  if (!prisma) {
+    console.log("⚠️ Database not available, skipping schedule remove");
+    return false;
+  }
+
+  try {
+    await prisma.schedule.update({
+      where: {
+        dayOfWeek_streamNumber: {
+          dayOfWeek: dayOfWeek,
+          streamNumber: streamNumber,
+        },
+      },
+      data: {
+        isActive: false,
+        updatedAt: new Date(),
+      },
+    });
+
+    console.log(`🗑️ Schedule entry removed: Day ${dayOfWeek}, Stream ${streamNumber}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error removing schedule entry:`, error.message);
+    return false;
+  }
+}
+
+async function getScheduleForWeek() {
+  if (!prisma) {
+    console.log("⚠️ Database not available, returning empty schedule");
+    return [];
+  }
+
+  try {
+    const schedules = await prisma.schedule.findMany({
+      where: { isActive: true },
+      orderBy: [
+        { dayOfWeek: "asc" },
+        { streamNumber: "asc" },
+      ],
+    });
+
+    console.log(`📅 Loaded ${schedules.length} schedule entries from database`);
+    return schedules;
+  } catch (error) {
+    console.error("❌ Error loading schedule from database:", error.message);
+    return [];
+  }
+}
+
+// Helper function to get day name from day of week number
+function getDayName(dayOfWeek) {
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  return days[dayOfWeek] || "Unknown";
+}
+
+// Helper function to get stream time in different timezones
+function getStreamTimes(streamNumber) {
+  const stream1UTC = "09:00"; // 9 AM UTC
+  const stream2UTC = "17:00"; // 5 PM UTC
+  
+  const utcTime = streamNumber === 1 ? stream1UTC : stream2UTC;
+  
+  // Convert to different timezones
+  const istTime = streamNumber === 1 ? "14:30" : "22:30"; // +5:30 from UTC
+  const pstTime = streamNumber === 1 ? "01:00" : "09:00"; // -8 from UTC (PST)
+  
+  return {
+    utc: utcTime,
+    ist: istTime,
+    pst: pstTime,
+  };
+}
+
 // Check for required environment variables
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.error("❌ TELEGRAM_BOT_TOKEN environment variable is required!");
@@ -483,6 +596,8 @@ bot.help(async (ctx) => {
       `/guess bonus <number> - Guess the bonus total (requires linked Kick account)\n` +
       `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
       `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
+      `📅 **Schedule Commands:**\n` +
+      `/schedule - View stream schedule for next 7 days\n\n` +
       `🔗 **Account Commands:**\n` +
       `/start - Welcome message and setup\n` +
       `/help - Show this help\n` +
@@ -505,6 +620,8 @@ bot.help(async (ctx) => {
       `/groupstats - Show detailed group management statistics\n` +
       `/testgroups - Test group detection functionality\n` +
       `/addgroup - Manually add a group ID for live announcements\n\n` +
+      `/schedule add <day> <stream> <title> - Add schedule entry\n` +
+      `/schedule remove <day> <stream> - Remove schedule entry\n\n` +
       `/setrole <telegram_id> <MOD|OWNER> - Set user role\n` +
       `/listusers - List all users\n\n`;
 
@@ -518,6 +635,8 @@ bot.help(async (ctx) => {
       `/guess bonus <number> - Guess the bonus total (requires linked Kick account)\n` +
       `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
       `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
+      `📅 **Schedule Commands:**\n` +
+      `/schedule - View stream schedule for next 7 days\n\n` +
       `🔗 **Account Commands:**\n` +
       `/start - Welcome message and setup\n` +
       `/help - Show this help\n` +
@@ -1713,6 +1832,204 @@ bot.command("findgroups", async (ctx) => {
   } catch (error) {
     console.error("❌ Error in findgroups command:", error);
     await ctx.reply("❌ Error finding groups. Please try again.");
+  }
+});
+
+// Schedule command (viewers and admin management)
+bot.command("schedule", async (ctx) => {
+  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+  const args = ctx.message.text.split(" ").slice(1);
+
+  // If no arguments, show schedule (for everyone)
+  if (args.length === 0) {
+    try {
+      const schedules = await getScheduleForWeek();
+      
+      if (schedules.length === 0) {
+        await ctx.reply(
+          `📅 **Stream Schedule**\n\n` +
+          `No scheduled streams found for the next 7 days.\n\n` +
+          `**Stream Times:**\n` +
+          `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n` +
+          `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
+          `Check back later for updates!`
+        );
+        return;
+      }
+
+      let message = `📅 **Stream Schedule - Next 7 Days**\n\n`;
+      
+      // Group schedules by day
+      const schedulesByDay = {};
+      for (const schedule of schedules) {
+        if (!schedulesByDay[schedule.dayOfWeek]) {
+          schedulesByDay[schedule.dayOfWeek] = [];
+        }
+        schedulesByDay[schedule.dayOfWeek].push(schedule);
+      }
+
+      // Display schedule for each day
+      for (let day = 0; day < 7; day++) {
+        const dayName = getDayName(day);
+        const daySchedules = schedulesByDay[day] || [];
+        
+        if (daySchedules.length > 0) {
+          message += `**${dayName}**\n`;
+          
+          for (const schedule of daySchedules) {
+            const times = getStreamTimes(schedule.streamNumber);
+            message += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
+            message += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
+          }
+          message += `\n`;
+        }
+      }
+
+      message += `**Stream Times:**\n`;
+      message += `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n`;
+      message += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
+      message += `🎮 Join us at https://kick.com/sweetflips`;
+
+      await ctx.reply(message);
+    } catch (error) {
+      console.error("❌ Error in schedule command:", error);
+      await ctx.reply("❌ Error loading schedule. Please try again.");
+    }
+    return;
+  }
+
+  // Admin commands require admin privileges
+  if (!isAdmin(user)) {
+    await ctx.reply(`⛔️ Mods only.`);
+    return;
+  }
+
+  const action = args[0].toLowerCase();
+
+  if (action === "add") {
+    // /schedule add <day> <stream> <title>
+    if (args.length < 4) {
+      await ctx.reply(
+        `❌ **Invalid format for /schedule add**\n\n` +
+        `**Usage:** \`/schedule add <day> <stream> <title>\`\n\n` +
+        `**Examples:**\n` +
+        `• \`/schedule add monday 1 Gaming Stream\`\n` +
+        `• \`/schedule add friday 2 Bonus Hunt\`\n\n` +
+        `**Days:** monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
+        `**Streams:** 1 (9AM UTC) or 2 (5PM UTC)`
+      );
+      return;
+    }
+
+    const dayName = args[1].toLowerCase();
+    const streamNumber = parseInt(args[2]);
+    const eventTitle = args.slice(3).join(" ");
+
+    // Validate day
+    const dayMap = {
+      "sunday": 0, "monday": 1, "tuesday": 2, "wednesday": 3,
+      "thursday": 4, "friday": 5, "saturday": 6
+    };
+    
+    const dayOfWeek = dayMap[dayName];
+    if (dayOfWeek === undefined) {
+      await ctx.reply(
+        `❌ **Invalid day name.**\n\n` +
+        `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`
+      );
+      return;
+    }
+
+    // Validate stream number
+    if (streamNumber !== 1 && streamNumber !== 2) {
+      await ctx.reply(
+        `❌ **Invalid stream number.**\n\n` +
+        `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`
+      );
+      return;
+    }
+
+    // Add schedule entry
+    const success = await addScheduleEntry(dayOfWeek, streamNumber, eventTitle, user.id);
+    
+    if (success) {
+      const times = getStreamTimes(streamNumber);
+      await ctx.reply(
+        `✅ **Schedule Entry Added!**\n\n` +
+        `**Day:** ${getDayName(dayOfWeek)}\n` +
+        `**Stream:** ${streamNumber}\n` +
+        `**Title:** ${eventTitle}\n` +
+        `**Times:**\n` +
+        `🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}`
+      );
+    } else {
+      await ctx.reply("❌ Failed to add schedule entry. Please try again.");
+    }
+  } else if (action === "remove") {
+    // /schedule remove <day> <stream>
+    if (args.length < 3) {
+      await ctx.reply(
+        `❌ **Invalid format for /schedule remove**\n\n` +
+        `**Usage:** \`/schedule remove <day> <stream>\`\n\n` +
+        `**Examples:**\n` +
+        `• \`/schedule remove monday 1\`\n` +
+        `• \`/schedule remove friday 2\`\n\n` +
+        `**Days:** monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
+        `**Streams:** 1 (9AM UTC) or 2 (5PM UTC)`
+      );
+      return;
+    }
+
+    const dayName = args[1].toLowerCase();
+    const streamNumber = parseInt(args[2]);
+
+    // Validate day
+    const dayMap = {
+      "sunday": 0, "monday": 1, "tuesday": 2, "wednesday": 3,
+      "thursday": 4, "friday": 5, "saturday": 6
+    };
+    
+    const dayOfWeek = dayMap[dayName];
+    if (dayOfWeek === undefined) {
+      await ctx.reply(
+        `❌ **Invalid day name.**\n\n` +
+        `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`
+      );
+      return;
+    }
+
+    // Validate stream number
+    if (streamNumber !== 1 && streamNumber !== 2) {
+      await ctx.reply(
+        `❌ **Invalid stream number.**\n\n` +
+        `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`
+      );
+      return;
+    }
+
+    // Remove schedule entry
+    const success = await removeScheduleEntry(dayOfWeek, streamNumber);
+    
+    if (success) {
+      await ctx.reply(
+        `✅ **Schedule Entry Removed!**\n\n` +
+        `**Day:** ${getDayName(dayOfWeek)}\n` +
+        `**Stream:** ${streamNumber}`
+      );
+    } else {
+      await ctx.reply("❌ Failed to remove schedule entry. Please try again.");
+    }
+  } else {
+    await ctx.reply(
+      `❌ **Invalid schedule command.**\n\n` +
+      `**Available commands:**\n` +
+      `• \`/schedule\` - View schedule (everyone)\n` +
+      `• \`/schedule add <day> <stream> <title>\` - Add schedule entry (mods only)\n` +
+      `• \`/schedule remove <day> <stream>\` - Remove schedule entry (mods only)\n\n` +
+      `**Examples:**\n` +
+      `• \`/schedule add monday 1 Gaming Stream\`\n` +
+      `• \`/schedule remove friday 2\``
+    );
   }
 });
 
