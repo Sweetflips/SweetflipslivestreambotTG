@@ -767,17 +767,17 @@ bot.help(async (ctx) => {
         `/bonus finalize - Finalize bonus game with active bonus\n` +
         `/bonus reset - Reset bonus game\n` +
         `/bonus show - Show current bonus standings\n\n` +
-        `/add <bonus name> - Add a bonus (counts as +1)\n` +
-        `/remove <bonus name> - Remove a bonus (counts as -1)\n\n` +
+        `/add &lt;bonus name&gt; - Add a bonus (counts as +1)\n` +
+        `/remove &lt;bonus name&gt; - Remove a bonus (counts as -1)\n\n` +
         `/live - Send live announcement to all groups\n` +
         `/broadcastschedule - Manually send schedule to all groups\n` +
         `/findgroups - Find all group chats where bot is a member\n` +
         `/groupstats - Show detailed group management statistics\n` +
         `/testgroups - Test group detection functionality\n` +
         `/addgroup - Manually add a group ID for live announcements\n\n` +
-        `/schedule add <day> <stream> <title> - Add schedule entry\n` +
-        `/schedule remove <day> <stream> - Remove schedule entry\n\n` +
-        `/setrole <telegram_id> <MOD|OWNER> - Set user role\n` +
+        `/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt; - Add schedule entry\n` +
+        `/schedule remove &lt;day&gt; &lt;stream&gt; - Remove schedule entry\n\n` +
+        `/setrole &lt;telegram_id&gt; &lt;MOD|OWNER&gt; - Set user role\n` +
         `/listusers - List all users\n\n`;
 
       await ctx.reply(helpText, { parse_mode: "HTML" });
