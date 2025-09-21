@@ -20,6 +20,7 @@
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
     "db:migrate": "npx prisma migrate dev",
+    "db:setup": "node scripts/setup-database.js",
     "db:create-tables": "node create-tables.js",
     "health": "node -e \"console.log('Health check: OK')\"",
     "test:auto": "node -e \"console.log('Auto-continue test: Bot will restart automatically on errors')\""
