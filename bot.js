@@ -151,7 +151,12 @@ async function updateGroupInfo(groupId, groupInfo) {
 }
 
 // Schedule management functions
-async function addScheduleEntry(dayOfWeek, streamNumber, eventTitle, createdBy) {
+async function addScheduleEntry(
+  dayOfWeek,
+  streamNumber,
+  eventTitle,
+  createdBy
+) {
   if (!prisma) {
     console.log("⚠️ Database not available, skipping schedule add");
     return false;
@@ -180,7 +185,9 @@ async function addScheduleEntry(dayOfWeek, streamNumber, eventTitle, createdBy) 
       },
     });
 
-    console.log(`✅ Schedule entry added: Day ${dayOfWeek}, Stream ${streamNumber}, Title: ${eventTitle}`);
+    console.log(
+      `✅ Schedule entry added: Day ${dayOfWeek}, Stream ${streamNumber}, Title: ${eventTitle}`
+    );
     return true;
   } catch (error) {
     console.error(`❌ Error adding schedule entry:`, error.message);
@@ -208,7 +215,9 @@ async function removeScheduleEntry(dayOfWeek, streamNumber) {
       },
     });
 
-    console.log(`🗑️ Schedule entry removed: Day ${dayOfWeek}, Stream ${streamNumber}`);
+    console.log(
+      `🗑️ Schedule entry removed: Day ${dayOfWeek}, Stream ${streamNumber}`
+    );
     return true;
   } catch (error) {
     console.error(`❌ Error removing schedule entry:`, error.message);
@@ -225,10 +234,7 @@ async function getScheduleForWeek() {
   try {
     const schedules = await prisma.schedule.findMany({
       where: { isActive: true },
-      orderBy: [
-        { dayOfWeek: "asc" },
-        { streamNumber: "asc" },
-      ],
+      orderBy: [{ dayOfWeek: "asc" }, { streamNumber: "asc" }],
     });
 
     console.log(`📅 Loaded ${schedules.length} schedule entries from database`);
@@ -241,7 +247,15 @@ async function getScheduleForWeek() {
 
 // Helper function to get day name from day of week number
 function getDayName(dayOfWeek) {
-  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
   return days[dayOfWeek] || "Unknown";
 }
 
@@ -249,13 +263,13 @@ function getDayName(dayOfWeek) {
 function getStreamTimes(streamNumber) {
   const stream1UTC = "09:00"; // 9 AM UTC
   const stream2UTC = "17:00"; // 5 PM UTC
-  
+
   const utcTime = streamNumber === 1 ? stream1UTC : stream2UTC;
-  
+
   // Convert to different timezones
   const istTime = streamNumber === 1 ? "14:30" : "22:30"; // +5:30 from UTC
   const pstTime = streamNumber === 1 ? "01:00" : "09:00"; // -8 from UTC (PST)
-  
+
   return {
     utc: utcTime,
     ist: istTime,
@@ -1844,21 +1858,22 @@ bot.command("schedule", async (ctx) => {
   if (args.length === 0) {
     try {
       const schedules = await getScheduleForWeek();
-      
-      if (schedules.length === 0) {
-        await ctx.reply(
-          `📅 **Stream Schedule**\n\n` +
-          `No scheduled streams found for the next 7 days.\n\n` +
-          `**Stream Times:**\n` +
-          `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n` +
-          `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
-          `Check back later for updates!`
-        );
-        return;
-      }
 
-      let message = `📅 **Stream Schedule - Next 7 Days**\n\n`;
-      
+        if (schedules.length === 0) {
+          await ctx.reply(
+            `📅 <b>Stream Schedule</b>\n\n` +
+              `No scheduled streams found for the next 7 days.\n\n` +
+              `<b>Stream Times:</b>\n` +
+              `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n` +
+              `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
+              `Check back later for updates!`,
+            { parse_mode: 'HTML' }
+          );
+          return;
+        }
+
+        let message = `📅 <b>Stream Schedule - Next 7 Days</b>\n\n`;
+
       // Group schedules by day
       const schedulesByDay = {};
       for (const schedule of schedules) {
@@ -1872,10 +1887,10 @@ bot.command("schedule", async (ctx) => {
       for (let day = 0; day < 7; day++) {
         const dayName = getDayName(day);
         const daySchedules = schedulesByDay[day] || [];
-        
+
         if (daySchedules.length > 0) {
-          message += `**${dayName}**\n`;
-          
+          message += `<b>${dayName}</b>\n`;
+
           for (const schedule of daySchedules) {
             const times = getStreamTimes(schedule.streamNumber);
             message += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
@@ -1885,12 +1900,12 @@ bot.command("schedule", async (ctx) => {
         }
       }
 
-      message += `**Stream Times:**\n`;
+      message += `<b>Stream Times:</b>\n`;
       message += `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n`;
       message += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
       message += `🎮 Join us at https://kick.com/sweetflips`;
 
-      await ctx.reply(message);
+      await ctx.reply(message, { parse_mode: 'HTML' });
     } catch (error) {
       console.error("❌ Error in schedule command:", error);
       await ctx.reply("❌ Error loading schedule. Please try again.");
@@ -1910,13 +1925,14 @@ bot.command("schedule", async (ctx) => {
     // /schedule add <day> <stream> <title>
     if (args.length < 4) {
       await ctx.reply(
-        `❌ **Invalid format for /schedule add**\n\n` +
-        `**Usage:** \`/schedule add <day> <stream> <title>\`\n\n` +
-        `**Examples:**\n` +
-        `• \`/schedule add monday 1 Gaming Stream\`\n` +
-        `• \`/schedule add friday 2 Bonus Hunt\`\n\n` +
-        `**Days:** monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
-        `**Streams:** 1 (9AM UTC) or 2 (5PM UTC)`
+        `❌ <b>Invalid format for /schedule add</b>\n\n` +
+          `<b>Usage:</b> <code>/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt;</code>\n\n` +
+          `<b>Examples:</b>\n` +
+          `• <code>/schedule add monday 1 Gaming Stream</code>\n` +
+          `• <code>/schedule add friday 2 Bonus Hunt</code>\n\n` +
+          `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
+          `<b>Streams:</b> 1 (9AM UTC) or 2 (5PM UTC)`,
+        { parse_mode: 'HTML' }
       );
       return;
     }
@@ -1927,15 +1943,21 @@ bot.command("schedule", async (ctx) => {
 
     // Validate day
     const dayMap = {
-      "sunday": 0, "monday": 1, "tuesday": 2, "wednesday": 3,
-      "thursday": 4, "friday": 5, "saturday": 6
+      sunday: 0,
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
     };
-    
+
     const dayOfWeek = dayMap[dayName];
     if (dayOfWeek === undefined) {
       await ctx.reply(
-        `❌ **Invalid day name.**\n\n` +
-        `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`
+        `❌ <b>Invalid day name.</b>\n\n` +
+          `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`,
+        { parse_mode: 'HTML' }
       );
       return;
     }
@@ -1943,24 +1965,31 @@ bot.command("schedule", async (ctx) => {
     // Validate stream number
     if (streamNumber !== 1 && streamNumber !== 2) {
       await ctx.reply(
-        `❌ **Invalid stream number.**\n\n` +
-        `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`
+        `❌ <b>Invalid stream number.</b>\n\n` +
+          `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`,
+        { parse_mode: 'HTML' }
       );
       return;
     }
 
     // Add schedule entry
-    const success = await addScheduleEntry(dayOfWeek, streamNumber, eventTitle, user.id);
-    
+    const success = await addScheduleEntry(
+      dayOfWeek,
+      streamNumber,
+      eventTitle,
+      user.id
+    );
+
     if (success) {
       const times = getStreamTimes(streamNumber);
       await ctx.reply(
-        `✅ **Schedule Entry Added!**\n\n` +
-        `**Day:** ${getDayName(dayOfWeek)}\n` +
-        `**Stream:** ${streamNumber}\n` +
-        `**Title:** ${eventTitle}\n` +
-        `**Times:**\n` +
-        `🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}`
+        `✅ <b>Schedule Entry Added!</b>\n\n` +
+          `<b>Day:</b> ${getDayName(dayOfWeek)}\n` +
+          `<b>Stream:</b> ${streamNumber}\n` +
+          `<b>Title:</b> ${eventTitle}\n` +
+          `<b>Times:</b>\n` +
+          `🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}`,
+        { parse_mode: 'HTML' }
       );
     } else {
       await ctx.reply("❌ Failed to add schedule entry. Please try again.");
@@ -1969,13 +1998,14 @@ bot.command("schedule", async (ctx) => {
     // /schedule remove <day> <stream>
     if (args.length < 3) {
       await ctx.reply(
-        `❌ **Invalid format for /schedule remove**\n\n` +
-        `**Usage:** \`/schedule remove <day> <stream>\`\n\n` +
-        `**Examples:**\n` +
-        `• \`/schedule remove monday 1\`\n` +
-        `• \`/schedule remove friday 2\`\n\n` +
-        `**Days:** monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
-        `**Streams:** 1 (9AM UTC) or 2 (5PM UTC)`
+        `❌ <b>Invalid format for /schedule remove</b>\n\n` +
+          `<b>Usage:</b> <code>/schedule remove &lt;day&gt; &lt;stream&gt;</code>\n\n` +
+          `<b>Examples:</b>\n` +
+          `• <code>/schedule remove monday 1</code>\n` +
+          `• <code>/schedule remove friday 2</code>\n\n` +
+          `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
+          `<b>Streams:</b> 1 (9AM UTC) or 2 (5PM UTC)`,
+        { parse_mode: 'HTML' }
       );
       return;
     }
@@ -1985,15 +2015,21 @@ bot.command("schedule", async (ctx) => {
 
     // Validate day
     const dayMap = {
-      "sunday": 0, "monday": 1, "tuesday": 2, "wednesday": 3,
-      "thursday": 4, "friday": 5, "saturday": 6
+      sunday: 0,
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
     };
-    
+
     const dayOfWeek = dayMap[dayName];
     if (dayOfWeek === undefined) {
       await ctx.reply(
-        `❌ **Invalid day name.**\n\n` +
-        `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`
+        `❌ <b>Invalid day name.</b>\n\n` +
+          `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`,
+        { parse_mode: 'HTML' }
       );
       return;
     }
@@ -2001,34 +2037,37 @@ bot.command("schedule", async (ctx) => {
     // Validate stream number
     if (streamNumber !== 1 && streamNumber !== 2) {
       await ctx.reply(
-        `❌ **Invalid stream number.**\n\n` +
-        `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`
+        `❌ <b>Invalid stream number.</b>\n\n` +
+          `Valid streams: 1 (9AM UTC) or 2 (5PM UTC)`,
+        { parse_mode: 'HTML' }
       );
       return;
     }
 
     // Remove schedule entry
     const success = await removeScheduleEntry(dayOfWeek, streamNumber);
-    
+
     if (success) {
       await ctx.reply(
-        `✅ **Schedule Entry Removed!**\n\n` +
-        `**Day:** ${getDayName(dayOfWeek)}\n` +
-        `**Stream:** ${streamNumber}`
+        `✅ <b>Schedule Entry Removed!</b>\n\n` +
+          `<b>Day:</b> ${getDayName(dayOfWeek)}\n` +
+          `<b>Stream:</b> ${streamNumber}`,
+        { parse_mode: 'HTML' }
       );
     } else {
       await ctx.reply("❌ Failed to remove schedule entry. Please try again.");
     }
   } else {
     await ctx.reply(
-      `❌ **Invalid schedule command.**\n\n` +
-      `**Available commands:**\n` +
-      `• \`/schedule\` - View schedule (everyone)\n` +
-      `• \`/schedule add <day> <stream> <title>\` - Add schedule entry (mods only)\n` +
-      `• \`/schedule remove <day> <stream>\` - Remove schedule entry (mods only)\n\n` +
-      `**Examples:**\n` +
-      `• \`/schedule add monday 1 Gaming Stream\`\n` +
-      `• \`/schedule remove friday 2\``
+      `❌ <b>Invalid schedule command.</b>\n\n` +
+        `<b>Available commands:</b>\n` +
+        `• <code>/schedule</code> - View schedule (everyone)\n` +
+        `• <code>/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt;</code> - Add schedule entry (mods only)\n` +
+        `• <code>/schedule remove &lt;day&gt; &lt;stream&gt;</code> - Remove schedule entry (mods only)\n\n` +
+        `<b>Examples:</b>\n` +
+        `• <code>/schedule add monday 1 Gaming Stream</code>\n` +
+        `• <code>/schedule remove friday 2</code>`,
+      { parse_mode: 'HTML' }
     );
   }
 });
