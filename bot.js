@@ -393,6 +393,7 @@ bot.help(async (ctx) => {
       `/live - Send live announcement to all groups\n` +
       `/findgroups - Find all group chats where bot is a member\n` +
       `/groupstats - Show detailed group management statistics\n` +
+      `/testgroups - Test group detection functionality\n` +
       `/addgroup - Manually add a group ID for live announcements\n\n` +
       `/setrole <telegram_id> <MOD|OWNER> - Set user role\n` +
       `/listusers - List all users\n\n`;
@@ -986,7 +987,9 @@ async function getAllGroups() {
   console.log("🔍 Discovering all groups where bot is a member...");
 
   // First, add manually added groups from memory
-  console.log(`📝 Checking ${global.knownGroups.size} known groups from memory...`);
+  console.log(
+    `📝 Checking ${global.knownGroups.size} known groups from memory...`
+  );
   for (const groupId of global.knownGroups) {
     try {
       if (await isBotMember(groupId)) {
@@ -995,15 +998,15 @@ async function getAllGroups() {
         try {
           const chatInfo = await bot.telegram.getChat(groupId);
           groupDetails.set(groupId, {
-            title: chatInfo.title || 'Unknown',
+            title: chatInfo.title || "Unknown",
             type: chatInfo.type,
-            source: 'memory'
+            source: "memory",
           });
         } catch (error) {
           groupDetails.set(groupId, {
-            title: 'Unknown',
-            type: 'unknown',
-            source: 'memory'
+            title: "Unknown",
+            type: "unknown",
+            source: "memory",
           });
         }
         console.log(`✅ Found active group from memory: ${groupId}`);
@@ -1012,16 +1015,24 @@ async function getAllGroups() {
         global.knownGroups.delete(groupId); // Clean up inactive groups
       }
     } catch (error) {
-      console.error(`❌ Error checking group from memory ${groupId}:`, error.message);
+      console.error(
+        `❌ Error checking group from memory ${groupId}:`,
+        error.message
+      );
     }
   }
 
   // Then, try to get groups from environment variable (if configured)
   const configuredGroups = process.env.ADMIN_GROUP_IDS;
   if (configuredGroups) {
-    const groupIds = configuredGroups.split(",").map((id) => id.trim()).filter(id => id);
-    console.log(`⚙️ Checking ${groupIds.length} configured groups from environment...`);
-    
+    const groupIds = configuredGroups
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id);
+    console.log(
+      `⚙️ Checking ${groupIds.length} configured groups from environment...`
+    );
+
     for (const groupId of groupIds) {
       try {
         if (await isBotMember(groupId)) {
@@ -1030,15 +1041,15 @@ async function getAllGroups() {
           try {
             const chatInfo = await bot.telegram.getChat(groupId);
             groupDetails.set(groupId, {
-              title: chatInfo.title || 'Unknown',
+              title: chatInfo.title || "Unknown",
               type: chatInfo.type,
-              source: 'environment'
+              source: "environment",
             });
           } catch (error) {
             groupDetails.set(groupId, {
-              title: 'Unknown',
-              type: 'unknown',
-              source: 'environment'
+              title: "Unknown",
+              type: "unknown",
+              source: "environment",
             });
           }
           console.log(`✅ Found active configured group: ${groupId}`);
@@ -1046,7 +1057,10 @@ async function getAllGroups() {
           console.log(`❌ Configured group is no longer active: ${groupId}`);
         }
       } catch (error) {
-        console.error(`❌ Error checking configured group ${groupId}:`, error.message);
+        console.error(
+          `❌ Error checking configured group ${groupId}:`,
+          error.message
+        );
       }
     }
   }
@@ -1073,46 +1087,66 @@ async function getAllGroups() {
         // Check regular messages
         if (update.message && update.message.chat) {
           const chat = update.message.chat;
-          if ((chat.type === "group" || chat.type === "supergroup") && !allGroups.has(chat.id.toString())) {
+          if (
+            (chat.type === "group" || chat.type === "supergroup") &&
+            !allGroups.has(chat.id.toString())
+          ) {
             try {
               if (await isBotMember(chat.id)) {
                 allGroups.add(chat.id.toString());
                 groupDetails.set(chat.id.toString(), {
-                  title: chat.title || 'Unknown',
+                  title: chat.title || "Unknown",
                   type: chat.type,
-                  source: 'updates'
+                  source: "updates",
                 });
                 newGroupsFound++;
-                console.log(`✅ Found new group from updates: ${chat.id} (${chat.title || 'Unknown'})`);
+                console.log(
+                  `✅ Found new group from updates: ${chat.id} (${
+                    chat.title || "Unknown"
+                  })`
+                );
               }
             } catch (error) {
-              console.error(`❌ Error checking group from updates ${chat.id}:`, error.message);
+              console.error(
+                `❌ Error checking group from updates ${chat.id}:`,
+                error.message
+              );
             }
           }
         }
-        
+
         // Check my_chat_member updates (bot being added/removed)
         if (update.my_chat_member && update.my_chat_member.chat) {
           const chat = update.my_chat_member.chat;
-          if ((chat.type === "group" || chat.type === "supergroup") && !allGroups.has(chat.id.toString())) {
+          if (
+            (chat.type === "group" || chat.type === "supergroup") &&
+            !allGroups.has(chat.id.toString())
+          ) {
             try {
               if (await isBotMember(chat.id)) {
                 allGroups.add(chat.id.toString());
                 groupDetails.set(chat.id.toString(), {
-                  title: chat.title || 'Unknown',
+                  title: chat.title || "Unknown",
                   type: chat.type,
-                  source: 'chat_member_updates'
+                  source: "chat_member_updates",
                 });
                 newGroupsFound++;
-                console.log(`✅ Found new group from chat member updates: ${chat.id} (${chat.title || 'Unknown'})`);
+                console.log(
+                  `✅ Found new group from chat member updates: ${chat.id} (${
+                    chat.title || "Unknown"
+                  })`
+                );
               }
             } catch (error) {
-              console.error(`❌ Error checking group from chat member updates ${chat.id}:`, error.message);
+              console.error(
+                `❌ Error checking group from chat member updates ${chat.id}:`,
+                error.message
+              );
             }
           }
         }
       }
-      
+
       console.log(`📊 Found ${newGroupsFound} new groups from updates`);
     } else {
       console.error("❌ Failed to fetch updates from Telegram API");
@@ -1124,12 +1158,12 @@ async function getAllGroups() {
   // Log summary
   console.log(`\n📊 Group Discovery Summary:`);
   console.log(`✅ Total active groups found: ${allGroups.size}`);
-  
+
   const sourceCounts = {};
   for (const [groupId, details] of groupDetails) {
     sourceCounts[details.source] = (sourceCounts[details.source] || 0) + 1;
   }
-  
+
   for (const [source, count] of Object.entries(sourceCounts)) {
     console.log(`   ${source}: ${count} groups`);
   }
@@ -1139,15 +1173,15 @@ async function getAllGroups() {
 
 // Function to send live announcement to all groups
 async function sendLiveAnnouncement() {
-  const currentTime = new Date().toLocaleString('en-US', {
-    timeZone: 'America/New_York',
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZoneName: 'short'
+  const currentTime = new Date().toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
   });
 
   const liveMessage = `🔴 **SWEETFLIPS IS LIVE!** 🔴
@@ -1186,30 +1220,40 @@ async function sendLiveAnnouncement() {
     const results = [];
     const failedGroups = []; // Groups to retry
 
-    console.log(`📢 Sending live announcement to ${allGroups.length} groups...`);
+    console.log(
+      `📢 Sending live announcement to ${allGroups.length} groups...`
+    );
 
     // First attempt - send to all groups
     for (const groupId of allGroups) {
       try {
         await bot.telegram.sendMessage(groupId, liveMessage, {
-          parse_mode: 'Markdown',
-          disable_web_page_preview: false
+          parse_mode: "Markdown",
+          disable_web_page_preview: false,
         });
         successCount++;
         results.push({ groupId, status: "success", attempt: 1 });
         console.log(`✅ Live announcement sent to group ${groupId}`);
-        
+
         // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`❌ Failed to send to group ${groupId} (attempt 1):`, error.message);
-        
+        console.error(
+          `❌ Failed to send to group ${groupId} (attempt 1):`,
+          error.message
+        );
+
         // Check if it's a retryable error
         if (isRetryableError(error)) {
           failedGroups.push({ groupId, error: error.message, attempt: 1 });
         } else {
           failedCount++;
-          results.push({ groupId, status: "failed", error: error.message, attempt: 1 });
+          results.push({
+            groupId,
+            status: "failed",
+            error: error.message,
+            attempt: 1,
+          });
         }
       }
     }
@@ -1217,35 +1261,42 @@ async function sendLiveAnnouncement() {
     // Retry failed groups after a short delay
     if (failedGroups.length > 0) {
       console.log(`🔄 Retrying ${failedGroups.length} failed groups...`);
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
 
       for (const { groupId, error: originalError } of failedGroups) {
         try {
           await bot.telegram.sendMessage(groupId, liveMessage, {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: false
+            parse_mode: "Markdown",
+            disable_web_page_preview: false,
           });
           successCount++;
           results.push({ groupId, status: "success", attempt: 2 });
-          console.log(`✅ Live announcement sent to group ${groupId} (retry successful)`);
-          
+          console.log(
+            `✅ Live announcement sent to group ${groupId} (retry successful)`
+          );
+
           // Small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 150));
+          await new Promise((resolve) => setTimeout(resolve, 150));
         } catch (error) {
           failedCount++;
-          results.push({ 
-            groupId, 
-            status: "failed", 
-            error: error.message, 
+          results.push({
+            groupId,
+            status: "failed",
+            error: error.message,
             originalError: originalError,
-            attempt: 2 
+            attempt: 2,
           });
-          console.error(`❌ Failed to send to group ${groupId} (retry failed):`, error.message);
-          
+          console.error(
+            `❌ Failed to send to group ${groupId} (retry failed):`,
+            error.message
+          );
+
           // Remove from known groups if bot was removed or group doesn't exist
           if (isPermanentError(error)) {
             global.knownGroups.delete(groupId);
-            console.log(`🗑️ Removed inactive group from known groups: ${groupId}`);
+            console.log(
+              `🗑️ Removed inactive group from known groups: ${groupId}`
+            );
           }
         }
       }
@@ -1254,7 +1305,11 @@ async function sendLiveAnnouncement() {
     console.log(`\n📊 Live Announcement Results:`);
     console.log(`✅ Successfully sent: ${successCount} groups`);
     console.log(`❌ Failed: ${failedCount} groups`);
-    console.log(`📈 Success rate: ${((successCount / allGroups.length) * 100).toFixed(1)}%`);
+    console.log(
+      `📈 Success rate: ${((successCount / allGroups.length) * 100).toFixed(
+        1
+      )}%`
+    );
 
     return { success: successCount, failed: failedCount, groups: results };
   } catch (error) {
@@ -1266,34 +1321,38 @@ async function sendLiveAnnouncement() {
 // Helper function to determine if an error is retryable
 function isRetryableError(error) {
   const retryableErrors = [
-    'ETELEGRAM',
-    'ECONNRESET',
-    'ETIMEDOUT',
-    'ENOTFOUND',
-    'rate limit',
-    'flood',
-    'temporary'
+    "ETELEGRAM",
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "ENOTFOUND",
+    "rate limit",
+    "flood",
+    "temporary",
   ];
-  
+
   const errorMessage = error.message.toLowerCase();
-  return retryableErrors.some(retryableError => errorMessage.includes(retryableError));
+  return retryableErrors.some((retryableError) =>
+    errorMessage.includes(retryableError)
+  );
 }
 
 // Helper function to determine if an error is permanent (bot removed, group deleted, etc.)
 function isPermanentError(error) {
   const permanentErrors = [
-    'bot was blocked',
-    'chat not found',
-    'bot is not a member',
-    'group chat was upgraded',
-    'chat is deactivated',
-    'user is deactivated',
-    'forbidden: bot is not a member',
-    'forbidden: chat not found'
+    "bot was blocked",
+    "chat not found",
+    "bot is not a member",
+    "group chat was upgraded",
+    "chat is deactivated",
+    "user is deactivated",
+    "forbidden: bot is not a member",
+    "forbidden: chat not found",
   ];
-  
+
   const errorMessage = error.message.toLowerCase();
-  return permanentErrors.some(permanentError => errorMessage.includes(permanentError));
+  return permanentErrors.some((permanentError) =>
+    errorMessage.includes(permanentError)
+  );
 }
 
 bot.command("addgroup", async (ctx) => {
@@ -1340,19 +1399,21 @@ bot.command("findgroups", async (ctx) => {
 
     if (allGroups.length > 0) {
       let message = `✅ **Found ${allGroups.length} groups where bot is a member:**\n\n`;
-      
+
       // Get detailed info for each group
       for (let i = 0; i < allGroups.length; i++) {
         const groupId = allGroups[i];
         try {
           const chatInfo = await bot.telegram.getChat(groupId);
           const memberCount = await bot.telegram.getChatMemberCount(groupId);
-          message += `${i + 1}. **${chatInfo.title || 'Unknown'}**\n`;
+          message += `${i + 1}. **${chatInfo.title || "Unknown"}**\n`;
           message += `   ID: \`${groupId}\`\n`;
           message += `   Type: ${chatInfo.type}\n`;
           message += `   Members: ${memberCount}\n\n`;
         } catch (error) {
-          message += `${i + 1}. Group ID: \`${groupId}\` (Info unavailable)\n\n`;
+          message += `${
+            i + 1
+          }. Group ID: \`${groupId}\` (Info unavailable)\n\n`;
         }
       }
 
@@ -1383,6 +1444,69 @@ bot.command("findgroups", async (ctx) => {
   }
 });
 
+// Test command to verify group detection functionality
+bot.command("testgroups", async (ctx) => {
+  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+
+  if (!isAdmin(user)) {
+    await ctx.reply(`⛔️ Mods only.`);
+    return;
+  }
+
+  await ctx.reply("🧪 Testing group detection functionality...");
+
+  try {
+    // Test 1: Check current known groups
+    let message = `🧪 **Group Detection Test Results**\n\n`;
+    message += `📝 **Known Groups (Memory):** ${global.knownGroups.size}\n`;
+    if (global.knownGroups.size > 0) {
+      message += `Groups: ${Array.from(global.knownGroups).join(", ")}\n\n`;
+    } else {
+      message += `No groups in memory\n\n`;
+    }
+
+    // Test 2: Check environment variable
+    const configuredGroups = process.env.ADMIN_GROUP_IDS;
+    message += `⚙️ **Environment Variable:** ${configuredGroups ? "Set" : "Not set"}\n`;
+    if (configuredGroups) {
+      const groupIds = configuredGroups.split(",").map((id) => id.trim()).filter((id) => id);
+      message += `Configured groups: ${groupIds.length}\n`;
+      message += `IDs: ${groupIds.join(", ")}\n\n`;
+    } else {
+      message += `No ADMIN_GROUP_IDS configured\n\n`;
+    }
+
+    // Test 3: Test isBotMember function with a dummy ID
+    message += `🔍 **Bot Member Check Test:**\n`;
+    try {
+      const testResult = await isBotMember("-1000000000000"); // Dummy group ID
+      message += `Dummy group test: ${testResult ? "Member" : "Not member"} (expected: Not member)\n`;
+    } catch (error) {
+      message += `Dummy group test: Error - ${error.message}\n`;
+    }
+
+    // Test 4: Check if we can get bot info
+    try {
+      const botInfo = await bot.telegram.getMe();
+      message += `Bot info: @${botInfo.username} (ID: ${botInfo.id})\n\n`;
+    } catch (error) {
+      message += `Bot info: Error - ${error.message}\n\n`;
+    }
+
+    message += `💡 **Next Steps:**\n`;
+    message += `1. Add bot to a test group\n`;
+    message += `2. Send any message in the group\n`;
+    message += `3. Run /findgroups to see if it's detected\n`;
+    message += `4. Use /addgroup to manually add group IDs\n`;
+    message += `5. Set ADMIN_GROUP_IDS environment variable for persistence`;
+
+    await ctx.reply(message);
+  } catch (error) {
+    console.error("❌ Error in testgroups command:", error);
+    await ctx.reply("❌ Error running group detection test. Please try again.");
+  }
+});
+
 // New command to show group statistics
 bot.command("groupstats", async (ctx) => {
   const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
@@ -1397,7 +1521,9 @@ bot.command("groupstats", async (ctx) => {
   try {
     const allGroups = await getAllGroups();
     const knownGroupsCount = global.knownGroups.size;
-    const configuredGroups = process.env.ADMIN_GROUP_IDS ? process.env.ADMIN_GROUP_IDS.split(",").length : 0;
+    const configuredGroups = process.env.ADMIN_GROUP_IDS
+      ? process.env.ADMIN_GROUP_IDS.split(",").length
+      : 0;
 
     let message = `📊 **Group Management Statistics**\n\n`;
     message += `🔢 **Total Active Groups:** ${allGroups.length}\n`;
@@ -1406,27 +1532,28 @@ bot.command("groupstats", async (ctx) => {
 
     if (allGroups.length > 0) {
       message += `📋 **Group Details:**\n`;
-      
+
       let totalMembers = 0;
-      for (let i = 0; i < Math.min(allGroups.length, 10); i++) { // Show max 10 groups
+      for (let i = 0; i < Math.min(allGroups.length, 10); i++) {
+        // Show max 10 groups
         const groupId = allGroups[i];
         try {
           const chatInfo = await bot.telegram.getChat(groupId);
           const memberCount = await bot.telegram.getChatMemberCount(groupId);
           totalMembers += memberCount;
-          
-          message += `${i + 1}. **${chatInfo.title || 'Unknown'}**\n`;
+
+          message += `${i + 1}. **${chatInfo.title || "Unknown"}**\n`;
           message += `   👥 ${memberCount} members\n`;
           message += `   🆔 \`${groupId}\`\n\n`;
         } catch (error) {
           message += `${i + 1}. Group \`${groupId}\` (Info unavailable)\n\n`;
         }
       }
-      
+
       if (allGroups.length > 10) {
         message += `... and ${allGroups.length - 10} more groups\n\n`;
       }
-      
+
       message += `👥 **Total Members Across All Groups:** ${totalMembers}\n\n`;
     }
 
@@ -1487,40 +1614,54 @@ bot.command("live", async (ctx) => {
 bot.on("my_chat_member", async (ctx) => {
   const update = ctx.update;
   const chatMember = update.my_chat_member;
-  
-  if (chatMember.chat.type === "group" || chatMember.chat.type === "supergroup") {
+
+  if (
+    chatMember.chat.type === "group" ||
+    chatMember.chat.type === "supergroup"
+  ) {
     const chatId = chatMember.chat.id.toString();
     const newStatus = chatMember.new_chat_member.status;
     const oldStatus = chatMember.old_chat_member.status;
-    
+
     // Bot was added to group
     if (oldStatus === "left" && newStatus === "member") {
       global.knownGroups.add(chatId);
-      console.log(`✅ Bot added to new group: ${chatId} (${chatMember.chat.title || 'Unknown'})`);
-      
+      console.log(
+        `✅ Bot added to new group: ${chatId} (${
+          chatMember.chat.title || "Unknown"
+        })`
+      );
+
       // Send welcome message to the group
       try {
         await ctx.telegram.sendMessage(
           chatId,
           `🎉 **SweetflipsStreamBot is now active!**\n\n` +
-          `I'm here to help with live stream announcements and gaming features!\n\n` +
-          `**Available Commands:**\n` +
-          `• /start - Get started\n` +
-          `• /help - See all commands\n` +
-          `• /kick <username> - Link your Kick account\n\n` +
-          `**For Admins:**\n` +
-          `• /live - Send live announcement to all groups\n` +
-          `• /findgroups - Discover all groups\n\n` +
-          `Ready to enhance your stream experience! 🚀`
+            `I'm here to help with live stream announcements and gaming features!\n\n` +
+            `**Available Commands:**\n` +
+            `• /start - Get started\n` +
+            `• /help - See all commands\n` +
+            `• /kick <username> - Link your Kick account\n\n` +
+            `**For Admins:**\n` +
+            `• /live - Send live announcement to all groups\n` +
+            `• /findgroups - Discover all groups\n\n` +
+            `Ready to enhance your stream experience! 🚀`
         );
       } catch (error) {
-        console.error(`❌ Failed to send welcome message to group ${chatId}:`, error.message);
+        console.error(
+          `❌ Failed to send welcome message to group ${chatId}:`,
+          error.message
+        );
       }
     }
     // Bot was removed from group
     else if (oldStatus === "member" && newStatus === "left") {
       global.knownGroups.delete(chatId);
-      console.log(`❌ Bot removed from group: ${chatId} (${chatMember.chat.title || 'Unknown'})`);
+      console.log(
+        `❌ Bot removed from group: ${chatId} (${
+          chatMember.chat.title || "Unknown"
+        })`
+      );
     }
   }
 });
@@ -1528,17 +1669,24 @@ bot.on("my_chat_member", async (ctx) => {
 // Handle when new members join groups (to detect new groups)
 bot.on("new_chat_members", async (ctx) => {
   const chat = ctx.chat;
-  
-  if ((chat.type === "group" || chat.type === "supergroup") && ctx.message.new_chat_members) {
+
+  if (
+    (chat.type === "group" || chat.type === "supergroup") &&
+    ctx.message.new_chat_members
+  ) {
     const chatId = chat.id.toString();
-    
+
     // Check if bot is one of the new members
     const botInfo = await ctx.telegram.getMe();
-    const botWasAdded = ctx.message.new_chat_members.some(member => member.id === botInfo.id);
-    
+    const botWasAdded = ctx.message.new_chat_members.some(
+      (member) => member.id === botInfo.id
+    );
+
     if (botWasAdded) {
       global.knownGroups.add(chatId);
-      console.log(`✅ Bot detected in new group: ${chatId} (${chat.title || 'Unknown'})`);
+      console.log(
+        `✅ Bot detected in new group: ${chatId} (${chat.title || "Unknown"})`
+      );
     }
   }
 });
