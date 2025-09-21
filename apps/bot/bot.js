@@ -284,7 +284,8 @@ async function sendScheduleToAllGroups() {
     console.log("📅 Starting automated schedule broadcast...");
 
     // Get all active groups
-    const allGroups = await getAllGroups();
+    const result = await getAllGroups();
+    const allGroups = result.groupIds;
 
     if (allGroups.length === 0) {
       console.log("⚠️ No groups found for schedule broadcast");
@@ -1744,7 +1745,10 @@ async function getAllGroups() {
     console.log(`   ${source}: ${count} groups`);
   }
 
-  return Array.from(allGroups);
+  return {
+    groupIds: Array.from(allGroups),
+    groupDetails: groupDetails
+  };
 }
 
 // Function to send live announcement to all groups
@@ -1805,7 +1809,8 @@ async function sendLiveAnnouncement() {
 #SweetflipsLive #KickStreaming #GamingCommunity`;
 
   try {
-    const allGroups = await getAllGroups();
+    const result = await getAllGroups();
+    const allGroups = result.groupIds;
 
     if (allGroups.length === 0) {
       console.log("⚠️ No groups found to send live announcement");
@@ -1993,25 +1998,40 @@ bot.command("findgroups", async (ctx) => {
   await ctx.reply("🔍 Finding all group chats where bot is a member...");
 
   try {
-    const allGroups = await getAllGroups();
+    const result = await getAllGroups();
+    const allGroups = result.groupIds;
+    const groupDetails = result.groupDetails;
 
     if (allGroups.length > 0) {
       let message = `✅ <b>Found ${allGroups.length} groups where bot is a member:</b>\n\n`;
 
-      // Get detailed info for each group
+      // Use cached group details from database
       for (let i = 0; i < allGroups.length; i++) {
         const groupId = allGroups[i];
-        try {
-          const chatInfo = await bot.telegram.getChat(groupId);
-          const memberCount = await bot.telegram.getChatMemberCount(groupId);
-          message += `${i + 1}. <b>${chatInfo.title || "Unknown"}</b>\n`;
+        const details = groupDetails.get(groupId);
+        
+        if (details) {
+          // Use cached information from database
+          message += `${i + 1}. <b>${details.title || "Unknown"}</b>\n`;
           message += `   ID: <code>${groupId}</code>\n`;
-          message += `   Type: ${chatInfo.type}\n`;
-          message += `   Members: ${memberCount}\n\n`;
-        } catch (error) {
-          message += `${
-            i + 1
-          }. Group ID: \`${groupId}\` (Info unavailable)\n\n`;
+          message += `   Type: ${details.type}\n`;
+          message += `   Members: ${details.memberCount || "Unknown"}\n`;
+          message += `   Source: ${details.source}\n\n`;
+        } else {
+          // Fallback to API call if no cached info
+          try {
+            const chatInfo = await bot.telegram.getChat(groupId);
+            const memberCount = await bot.telegram.getChatMemberCount(groupId);
+            message += `${i + 1}. <b>${chatInfo.title || "Unknown"}</b>\n`;
+            message += `   ID: <code>${groupId}</code>\n`;
+            message += `   Type: ${chatInfo.type}\n`;
+            message += `   Members: ${memberCount}\n`;
+            message += `   Source: API call\n\n`;
+          } catch (error) {
+            message += `${
+              i + 1
+            }. Group ID: \`${groupId}\` (Info unavailable)\n\n`;
+          }
         }
       }
 
@@ -2348,7 +2368,9 @@ bot.command("groupstats", async (ctx) => {
   await ctx.reply("📊 Gathering group statistics...");
 
   try {
-    const allGroups = await getAllGroups();
+    const result = await getAllGroups();
+    const allGroups = result.groupIds;
+    const groupDetails = result.groupDetails;
     const knownGroupsCount = global.knownGroups.size;
     const configuredGroups = process.env.ADMIN_GROUP_IDS
       ? process.env.ADMIN_GROUP_IDS.split(",").length
@@ -2366,16 +2388,31 @@ bot.command("groupstats", async (ctx) => {
       for (let i = 0; i < Math.min(allGroups.length, 10); i++) {
         // Show max 10 groups
         const groupId = allGroups[i];
-        try {
-          const chatInfo = await bot.telegram.getChat(groupId);
-          const memberCount = await bot.telegram.getChatMemberCount(groupId);
+        const details = groupDetails.get(groupId);
+        
+        if (details) {
+          // Use cached information from database
+          const memberCount = details.memberCount || 0;
           totalMembers += memberCount;
 
-          message += `${i + 1}. <b>${chatInfo.title || "Unknown"}</b>\n`;
+          message += `${i + 1}. <b>${details.title || "Unknown"}</b>\n`;
           message += `   👥 ${memberCount} members\n`;
-          message += `   🆔 \`${groupId}\`\n\n`;
-        } catch (error) {
-          message += `${i + 1}. Group \`${groupId}\` (Info unavailable)\n\n`;
+          message += `   🆔 \`${groupId}\`\n`;
+          message += `   📊 ${details.source}\n\n`;
+        } else {
+          // Fallback to API call if no cached info
+          try {
+            const chatInfo = await bot.telegram.getChat(groupId);
+            const memberCount = await bot.telegram.getChatMemberCount(groupId);
+            totalMembers += memberCount;
+
+            message += `${i + 1}. <b>${chatInfo.title || "Unknown"}</b>\n`;
+            message += `   👥 ${memberCount} members\n`;
+            message += `   🆔 \`${groupId}\`\n`;
+            message += `   📊 API call\n\n`;
+          } catch (error) {
+            message += `${i + 1}. Group \`${groupId}\` (Info unavailable)\n\n`;
+          }
         }
       }
 
