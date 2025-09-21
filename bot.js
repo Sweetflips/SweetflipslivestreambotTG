@@ -586,15 +586,16 @@ bot.start(async (ctx) => {
     `🎉 Welcome to SweetflipsStreamBot!\n\n` +
       `You are: ${user.telegramUser || "Unknown"} (${user.telegramId})\n` +
       `Role: ${user.role}\n\n` +
-      `🎮 **Gaming Commands:**\n` +
+      `🎮 <b>Gaming Commands:</b>\n` +
       `/guess balance <number> - Guess the end balance\n` +
       `/guess bonus <number> - Guess the bonus total\n` +
       `/balanceboard - View balance leaderboard\n` +
       `/bonusboard - View bonus leaderboard\n\n` +
-      `🔗 **Account Commands:**\n` +
+      `🔗 <b>Account Commands:</b>\n` +
       `/kick - Link your Kick account\n` +
       `/help - Show all commands\n\n` +
-      `Ready to play? Link your Kick account first with /kick!`
+      `Ready to play? Link your Kick account first with /kick!`,
+    { parse_mode: 'HTML' }
   );
 });
 
@@ -604,19 +605,19 @@ bot.help(async (ctx) => {
   if (isAdmin(user)) {
     // Admin/Mod help - shows all commands
     let helpText =
-      `🤖 **SweetflipsStreamBot Commands**\n\n` +
-      `🎮 **Gaming Commands:**\n` +
+      `🤖 <b>SweetflipsStreamBot Commands</b>\n\n` +
+      `🎮 <b>Gaming Commands:</b>\n` +
       `/guess balance <number> - Guess the end balance (requires linked Kick account)\n` +
       `/guess bonus <number> - Guess the bonus total (requires linked Kick account)\n` +
       `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
       `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
-      `📅 **Schedule Commands:**\n` +
+      `📅 <b>Schedule Commands:</b>\n` +
       `/schedule - View stream schedule for next 7 days\n\n` +
-      `🔗 **Account Commands:**\n` +
+      `🔗 <b>Account Commands:</b>\n` +
       `/start - Welcome message and setup\n` +
       `/help - Show this help\n` +
       `/kick - Link your Kick account (one-time setup)\n\n` +
-      `⚙️ **Admin Commands:**\n` +
+      `⚙️ <b>Admin Commands:</b>\n` +
       `/balance open - Open balance guessing\n` +
       `/balance close - Close balance guessing\n` +
       `/balance finalize - Finalize balance game with live balance\n` +
@@ -639,24 +640,24 @@ bot.help(async (ctx) => {
       `/setrole <telegram_id> <MOD|OWNER> - Set user role\n` +
       `/listusers - List all users\n\n`;
 
-    await ctx.reply(helpText);
+    await ctx.reply(helpText, { parse_mode: 'HTML' });
   } else {
     // Viewer help - shows only gaming and account commands
     let helpText =
-      `🤖 **SweetflipsStreamBot Commands**\n\n` +
-      `🎮 **Gaming Commands:**\n` +
+      `🤖 <b>SweetflipsStreamBot Commands</b>\n\n` +
+      `🎮 <b>Gaming Commands:</b>\n` +
       `/guess balance <number> - Guess the end balance (requires linked Kick account)\n` +
       `/guess bonus <number> - Guess the bonus total (requires linked Kick account)\n` +
       `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
       `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
-      `📅 **Schedule Commands:**\n` +
+      `📅 <b>Schedule Commands:</b>\n` +
       `/schedule - View stream schedule for next 7 days\n\n` +
-      `🔗 **Account Commands:**\n` +
+      `🔗 <b>Account Commands:</b>\n` +
       `/start - Welcome message and setup\n` +
       `/help - Show this help\n` +
       `/kick - Link your Kick account (one-time setup)\n\n`;
 
-    await ctx.reply(helpText);
+    await ctx.reply(helpText, { parse_mode: 'HTML' });
   }
 });
 
@@ -685,10 +686,11 @@ bot.command("kick", async (ctx) => {
 
   global.linkingUsers.add(ctx.from.id);
   await ctx.reply(
-    `🔗 **Kick Account Linking**\n\n` +
+    `🔗 <b>Kick Account Linking</b>\n\n` +
       `Please send your Kick username (without @).\n` +
       `Example: sweetflips\n\n` +
-      `This will link your Telegram account to your Kick account for gaming features.`
+      `This will link your Telegram account to your Kick account for gaming features.`,
+    { parse_mode: 'HTML' }
   );
 });
 
@@ -786,13 +788,13 @@ bot.command("balanceboard", async (ctx) => {
   try {
     const liveBalance = await liveBalanceService.fetchCurrentBalance();
 
-    let leaderboardText = `💰 **Live Balance: ${liveBalance.toLocaleString()}**\n\n`;
+    let leaderboardText = `💰 <b>Live Balance: ${liveBalance.toLocaleString()}</b>\n\n`;
 
     if (
       gameState.balance.isFinalized &&
       gameState.balance.finalBalance !== null
     ) {
-      leaderboardText = `🏁 **Final Balance: ${gameState.balance.finalBalance.toLocaleString()}**\n\n`;
+      leaderboardText = `🏁 <b>Final Balance: ${gameState.balance.finalBalance.toLocaleString()}</b>\n\n`;
     }
 
     console.log(
@@ -818,7 +820,7 @@ bot.command("balanceboard", async (ctx) => {
         return diffA - diffB;
       });
 
-      leaderboardText += `**Top 5 Closest Guessers:**\n`;
+      leaderboardText += `<b>Top 5 Closest Guessers:</b>\n`;
       guesses.slice(0, 5).forEach((guess, index) => {
         const diff = Math.abs(guess.guess - targetBalance);
         const emoji =
@@ -845,10 +847,10 @@ bot.command("balanceboard", async (ctx) => {
 });
 
 bot.command("bonusboard", async (ctx) => {
-  let leaderboardText = `🎁 **Active Bonuses: ${gameState.bonus.bonusAmount}**\n\n`;
+  let leaderboardText = `🎁 <b>Active Bonuses: ${gameState.bonus.bonusAmount}</b>\n\n`;
 
   if (gameState.bonus.bonusList.length > 0) {
-    leaderboardText += `**Bonus List:**\n`;
+    leaderboardText += `<b>Bonus List:</b>\n`;
     gameState.bonus.bonusList.forEach((bonus, index) => {
       leaderboardText += `${index + 1}. ${bonus}\n`;
     });
@@ -856,7 +858,7 @@ bot.command("bonusboard", async (ctx) => {
   }
 
   if (gameState.bonus.isFinalized && gameState.bonus.finalBonus !== null) {
-    leaderboardText = `🏆 **Final Bonus Total: ${gameState.bonus.finalBonus}**\n\n`;
+    leaderboardText = `🏆 <b>Final Bonus Total: ${gameState.bonus.finalBonus}</b>\n\n`;
   }
 
   if (gameState.bonus.guesses.size === 0) {
@@ -874,7 +876,7 @@ bot.command("bonusboard", async (ctx) => {
       return diffA - diffB;
     });
 
-    leaderboardText += `**Top 5 Closest Guessers:**\n`;
+    leaderboardText += `<b>Top 5 Closest Guessers:</b>\n`;
     guesses.slice(0, 5).forEach((guess, index) => {
       const diff = Math.abs(guess.guess - targetBonus);
       const emoji =
@@ -958,7 +960,7 @@ bot.command("balance", async (ctx) => {
       if (balanceGuesses.length === 0) {
         await ctx.reply(`📊 No balance guesses recorded yet.`);
       } else {
-        let showText = `📊 **Balance Guesses (${balanceGuesses.length}):**\n\n`;
+        let showText = `📊 <b>Balance Guesses (${balanceGuesses.length}):</b>\n\n`;
         balanceGuesses.forEach((guess, index) => {
           showText += `${index + 1}. @${
             guess.kickName
@@ -1027,7 +1029,7 @@ bot.command("bonus", async (ctx) => {
       if (bonusGuesses.length === 0) {
         await ctx.reply(`📊 No bonus guesses recorded yet.`);
       } else {
-        let showText = `📊 **Bonus Guesses (${bonusGuesses.length}):**\n\n`;
+        let showText = `📊 <b>Bonus Guesses (${bonusGuesses.length}):</b>\n\n`;
         bonusGuesses.forEach((guess, index) => {
           showText += `${index + 1}. @${
             guess.kickName
@@ -1173,7 +1175,7 @@ bot.command("listusers", async (ctx) => {
       orderBy: { createdAt: "desc" },
     });
 
-    let userList = `👥 **All Users (${users.length}):**\n\n`;
+    let userList = `👥 <b>All Users (${users.length}):</b>\n\n`;
     users.forEach((u, index) => {
       const kickStatus = u.kickName ? `✅ @${u.kickName}` : "❌ Not linked";
       userList += `${index + 1}. ${u.telegramUser || "Unknown"} (${
@@ -1593,23 +1595,23 @@ async function sendLiveAnnouncement() {
     timeZoneName: "short",
   });
 
-  const liveMessage = `🔴 **SWEETFLIPS IS LIVE!** 🔴
+  const liveMessage = `🔴 <b>SWEETFLIPS IS LIVE!</b> 🔴
 
-🎮 **Join the stream now:**
+🎮 <b>Join the stream now:</b>
 👉 https://kick.com/sweetflips
 
-⏰ **Started:**
+⏰ <b>Started:</b>
 🌍 UTC: ${utcTime}
 🇮🇳 IST: ${istTime}
 🇺🇸 PST: ${pstTime}
 
-💬 **Get involved:**
+💬 <b>Get involved:</b>
 • Link your Kick account with /kick
 • Participate in live games
 • Chat with the community
 • Win rewards!
 
-🚀 **Don't miss out - join now!**
+🚀 <b>Don't miss out - join now!</b>
 #SweetflipsLive #KickStreaming #GamingCommunity`;
 
   try {
@@ -1777,15 +1779,16 @@ bot.command("addgroup", async (ctx) => {
 
   global.addingGroups.add(ctx.from.id);
   await ctx.reply(
-    `🔗 **Add Group for Live Announcements**\n\n` +
+    `🔗 <b>Add Group for Live Announcements</b>\n\n` +
       `Please send the group ID you want to add.\n\n` +
-      `**How to get a group ID:**\n` +
+      `<b>How to get a group ID:</b>\n` +
       `1. Add @userinfobot to your group\n` +
       `2. Send any message in the group\n` +
       `3. The bot will reply with the group ID\n` +
       `4. Copy the group ID and send it here\n\n` +
-      `**Example:** \`-1001234567890\`\n\n` +
-      `Type \`cancel\` to cancel this operation.`
+      `<b>Example:</b> <code>-1001234567890</code>\n\n` +
+      `Type <code>cancel</code> to cancel this operation.`,
+    { parse_mode: 'HTML' }
   );
 });
 
@@ -1803,7 +1806,7 @@ bot.command("findgroups", async (ctx) => {
     const allGroups = await getAllGroups();
 
     if (allGroups.length > 0) {
-      let message = `✅ **Found ${allGroups.length} groups where bot is a member:**\n\n`;
+      let message = `✅ <b>Found ${allGroups.length} groups where bot is a member:</b>\n\n`;
 
       // Get detailed info for each group
       for (let i = 0; i < allGroups.length; i++) {
@@ -1811,8 +1814,8 @@ bot.command("findgroups", async (ctx) => {
         try {
           const chatInfo = await bot.telegram.getChat(groupId);
           const memberCount = await bot.telegram.getChatMemberCount(groupId);
-          message += `${i + 1}. **${chatInfo.title || "Unknown"}**\n`;
-          message += `   ID: \`${groupId}\`\n`;
+          message += `${i + 1}. <b>${chatInfo.title || "Unknown"}</b>\n`;
+          message += `   ID: <code>${groupId}</code>\n`;
           message += `   Type: ${chatInfo.type}\n`;
           message += `   Members: ${memberCount}\n\n`;
         } catch (error) {
@@ -1822,25 +1825,26 @@ bot.command("findgroups", async (ctx) => {
         }
       }
 
-      message += `💡 **To configure these groups:**\n`;
+      message += `💡 <b>To configure these groups:</b>\n`;
       message += `Add this to your Railway environment variables:\n`;
       message += `\`ADMIN_GROUP_IDS=${allGroups.join(",")}\`\n\n`;
       message += `This will make the /live command more reliable.`;
 
-      await ctx.reply(message);
+      await ctx.reply(message, { parse_mode: 'HTML' });
     } else {
       await ctx.reply(
         `❌ No groups found automatically.\n\n` +
-          `**Try these solutions:**\n\n` +
-          `1. **Manual Group Addition:**\n` +
+          `<b>Try these solutions:</b>\n\n` +
+          `1. <b>Manual Group Addition:</b>\n` +
           `   Use /addgroup to manually add group IDs\n\n` +
-          `2. **Generate Activity:**\n` +
+          `2. <b>Generate Activity:</b>\n` +
           `   - Send messages in groups where bot is added\n` +
           `   - Try this command again\n\n` +
-          `3. **Environment Variable:**\n` +
-          `   Set \`ADMIN_GROUP_IDS=group_id_1,group_id_2\` in Railway\n\n` +
-          `4. **Get Group ID:**\n` +
-          `   Add @userinfobot to your group to get the group ID`
+          `3. <b>Environment Variable:</b>\n` +
+          `   Set <code>ADMIN_GROUP_IDS=group_id_1,group_id_2</code> in Railway\n\n` +
+          `4. <b>Get Group ID:</b>\n` +
+          `   Add @userinfobot to your group to get the group ID`,
+        { parse_mode: 'HTML' }
       );
     }
   } catch (error) {
@@ -2085,8 +2089,8 @@ bot.command("testgroups", async (ctx) => {
 
   try {
     // Test 1: Check current known groups
-    let message = `🧪 **Group Detection Test Results**\n\n`;
-    message += `📝 **Known Groups (Memory):** ${global.knownGroups.size}\n`;
+    let message = `🧪 <b>Group Detection Test Results</b>\n\n`;
+    message += `📝 <b>Known Groups (Memory):</b> ${global.knownGroups.size}\n`;
     if (global.knownGroups.size > 0) {
       message += `Groups: ${Array.from(global.knownGroups).join(", ")}\n\n`;
     } else {
@@ -2095,7 +2099,7 @@ bot.command("testgroups", async (ctx) => {
 
     // Test 2: Check environment variable
     const configuredGroups = process.env.ADMIN_GROUP_IDS;
-    message += `⚙️ **Environment Variable:** ${
+    message += `⚙️ <b>Environment Variable:</b> ${
       configuredGroups ? "Set" : "Not set"
     }\n`;
     if (configuredGroups) {
@@ -2110,7 +2114,7 @@ bot.command("testgroups", async (ctx) => {
     }
 
     // Test 3: Test isBotMember function with a dummy ID
-    message += `🔍 **Bot Member Check Test:**\n`;
+    message += `🔍 <b>Bot Member Check Test:</b>\n`;
     try {
       const testResult = await isBotMember("-1000000000000"); // Dummy group ID
       message += `Dummy group test: ${
@@ -2128,14 +2132,14 @@ bot.command("testgroups", async (ctx) => {
       message += `Bot info: Error - ${error.message}\n\n`;
     }
 
-    message += `💡 **Next Steps:**\n`;
+    message += `💡 <b>Next Steps:</b>\n`;
     message += `1. Add bot to a test group\n`;
     message += `2. Send any message in the group\n`;
     message += `3. Run /findgroups to see if it's detected\n`;
     message += `4. Use /addgroup to manually add group IDs\n`;
     message += `5. Set ADMIN_GROUP_IDS environment variable for persistence`;
 
-    await ctx.reply(message);
+    await ctx.reply(message, { parse_mode: 'HTML' });
   } catch (error) {
     console.error("❌ Error in testgroups command:", error);
     await ctx.reply("❌ Error running group detection test. Please try again.");
@@ -2160,13 +2164,13 @@ bot.command("groupstats", async (ctx) => {
       ? process.env.ADMIN_GROUP_IDS.split(",").length
       : 0;
 
-    let message = `📊 **Group Management Statistics**\n\n`;
-    message += `🔢 **Total Active Groups:** ${allGroups.length}\n`;
-    message += `💾 **Known Groups (Memory):** ${knownGroupsCount}\n`;
-    message += `⚙️ **Configured Groups (Env):** ${configuredGroups}\n\n`;
+    let message = `📊 <b>Group Management Statistics</b>\n\n`;
+    message += `🔢 <b>Total Active Groups:</b> ${allGroups.length}\n`;
+    message += `💾 <b>Known Groups (Memory):</b> ${knownGroupsCount}\n`;
+    message += `⚙️ <b>Configured Groups (Env):</b> ${configuredGroups}\n\n`;
 
     if (allGroups.length > 0) {
-      message += `📋 **Group Details:**\n`;
+      message += `📋 <b>Group Details:</b>\n`;
 
       let totalMembers = 0;
       for (let i = 0; i < Math.min(allGroups.length, 10); i++) {
@@ -2177,7 +2181,7 @@ bot.command("groupstats", async (ctx) => {
           const memberCount = await bot.telegram.getChatMemberCount(groupId);
           totalMembers += memberCount;
 
-          message += `${i + 1}. **${chatInfo.title || "Unknown"}**\n`;
+          message += `${i + 1}. <b>${chatInfo.title || "Unknown"}</b>\n`;
           message += `   👥 ${memberCount} members\n`;
           message += `   🆔 \`${groupId}\`\n\n`;
         } catch (error) {
@@ -2189,16 +2193,16 @@ bot.command("groupstats", async (ctx) => {
         message += `... and ${allGroups.length - 10} more groups\n\n`;
       }
 
-      message += `👥 **Total Members Across All Groups:** ${totalMembers}\n\n`;
+      message += `👥 <b>Total Members Across All Groups:</b> ${totalMembers}\n\n`;
     }
 
-    message += `💡 **Tips:**\n`;
+    message += `💡 <b>Tips:</b>\n`;
     message += `• Use /findgroups to see all group IDs\n`;
     message += `• Use /addgroup to manually add groups\n`;
     message += `• Set ADMIN_GROUP_IDS for persistent storage\n`;
     message += `• Groups are auto-detected when bot is added`;
 
-    await ctx.reply(message);
+    await ctx.reply(message, { parse_mode: 'HTML' });
   } catch (error) {
     console.error("❌ Error in groupstats command:", error);
     await ctx.reply("❌ Error gathering group statistics. Please try again.");
@@ -2221,7 +2225,7 @@ bot.command("live", async (ctx) => {
     if (result.success > 0) {
       await ctx.reply(
         `✅ Live announcement sent successfully!\n\n` +
-          `📊 **Results:**\n` +
+          `📊 <b>Results:</b>\n` +
           `✅ Success: ${result.success} groups\n` +
           `❌ Failed: ${result.failed} groups\n\n` +
           `🎉 Sweetflips is now live on Kick!`
@@ -2229,11 +2233,11 @@ bot.command("live", async (ctx) => {
     } else {
       await ctx.reply(
         `❌ Failed to send live announcement.\n\n` +
-          `📊 **Results:**\n` +
+          `📊 <b>Results:</b>\n` +
           `✅ Success: ${result.success} groups\n` +
           `❌ Failed: ${result.failed} groups\n\n` +
           `⚠️ No groups were reached.\n\n` +
-          `**Try this:**\n` +
+          `<b>Try this:</b>\n` +
           `1. Use /findgroups to discover group IDs\n` +
           `2. Set ADMIN_GROUP_IDS in Railway environment variables\n` +
           `3. Make sure bot is added to group chats`
@@ -2296,16 +2300,17 @@ bot.on("my_chat_member", async (ctx) => {
       try {
         await ctx.telegram.sendMessage(
           chatId,
-          `🎉 **SweetflipsStreamBot is now active!**\n\n` +
+          `🎉 <b>SweetflipsStreamBot is now active!</b>\n\n` +
             `I'm here to help with live stream announcements and gaming features!\n\n` +
-            `**Available Commands:**\n` +
+            `<b>Available Commands:</b>\n` +
             `• /start - Get started\n` +
             `• /help - See all commands\n` +
             `• /kick <username> - Link your Kick account\n\n` +
-            `**For Admins:**\n` +
+            `<b>For Admins:</b>\n` +
             `• /live - Send live announcement to all groups\n` +
             `• /findgroups - Discover all groups\n\n` +
-            `Ready to enhance your stream experience! 🚀`
+            `Ready to enhance your stream experience! 🚀`,
+          { parse_mode: 'HTML' }
         );
       } catch (error) {
         console.error(
@@ -2423,10 +2428,11 @@ bot.on("text", async (ctx) => {
       global.linkingUsers.delete(ctx.from.id);
 
       await ctx.reply(
-        `✅ **Account Linked Successfully!**\n\n` +
+        `✅ <b>Account Linked Successfully!</b>\n\n` +
           `Telegram: @${user.telegramUser}\n` +
           `Kick: @${kickUsername}\n\n` +
-          `You can now participate in gaming features!`
+          `You can now participate in gaming features!`,
+        { parse_mode: 'HTML' }
       );
 
       // Sync to Google Sheets
@@ -2501,12 +2507,13 @@ bot.on("text", async (ctx) => {
       global.addingGroups.delete(ctx.from.id);
 
       await ctx.reply(
-        `✅ **Group Added Successfully!**\n\n` +
-          `Group ID: \`${groupId}\`\n\n` +
+        `✅ <b>Group Added Successfully!</b>\n\n` +
+          `Group ID: <code>${groupId}</code>\n\n` +
           `This group will now receive live announcements when you use /live.\n\n` +
-          `**To make this permanent:**\n` +
+          `<b>To make this permanent:</b>\n` +
           `Add this to your Railway environment variables:\n` +
-          `\`ADMIN_GROUP_IDS=${Array.from(global.knownGroups).join(",")}\``
+          `<code>ADMIN_GROUP_IDS=${Array.from(global.knownGroups).join(",")}</code>`,
+        { parse_mode: 'HTML' }
       );
 
       console.log(`✅ Group ${groupId} added by user ${ctx.from.id}`);
