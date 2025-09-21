@@ -953,6 +953,11 @@ bot.command("guess", async (ctx) => {
 
 bot.command("balanceboard", async (ctx) => {
   try {
+    // Log command usage for debugging
+    const chatType = ctx.chat?.type || 'unknown';
+    const chatId = ctx.chat?.id || 'unknown';
+    console.log(`📊 /balanceboard command used in ${chatType} chat: ${chatId}`);
+    
     const liveBalance = await liveBalanceService.fetchCurrentBalance();
 
     if (liveBalance === null) {
@@ -1028,6 +1033,11 @@ bot.command("balanceboard", async (ctx) => {
 
 bot.command("bonusboard", async (ctx) => {
   try {
+    // Log command usage for debugging
+    const chatType = ctx.chat?.type || 'unknown';
+    const chatId = ctx.chat?.id || 'unknown';
+    console.log(`🎁 /bonusboard command used in ${chatType} chat: ${chatId}`);
+    
     let leaderboardText = `🎁 <b>Active Bonuses: ${gameState.bonus.bonusAmount}</b>\n\n`;
 
     if (gameState.bonus.bonusList.length > 0) {
@@ -2065,8 +2075,14 @@ bot.command("findgroups", async (ctx) => {
 
 // Schedule command (viewers and admin management)
 bot.command("schedule", async (ctx) => {
-  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
-  const args = ctx.message.text.split(" ").slice(1);
+  try {
+    // Log command usage for debugging
+    const chatType = ctx.chat?.type || 'unknown';
+    const chatId = ctx.chat?.id || 'unknown';
+    console.log(`📅 /schedule command used in ${chatType} chat: ${chatId}`);
+    
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+    const args = ctx.message.text.split(" ").slice(1);
 
   // If no arguments, show schedule (for everyone)
   if (args.length === 0) {
@@ -2283,6 +2299,10 @@ bot.command("schedule", async (ctx) => {
         `• <code>/schedule remove friday 2</code>`,
       { parse_mode: "HTML" }
     );
+  }
+  } catch (error) {
+    console.error("❌ Error in schedule command:", error);
+    await ctx.reply("❌ Error processing schedule command. Please try again.");
   }
 });
 
