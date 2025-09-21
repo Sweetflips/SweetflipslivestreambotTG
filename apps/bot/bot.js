@@ -3,6 +3,7 @@ const { PrismaClient } = require("@prisma/client");
 const { google } = require("googleapis");
 const fs = require("fs");
 const path = require("path");
+const cron = require("node-cron");
 
 // Initialize Prisma with error handling
 let prisma = null;
@@ -275,6 +276,110 @@ function getStreamTimes(streamNumber) {
     ist: istTime,
     pst: pstTime,
   };
+}
+
+// Automated schedule messaging function
+async function sendScheduleToAllGroups() {
+  try {
+    console.log("📅 Starting automated schedule broadcast...");
+    
+    // Get all active groups
+    const allGroups = await getAllGroups();
+    
+    if (allGroups.length === 0) {
+      console.log("⚠️ No groups found for schedule broadcast");
+      return { success: 0, failed: 0, groups: [] };
+    }
+
+    // Get current schedule
+    const schedules = await getScheduleForWeek();
+    
+    // Build schedule message
+    let scheduleMessage = `📅 <b>Daily Stream Schedule</b>\n\n`;
+    
+    if (schedules.length === 0) {
+      scheduleMessage += `No scheduled streams for today.\n\n`;
+    } else {
+      // Group schedules by day
+      const schedulesByDay = {};
+      for (const schedule of schedules) {
+        if (!schedulesByDay[schedule.dayOfWeek]) {
+          schedulesByDay[schedule.dayOfWeek] = [];
+        }
+        schedulesByDay[schedule.dayOfWeek].push(schedule);
+      }
+
+      // Get today's day of week (0 = Sunday, 1 = Monday, etc.)
+      const today = new Date().getDay();
+      
+      // Show today's schedule
+      if (schedulesByDay[today] && schedulesByDay[today].length > 0) {
+        scheduleMessage += `<b>Today's Streams:</b>\n`;
+        for (const schedule of schedulesByDay[today]) {
+          const times = getStreamTimes(schedule.streamNumber);
+          scheduleMessage += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
+          scheduleMessage += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
+        }
+        scheduleMessage += `\n`;
+      } else {
+        scheduleMessage += `No streams scheduled for today.\n\n`;
+      }
+
+      // Show tomorrow's schedule
+      const tomorrow = (today + 1) % 7;
+      if (schedulesByDay[tomorrow] && schedulesByDay[tomorrow].length > 0) {
+        scheduleMessage += `<b>Tomorrow's Streams:</b>\n`;
+        for (const schedule of schedulesByDay[tomorrow]) {
+          const times = getStreamTimes(schedule.streamNumber);
+          scheduleMessage += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
+          scheduleMessage += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
+        }
+        scheduleMessage += `\n`;
+      }
+    }
+
+    scheduleMessage += `<b>Regular Stream Times:</b>\n`;
+    scheduleMessage += `• Stream 1: 9:00 AM UTC (2:30 PM IST, 1:00 AM PST)\n`;
+    scheduleMessage += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
+    scheduleMessage += `🎮 Join us at https://kick.com/sweetflips\n`;
+    scheduleMessage += `💬 Use /kick to link your account and participate in games!`;
+
+    // Send to all groups
+    let successCount = 0;
+    let failedCount = 0;
+    const results = [];
+
+    console.log(`📢 Sending schedule to ${allGroups.length} groups...`);
+
+    for (const groupId of allGroups) {
+      try {
+        await bot.telegram.sendMessage(groupId, scheduleMessage, {
+          parse_mode: "HTML",
+          disable_web_page_preview: false,
+        });
+        successCount++;
+        results.push({ groupId, status: "success" });
+        console.log(`✅ Schedule sent to group ${groupId}`);
+
+        // Small delay to avoid rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (error) {
+        failedCount++;
+        results.push({ groupId, status: "failed", error: error.message });
+        console.error(`❌ Failed to send schedule to group ${groupId}:`, error.message);
+      }
+    }
+
+    console.log(`\n📊 Schedule Broadcast Results:`);
+    console.log(`✅ Successfully sent: ${successCount} groups`);
+    console.log(`❌ Failed: ${failedCount} groups`);
+    console.log(`📈 Success rate: ${((successCount / allGroups.length) * 100).toFixed(1)}%`);
+
+    return { success: successCount, failed: failedCount, groups: results };
+  } catch (error) {
+    console.error("❌ Error in automated schedule broadcast:", error);
+    return { success: 0, failed: 0, groups: [], error: error.message };
+  }
 }
 
 // Check for required environment variables
@@ -660,6 +765,7 @@ bot.help(async (ctx) => {
         `/add <bonus name> - Add a bonus (counts as +1)\n` +
         `/remove <bonus name> - Remove a bonus (counts as -1)\n\n` +
         `/live - Send live announcement to all groups\n` +
+        `/broadcastschedule - Manually send schedule to all groups\n` +
         `/findgroups - Find all group chats where bot is a member\n` +
         `/groupstats - Show detailed group management statistics\n` +
         `/testgroups - Test group detection functionality\n` +
@@ -2324,6 +2430,46 @@ bot.command("live", async (ctx) => {
   }
 });
 
+bot.command("broadcastschedule", async (ctx) => {
+  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+
+  if (!isAdmin(user)) {
+    await ctx.reply(`⛔️ Mods only.`);
+    return;
+  }
+
+  await ctx.reply("📅 Broadcasting schedule to all groups...");
+
+  try {
+    const result = await sendScheduleToAllGroups();
+
+    if (result.success > 0) {
+      await ctx.reply(
+        `✅ Schedule broadcast sent successfully!\n\n` +
+          `📊 <b>Results:</b>\n` +
+          `✅ Success: ${result.success} groups\n` +
+          `❌ Failed: ${result.failed} groups\n\n` +
+          `📅 Schedule shared with all groups!`
+      );
+    } else {
+      await ctx.reply(
+        `❌ Failed to send schedule broadcast.\n\n` +
+          `📊 <b>Results:</b>\n` +
+          `✅ Success: ${result.success} groups\n` +
+          `❌ Failed: ${result.failed} groups\n\n` +
+          `⚠️ No groups were reached.\n\n` +
+          `<b>Try this:</b>\n` +
+          `1. Use /findgroups to discover group IDs\n` +
+          `2. Set ADMIN_GROUP_IDS in Railway environment variables\n` +
+          `3. Make sure bot is added to group chats`
+      );
+    }
+  } catch (error) {
+    console.error("❌ Error in broadcastschedule command:", error);
+    await ctx.reply("❌ Error sending schedule broadcast. Please try again.");
+  }
+});
+
 // Handle when bot is added to a new group
 bot.on("my_chat_member", async (ctx) => {
   const update = ctx.update;
@@ -2715,6 +2861,47 @@ async function gracefulRestart() {
   }
 }
 
+// Setup automated schedule messaging with cron jobs
+function setupAutomatedScheduleMessaging() {
+  console.log("⏰ Setting up automated schedule messaging...");
+  
+  // Schedule for 7:00 AM UTC (0 7 * * *)
+  const morningSchedule = cron.schedule('0 7 * * *', async () => {
+    console.log("🌅 Morning schedule broadcast triggered (7:00 AM UTC)");
+    try {
+      const result = await sendScheduleToAllGroups();
+      console.log(`🌅 Morning broadcast completed: ${result.success} success, ${result.failed} failed`);
+    } catch (error) {
+      console.error("❌ Error in morning schedule broadcast:", error);
+    }
+  }, {
+    scheduled: true,
+    timezone: "UTC"
+  });
+
+  // Schedule for 3:00 PM UTC (0 15 * * *)
+  const afternoonSchedule = cron.schedule('0 15 * * *', async () => {
+    console.log("🌆 Afternoon schedule broadcast triggered (3:00 PM UTC)");
+    try {
+      const result = await sendScheduleToAllGroups();
+      console.log(`🌆 Afternoon broadcast completed: ${result.success} success, ${result.failed} failed`);
+    } catch (error) {
+      console.error("❌ Error in afternoon schedule broadcast:", error);
+    }
+  }, {
+    scheduled: true,
+    timezone: "UTC"
+  });
+
+  console.log("✅ Automated schedule messaging configured:");
+  console.log("   🌅 Morning broadcast: 7:00 AM UTC");
+  console.log("   🌆 Afternoon broadcast: 3:00 PM UTC");
+  
+  // Store references for cleanup
+  global.morningSchedule = morningSchedule;
+  global.afternoonSchedule = afternoonSchedule;
+}
+
 // Start bot with auto-restart capabilities
 async function startBot() {
   console.log("🤖 Starting SweetflipsStreamBot...");
@@ -2743,6 +2930,9 @@ async function startBot() {
 
     // Start health monitoring
     startHealthMonitoring();
+
+    // Set up automated schedule messaging
+    setupAutomatedScheduleMessaging();
 
     // Set up graceful shutdown handlers
     setupGracefulShutdown();
@@ -2777,6 +2967,16 @@ function setupGracefulShutdown() {
     if (healthCheckInterval) {
       clearInterval(healthCheckInterval);
       healthCheckInterval = null;
+    }
+
+    // Stop automated schedule messaging
+    if (global.morningSchedule) {
+      global.morningSchedule.stop();
+      console.log("✅ Morning schedule broadcast stopped");
+    }
+    if (global.afternoonSchedule) {
+      global.afternoonSchedule.stop();
+      console.log("✅ Afternoon schedule broadcast stopped");
     }
 
     try {
