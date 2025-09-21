@@ -580,27 +580,35 @@ function isAdmin(user) {
 
 // Bot commands
 bot.start(async (ctx) => {
-  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+  try {
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
 
-  await ctx.reply(
-    `🎉 Welcome to SweetflipsStreamBot!\n\n` +
-      `You are: ${user.telegramUser || "Unknown"} (${user.telegramId})\n` +
-      `Role: ${user.role}\n\n` +
-      `🎮 <b>Gaming Commands:</b>\n` +
-      `/guess balance <number> - Guess the end balance\n` +
-      `/guess bonus <number> - Guess the bonus total\n` +
-      `/balanceboard - View balance leaderboard\n` +
-      `/bonusboard - View bonus leaderboard\n\n` +
-      `🔗 <b>Account Commands:</b>\n` +
-      `/kick - Link your Kick account\n` +
-      `/help - Show all commands\n\n` +
-      `Ready to play? Link your Kick account first with /kick!`,
-    { parse_mode: "HTML" }
-  );
+    await ctx.reply(
+      `🎉 Welcome to SweetflipsStreamBot!\n\n` +
+        `You are: ${user.telegramUser || "Unknown"} (${user.telegramId})\n` +
+        `Role: ${user.role}\n\n` +
+        `🎮 <b>Gaming Commands:</b>\n` +
+        `/guess balance <number> - Guess the end balance\n` +
+        `/guess bonus <number> - Guess the bonus total\n` +
+        `/balanceboard - View balance leaderboard\n` +
+        `/bonusboard - View bonus leaderboard\n\n` +
+        `🔗 <b>Account Commands:</b>\n` +
+        `/kick - Link your Kick account\n` +
+        `/help - Show all commands\n\n` +
+        `Ready to play? Link your Kick account first with /kick!`,
+      { parse_mode: "HTML" }
+    );
+  } catch (error) {
+    console.error("❌ Error in start command:", error);
+    await ctx.reply(
+      `❌ An error occurred. Please try again.`
+    );
+  }
 });
 
 bot.help(async (ctx) => {
-  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+  try {
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
 
   if (isAdmin(user)) {
     // Admin/Mod help - shows all commands
@@ -659,18 +667,25 @@ bot.help(async (ctx) => {
 
     await ctx.reply(helpText, { parse_mode: "HTML" });
   }
+  } catch (error) {
+    console.error("❌ Error in help command:", error);
+    await ctx.reply(
+      `❌ An error occurred. Please try again.`
+    );
+  }
 });
 
 bot.command("kick", async (ctx) => {
-  // Check if command is used in a group chat
-  if (ctx.chat.type !== "private") {
-    await ctx.reply(
-      `❌ This command can only be used in personal messages. [BOT.JS v2.0]`
-    );
-    return;
-  }
+  try {
+    // Check if command is used in a group chat
+    if (ctx.chat.type !== "private") {
+      await ctx.reply(
+        `❌ This command can only be used in personal messages. [BOT.JS v2.0]`
+      );
+      return;
+    }
 
-  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
 
   if (user.kickName) {
     await ctx.reply(`✅ You already linked a Kick account: @${user.kickName}`);
@@ -692,16 +707,23 @@ bot.command("kick", async (ctx) => {
       `This will link your Telegram account to your Kick account for gaming features.`,
     { parse_mode: "HTML" }
   );
+  } catch (error) {
+    console.error("❌ Error in kick command:", error);
+    await ctx.reply(
+      `❌ An error occurred. Please try again.`
+    );
+  }
 });
 
 bot.command("guess", async (ctx) => {
-  // Check if command is used in a group chat
-  if (ctx.chat.type !== "private") {
-    await ctx.reply(`❌ This command can only be used in personal messages.`);
-    return;
-  }
+  try {
+    // Check if command is used in a group chat
+    if (ctx.chat.type !== "private") {
+      await ctx.reply(`❌ This command can only be used in personal messages.`);
+      return;
+    }
 
-  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
 
   if (!user.kickName) {
     await ctx.reply(
@@ -782,11 +804,31 @@ bot.command("guess", async (ctx) => {
   } else {
     await ctx.reply(`❌ Invalid game type. Use 'balance' or 'bonus'.`);
   }
+  } catch (error) {
+    console.error("❌ Error in guess command:", error);
+    await ctx.reply(
+      `❌ An error occurred. Please try again.`
+    );
+  }
 });
 
 bot.command("balanceboard", async (ctx) => {
   try {
     const liveBalance = await liveBalanceService.fetchCurrentBalance();
+    
+    if (liveBalance === null) {
+      await ctx.reply(
+        `💰 <b>Balance Leaderboard</b>\n\n` +
+        `Unable to fetch live balance at the moment.\n\n` +
+        `This could be due to:\n` +
+        `• Network connectivity issues\n` +
+        `• API service temporarily unavailable\n` +
+        `• Missing or invalid API credentials\n\n` +
+        `Please try again later or contact an admin.`,
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
 
     let leaderboardText = `💰 <b>Live Balance: ${liveBalance.toLocaleString()}</b>\n\n`;
 
@@ -847,7 +889,8 @@ bot.command("balanceboard", async (ctx) => {
 });
 
 bot.command("bonusboard", async (ctx) => {
-  let leaderboardText = `🎁 <b>Active Bonuses: ${gameState.bonus.bonusAmount}</b>\n\n`;
+  try {
+    let leaderboardText = `🎁 <b>Active Bonuses: ${gameState.bonus.bonusAmount}</b>\n\n`;
 
   if (gameState.bonus.bonusList.length > 0) {
     leaderboardText += `<b>Bonus List:</b>\n`;
@@ -894,6 +937,12 @@ bot.command("bonusboard", async (ctx) => {
   }
 
   await ctx.reply(leaderboardText, { parse_mode: "HTML" });
+  } catch (error) {
+    console.error("❌ Error showing bonus leaderboard:", error);
+    await ctx.reply(
+      `❌ Error loading bonus leaderboard. Please try again later.`
+    );
+  }
 });
 
 // Admin commands
