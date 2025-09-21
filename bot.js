@@ -1191,13 +1191,6 @@ async function sendLiveAnnouncement() {
 
 ⏰ **Started:** ${currentTime}
 
-🎯 **What's happening:**
-• Live gaming and entertainment
-• Interactive chat games
-• Balance and bonus guessing
-• Trivia questions
-• Community fun!
-
 💬 **Get involved:**
 • Link your Kick account with /kick
 • Participate in live games
@@ -1467,9 +1460,14 @@ bot.command("testgroups", async (ctx) => {
 
     // Test 2: Check environment variable
     const configuredGroups = process.env.ADMIN_GROUP_IDS;
-    message += `⚙️ **Environment Variable:** ${configuredGroups ? "Set" : "Not set"}\n`;
+    message += `⚙️ **Environment Variable:** ${
+      configuredGroups ? "Set" : "Not set"
+    }\n`;
     if (configuredGroups) {
-      const groupIds = configuredGroups.split(",").map((id) => id.trim()).filter((id) => id);
+      const groupIds = configuredGroups
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id);
       message += `Configured groups: ${groupIds.length}\n`;
       message += `IDs: ${groupIds.join(", ")}\n\n`;
     } else {
@@ -1480,7 +1478,9 @@ bot.command("testgroups", async (ctx) => {
     message += `🔍 **Bot Member Check Test:**\n`;
     try {
       const testResult = await isBotMember("-1000000000000"); // Dummy group ID
-      message += `Dummy group test: ${testResult ? "Member" : "Not member"} (expected: Not member)\n`;
+      message += `Dummy group test: ${
+        testResult ? "Member" : "Not member"
+      } (expected: Not member)\n`;
     } catch (error) {
       message += `Dummy group test: Error - ${error.message}\n`;
     }
