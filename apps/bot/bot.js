@@ -1007,9 +1007,9 @@ bot.command("balanceboard", async (ctx) => {
           index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅";
 
         let prizeText = "";
-        if (index === 0) prizeText = " - $12.50";
-        else if (index === 1) prizeText = " - $7.50";
-        else if (index === 2) prizeText = " - $5.00";
+        if (index === 0) prizeText = " - $25";
+        else if (index === 1) prizeText = " - $15";
+        else if (index === 2) prizeText = " - $10";
 
         leaderboardText += `${emoji} ${index + 1}. @${
           guess.kickName
@@ -1064,9 +1064,9 @@ bot.command("bonusboard", async (ctx) => {
           index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅";
 
         let prizeText = "";
-        if (index === 0) prizeText = " - $12.50";
-        else if (index === 1) prizeText = " - $7.50";
-        else if (index === 2) prizeText = " - $5.00";
+        if (index === 0) prizeText = " - $25";
+        else if (index === 1) prizeText = " - $15";
+        else if (index === 2) prizeText = " - $10";
 
         leaderboardText += `${emoji} ${index + 1}. @${
           guess.kickName
@@ -1747,7 +1747,7 @@ async function getAllGroups() {
 
   return {
     groupIds: Array.from(allGroups),
-    groupDetails: groupDetails
+    groupDetails: groupDetails,
   };
 }
 
@@ -2009,7 +2009,7 @@ bot.command("findgroups", async (ctx) => {
       for (let i = 0; i < allGroups.length; i++) {
         const groupId = allGroups[i];
         const details = groupDetails.get(groupId);
-        
+
         if (details) {
           // Use cached information from database
           message += `${i + 1}. <b>${details.title || "Unknown"}</b>\n`;
@@ -2389,7 +2389,7 @@ bot.command("groupstats", async (ctx) => {
         // Show max 10 groups
         const groupId = allGroups[i];
         const details = groupDetails.get(groupId);
-        
+
         if (details) {
           // Use cached information from database
           const memberCount = details.memberCount || 0;
