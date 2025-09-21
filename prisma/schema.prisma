@@ -54,3 +54,18 @@ model AuditLog {
 
   @@map("audit_logs")
 }
+
+model TelegramGroup {
+  id          String   @id @default(cuid())
+  groupId     String   @unique // Telegram group ID (e.g., "-1001234567890")
+  title       String?  // Group title
+  type        String?  // "group" or "supergroup"
+  memberCount Int?     // Number of members
+  isActive    Boolean  @default(true) // Whether bot is still a member
+  source      String?  // How the group was discovered: "manual", "auto", "environment"
+  lastSeen    DateTime @default(now()) // Last time we confirmed bot membership
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("telegram_groups")
+}

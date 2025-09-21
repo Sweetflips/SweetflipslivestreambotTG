@@ -40,6 +40,110 @@ async function waitForDatabase() {
   return false;
 }
 
+// Database functions for group management
+async function saveGroupToDatabase(groupId, groupInfo = {}, source = "auto") {
+  if (!prisma) {
+    console.log("⚠️ Database not available, skipping group save");
+    return false;
+  }
+
+  try {
+    const groupData = {
+      groupId: groupId.toString(),
+      title: groupInfo.title || null,
+      type: groupInfo.type || null,
+      memberCount: groupInfo.memberCount || null,
+      isActive: true,
+      source: source,
+      lastSeen: new Date(),
+    };
+
+    await prisma.telegramGroup.upsert({
+      where: { groupId: groupId.toString() },
+      update: {
+        ...groupData,
+        updatedAt: new Date(),
+      },
+      create: groupData,
+    });
+
+    console.log(`✅ Group ${groupId} saved to database (source: ${source})`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error saving group ${groupId} to database:`, error.message);
+    return false;
+  }
+}
+
+async function loadGroupsFromDatabase() {
+  if (!prisma) {
+    console.log("⚠️ Database not available, returning empty groups list");
+    return [];
+  }
+
+  try {
+    const groups = await prisma.telegramGroup.findMany({
+      where: { isActive: true },
+      orderBy: { lastSeen: "desc" },
+    });
+
+    console.log(`📊 Loaded ${groups.length} groups from database`);
+    return groups;
+  } catch (error) {
+    console.error("❌ Error loading groups from database:", error.message);
+    return [];
+  }
+}
+
+async function markGroupInactive(groupId) {
+  if (!prisma) {
+    console.log("⚠️ Database not available, skipping group deactivation");
+    return false;
+  }
+
+  try {
+    await prisma.telegramGroup.update({
+      where: { groupId: groupId.toString() },
+      data: {
+        isActive: false,
+        updatedAt: new Date(),
+      },
+    });
+
+    console.log(`🗑️ Group ${groupId} marked as inactive in database`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error marking group ${groupId} as inactive:`, error.message);
+    return false;
+  }
+}
+
+async function updateGroupInfo(groupId, groupInfo) {
+  if (!prisma) {
+    console.log("⚠️ Database not available, skipping group update");
+    return false;
+  }
+
+  try {
+    await prisma.telegramGroup.update({
+      where: { groupId: groupId.toString() },
+      data: {
+        title: groupInfo.title || undefined,
+        type: groupInfo.type || undefined,
+        memberCount: groupInfo.memberCount || undefined,
+        lastSeen: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    console.log(`🔄 Group ${groupId} info updated in database`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error updating group ${groupId} info:`, error.message);
+    return false;
+  }
+}
+
 // Check for required environment variables
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.error("❌ TELEGRAM_BOT_TOKEN environment variable is required!");
@@ -986,39 +1090,85 @@ async function getAllGroups() {
 
   console.log("🔍 Discovering all groups where bot is a member...");
 
-  // First, add manually added groups from memory
+  // First, load groups from database
+  console.log("💾 Loading groups from database...");
+  const dbGroups = await loadGroupsFromDatabase();
+  for (const dbGroup of dbGroups) {
+    try {
+      if (await isBotMember(dbGroup.groupId)) {
+        allGroups.add(dbGroup.groupId);
+        groupDetails.set(dbGroup.groupId, {
+          title: dbGroup.title || "Unknown",
+          type: dbGroup.type || "unknown",
+          source: "database",
+          memberCount: dbGroup.memberCount,
+        });
+        console.log(`✅ Found active group from database: ${dbGroup.groupId}`);
+        
+        // Update last seen timestamp
+        await updateGroupInfo(dbGroup.groupId, {
+          lastSeen: new Date(),
+        });
+      } else {
+        console.log(`❌ Group from database is no longer active: ${dbGroup.groupId}`);
+        await markGroupInactive(dbGroup.groupId);
+      }
+    } catch (error) {
+      console.error(
+        `❌ Error checking group from database ${dbGroup.groupId}:`,
+        error.message
+      );
+    }
+  }
+
+  // Then, add manually added groups from memory (for backward compatibility)
   console.log(
     `📝 Checking ${global.knownGroups.size} known groups from memory...`
   );
   for (const groupId of global.knownGroups) {
-    try {
-      if (await isBotMember(groupId)) {
-        allGroups.add(groupId);
-        // Try to get group info for better logging
-        try {
-          const chatInfo = await bot.telegram.getChat(groupId);
-          groupDetails.set(groupId, {
-            title: chatInfo.title || "Unknown",
-            type: chatInfo.type,
-            source: "memory",
-          });
-        } catch (error) {
-          groupDetails.set(groupId, {
-            title: "Unknown",
-            type: "unknown",
-            source: "memory",
-          });
+    if (!allGroups.has(groupId)) { // Don't duplicate groups already found in database
+      try {
+        if (await isBotMember(groupId)) {
+          allGroups.add(groupId);
+          // Try to get group info for better logging
+          try {
+            const chatInfo = await bot.telegram.getChat(groupId);
+            const memberCount = await bot.telegram.getChatMemberCount(groupId);
+            groupDetails.set(groupId, {
+              title: chatInfo.title || "Unknown",
+              type: chatInfo.type,
+              source: "memory",
+              memberCount: memberCount,
+            });
+            
+            // Save to database for future persistence
+            await saveGroupToDatabase(groupId, {
+              title: chatInfo.title,
+              type: chatInfo.type,
+              memberCount: memberCount,
+            }, "memory");
+          } catch (error) {
+            groupDetails.set(groupId, {
+              title: "Unknown",
+              type: "unknown",
+              source: "memory",
+            });
+            
+            // Save to database even with limited info
+            await saveGroupToDatabase(groupId, {}, "memory");
+          }
+          console.log(`✅ Found active group from memory: ${groupId}`);
+        } else {
+          console.log(`❌ Group from memory is no longer active: ${groupId}`);
+          global.knownGroups.delete(groupId); // Clean up inactive groups
+          await markGroupInactive(groupId); // Also mark as inactive in database
         }
-        console.log(`✅ Found active group from memory: ${groupId}`);
-      } else {
-        console.log(`❌ Group from memory is no longer active: ${groupId}`);
-        global.knownGroups.delete(groupId); // Clean up inactive groups
+      } catch (error) {
+        console.error(
+          `❌ Error checking group from memory ${groupId}:`,
+          error.message
+        );
       }
-    } catch (error) {
-      console.error(
-        `❌ Error checking group from memory ${groupId}:`,
-        error.message
-      );
     }
   }
 
@@ -1034,33 +1184,48 @@ async function getAllGroups() {
     );
 
     for (const groupId of groupIds) {
-      try {
-        if (await isBotMember(groupId)) {
-          allGroups.add(groupId);
-          // Try to get group info for better logging
-          try {
-            const chatInfo = await bot.telegram.getChat(groupId);
-            groupDetails.set(groupId, {
-              title: chatInfo.title || "Unknown",
-              type: chatInfo.type,
-              source: "environment",
-            });
-          } catch (error) {
-            groupDetails.set(groupId, {
-              title: "Unknown",
-              type: "unknown",
-              source: "environment",
-            });
+      if (!allGroups.has(groupId)) { // Don't duplicate groups already found
+        try {
+          if (await isBotMember(groupId)) {
+            allGroups.add(groupId);
+            // Try to get group info for better logging
+            try {
+              const chatInfo = await bot.telegram.getChat(groupId);
+              const memberCount = await bot.telegram.getChatMemberCount(groupId);
+              groupDetails.set(groupId, {
+                title: chatInfo.title || "Unknown",
+                type: chatInfo.type,
+                source: "environment",
+                memberCount: memberCount,
+              });
+              
+              // Save to database for future persistence
+              await saveGroupToDatabase(groupId, {
+                title: chatInfo.title,
+                type: chatInfo.type,
+                memberCount: memberCount,
+              }, "environment");
+            } catch (error) {
+              groupDetails.set(groupId, {
+                title: "Unknown",
+                type: "unknown",
+                source: "environment",
+              });
+              
+              // Save to database even with limited info
+              await saveGroupToDatabase(groupId, {}, "environment");
+            }
+            console.log(`✅ Found active configured group: ${groupId}`);
+          } else {
+            console.log(`❌ Configured group is no longer active: ${groupId}`);
+            await markGroupInactive(groupId);
           }
-          console.log(`✅ Found active configured group: ${groupId}`);
-        } else {
-          console.log(`❌ Configured group is no longer active: ${groupId}`);
+        } catch (error) {
+          console.error(
+            `❌ Error checking configured group ${groupId}:`,
+            error.message
+          );
         }
-      } catch (error) {
-        console.error(
-          `❌ Error checking configured group ${groupId}:`,
-          error.message
-        );
       }
     }
   }
@@ -1094,11 +1259,34 @@ async function getAllGroups() {
             try {
               if (await isBotMember(chat.id)) {
                 allGroups.add(chat.id.toString());
-                groupDetails.set(chat.id.toString(), {
-                  title: chat.title || "Unknown",
-                  type: chat.type,
-                  source: "updates",
-                });
+                try {
+                  const memberCount = await bot.telegram.getChatMemberCount(chat.id);
+                  groupDetails.set(chat.id.toString(), {
+                    title: chat.title || "Unknown",
+                    type: chat.type,
+                    source: "updates",
+                    memberCount: memberCount,
+                  });
+                  
+                  // Save to database for future persistence
+                  await saveGroupToDatabase(chat.id.toString(), {
+                    title: chat.title,
+                    type: chat.type,
+                    memberCount: memberCount,
+                  }, "updates");
+                } catch (error) {
+                  groupDetails.set(chat.id.toString(), {
+                    title: chat.title || "Unknown",
+                    type: chat.type,
+                    source: "updates",
+                  });
+                  
+                  // Save to database even with limited info
+                  await saveGroupToDatabase(chat.id.toString(), {
+                    title: chat.title,
+                    type: chat.type,
+                  }, "updates");
+                }
                 newGroupsFound++;
                 console.log(
                   `✅ Found new group from updates: ${chat.id} (${
@@ -1125,11 +1313,34 @@ async function getAllGroups() {
             try {
               if (await isBotMember(chat.id)) {
                 allGroups.add(chat.id.toString());
-                groupDetails.set(chat.id.toString(), {
-                  title: chat.title || "Unknown",
-                  type: chat.type,
-                  source: "chat_member_updates",
-                });
+                try {
+                  const memberCount = await bot.telegram.getChatMemberCount(chat.id);
+                  groupDetails.set(chat.id.toString(), {
+                    title: chat.title || "Unknown",
+                    type: chat.type,
+                    source: "chat_member_updates",
+                    memberCount: memberCount,
+                  });
+                  
+                  // Save to database for future persistence
+                  await saveGroupToDatabase(chat.id.toString(), {
+                    title: chat.title,
+                    type: chat.type,
+                    memberCount: memberCount,
+                  }, "chat_member_updates");
+                } catch (error) {
+                  groupDetails.set(chat.id.toString(), {
+                    title: chat.title || "Unknown",
+                    type: chat.type,
+                    source: "chat_member_updates",
+                  });
+                  
+                  // Save to database even with limited info
+                  await saveGroupToDatabase(chat.id.toString(), {
+                    title: chat.title,
+                    type: chat.type,
+                  }, "chat_member_updates");
+                }
                 newGroupsFound++;
                 console.log(
                   `✅ Found new group from chat member updates: ${chat.id} (${
@@ -1173,8 +1384,33 @@ async function getAllGroups() {
 
 // Function to send live announcement to all groups
 async function sendLiveAnnouncement() {
-  const currentTime = new Date().toLocaleString("en-US", {
-    timeZone: "America/New_York",
+  const now = new Date();
+  
+  // Format time for different timezones
+  const utcTime = now.toLocaleString("en-US", {
+    timeZone: "UTC",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+  
+  const istTime = now.toLocaleString("en-US", {
+    timeZone: "Asia/Kolkata",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+  
+  const pstTime = now.toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles",
     weekday: "long",
     year: "numeric",
     month: "long",
@@ -1189,7 +1425,10 @@ async function sendLiveAnnouncement() {
 🎮 **Join the stream now:**
 👉 https://kick.com/sweetflips
 
-⏰ **Started:** ${currentTime}
+⏰ **Started:**
+🌍 UTC: ${utcTime}
+🇮🇳 IST: ${istTime}
+🇺🇸 PST: ${pstTime}
 
 💬 **Get involved:**
 • Link your Kick account with /kick
@@ -1632,6 +1871,23 @@ bot.on("my_chat_member", async (ctx) => {
         })`
       );
 
+      // Save to database
+      try {
+        const memberCount = await bot.telegram.getChatMemberCount(chatId);
+        await saveGroupToDatabase(chatId, {
+          title: chatMember.chat.title,
+          type: chatMember.chat.type,
+          memberCount: memberCount,
+        }, "auto_added");
+      } catch (error) {
+        console.error(`❌ Error saving new group to database:`, error.message);
+        // Still save with basic info
+        await saveGroupToDatabase(chatId, {
+          title: chatMember.chat.title,
+          type: chatMember.chat.type,
+        }, "auto_added");
+      }
+
       // Send welcome message to the group
       try {
         await ctx.telegram.sendMessage(
@@ -1662,6 +1918,9 @@ bot.on("my_chat_member", async (ctx) => {
           chatMember.chat.title || "Unknown"
         })`
       );
+      
+      // Mark as inactive in database
+      await markGroupInactive(chatId);
     }
   }
 });
@@ -1687,6 +1946,23 @@ bot.on("new_chat_members", async (ctx) => {
       console.log(
         `✅ Bot detected in new group: ${chatId} (${chat.title || "Unknown"})`
       );
+      
+      // Save to database
+      try {
+        const memberCount = await bot.telegram.getChatMemberCount(chatId);
+        await saveGroupToDatabase(chatId, {
+          title: chat.title,
+          type: chat.type,
+          memberCount: memberCount,
+        }, "auto_detected");
+      } catch (error) {
+        console.error(`❌ Error saving detected group to database:`, error.message);
+        // Still save with basic info
+        await saveGroupToDatabase(chatId, {
+          title: chat.title,
+          type: chat.type,
+        }, "auto_detected");
+      }
     }
   }
 });
@@ -1784,6 +2060,21 @@ bot.on("text", async (ctx) => {
 
       // Add to known groups
       global.knownGroups.add(groupId);
+
+      // Save to database
+      try {
+        const chatInfo = await bot.telegram.getChat(groupId);
+        const memberCount = await bot.telegram.getChatMemberCount(groupId);
+        await saveGroupToDatabase(groupId, {
+          title: chatInfo.title,
+          type: chatInfo.type,
+          memberCount: memberCount,
+        }, "manual");
+      } catch (error) {
+        console.error(`❌ Error saving manually added group to database:`, error.message);
+        // Still save with basic info
+        await saveGroupToDatabase(groupId, {}, "manual");
+      }
 
       global.addingGroups.delete(ctx.from.id);
 

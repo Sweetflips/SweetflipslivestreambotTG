@@ -1,78 +1,86 @@
 #!/usr/bin/env node
 
 /**
- * Script to get the actual Railway database connection details
+ * Script to help get the actual Railway database URL
+ * This will show you the resolved values instead of template variables
  */
 
-console.log("🔍 Getting Railway database connection details...");
+console.log("🔍 Railway Database URL Helper");
+console.log("=====================================");
 
-// Check all environment variables that might contain database info
+// Check if we're in Railway environment
+if (process.env.RAILWAY_ENVIRONMENT) {
+  console.log("✅ Running in Railway environment");
+  console.log(`Environment: ${process.env.RAILWAY_ENVIRONMENT}`);
+} else {
+  console.log("⚠️ Not running in Railway environment");
+}
+
+console.log("\n📊 Database Environment Variables:");
+console.log("=====================================");
+
 const dbVars = [
   "DATABASE_URL",
   "DATABASE_PUBLIC_URL",
+  "POSTGRES_USER",
+  "POSTGRES_PASSWORD",
+  "POSTGRES_DB",
+  "PGUSER",
+  "PGPASSWORD",
+  "PGDATABASE",
   "RAILWAY_TCP_PROXY_DOMAIN",
   "RAILWAY_TCP_PROXY_PORT",
   "RAILWAY_PRIVATE_DOMAIN",
-  "PGHOST",
-  "PGPORT",
-  "PGDATABASE",
-  "PGUSER",
-  "PGPASSWORD",
-  "POSTGRES_DB",
-  "POSTGRES_USER",
-  "POSTGRES_PASSWORD",
 ];
 
-console.log("\n📋 Database-related environment variables:");
 dbVars.forEach((varName) => {
   const value = process.env[varName];
   if (value) {
-    // Mask password in URLs
-    const maskedValue = value.replace(/(:\/\/[^:]+:)[^@]+(@)/, "$1***$2");
-    console.log(`${varName}: ${maskedValue}`);
+    // Mask password for security
+    const displayValue =
+      varName.includes("PASSWORD") || varName.includes("PASS")
+        ? value.substring(0, 4) + "***"
+        : value;
+    console.log(`${varName}: ${displayValue}`);
   } else {
-    console.log(`${varName}: Not set`);
+    console.log(`${varName}: (not set)`);
   }
 });
 
-// Try to construct a working DATABASE_URL
-console.log("\n🔧 Suggested DATABASE_URL values:");
+console.log("\n🔧 Recommended DATABASE_URL:");
+console.log("=====================================");
 
-// Option 1: Use DATABASE_PUBLIC_URL if available
-if (process.env.DATABASE_PUBLIC_URL) {
-  console.log("Option 1 (Public URL):");
-  console.log(`DATABASE_URL="${process.env.DATABASE_PUBLIC_URL}"`);
-}
+// Try to construct the URL
+const postgresUser = process.env.POSTGRES_USER || process.env.PGUSER;
+const postgresPassword =
+  process.env.POSTGRES_PASSWORD || process.env.PGPASSWORD;
+const postgresDb = process.env.POSTGRES_DB || process.env.PGDATABASE;
+const proxyDomain = process.env.RAILWAY_TCP_PROXY_DOMAIN;
+const proxyPort = process.env.RAILWAY_TCP_PROXY_PORT;
 
-// Option 2: Use direct values if available
 if (
-  process.env.PGHOST &&
-  process.env.PGPORT &&
-  process.env.PGDATABASE &&
-  process.env.PGUSER &&
-  process.env.PGPASSWORD
+  postgresUser &&
+  postgresPassword &&
+  postgresDb &&
+  proxyDomain &&
+  proxyPort
 ) {
-  const directUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
-  console.log("Option 2 (Direct values):");
-  console.log(`DATABASE_URL="${directUrl}"`);
-}
-
-// Option 3: Use Railway TCP Proxy if available
-if (
-  process.env.RAILWAY_TCP_PROXY_DOMAIN &&
-  process.env.RAILWAY_TCP_PROXY_PORT
-) {
-  const proxyUrl = `postgresql://postgres:${
-    process.env.POSTGRES_PASSWORD || process.env.PGPASSWORD
-  }@${process.env.RAILWAY_TCP_PROXY_DOMAIN}:${
-    process.env.RAILWAY_TCP_PROXY_PORT
-  }/railway`;
-  console.log("Option 3 (TCP Proxy):");
-  console.log(`DATABASE_URL="${proxyUrl}"`);
+  const constructedUrl = `postgresql://${postgresUser}:${postgresPassword}@${proxyDomain}:${proxyPort}/${postgresDb}`;
+  console.log("✅ Use this DATABASE_URL in your bot service:");
+  console.log(constructedUrl);
+} else {
+  console.log("❌ Missing required variables to construct DATABASE_URL");
+  console.log("Missing:");
+  if (!postgresUser) console.log("  - POSTGRES_USER or PGUSER");
+  if (!postgresPassword) console.log("  - POSTGRES_PASSWORD or PGPASSWORD");
+  if (!postgresDb) console.log("  - POSTGRES_DB or PGDATABASE");
+  if (!proxyDomain) console.log("  - RAILWAY_TCP_PROXY_DOMAIN");
+  if (!proxyPort) console.log("  - RAILWAY_TCP_PROXY_PORT");
 }
 
 console.log("\n📝 Instructions:");
-console.log("1. Copy one of the suggested DATABASE_URL values above");
-console.log("2. Go to your Railway bot service Variables tab");
-console.log("3. Update the DATABASE_URL variable with the copied value");
-console.log("4. Deploy your service");
+console.log("=====================================");
+console.log("1. Copy the DATABASE_URL above");
+console.log("2. Go to your Railway bot service");
+console.log("3. Add DATABASE_URL as an environment variable");
+console.log("4. Redeploy your bot service");
