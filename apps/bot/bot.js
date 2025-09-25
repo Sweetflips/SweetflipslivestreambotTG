@@ -405,14 +405,35 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
 // Add debugging middleware to log all messages
 bot.use((ctx, next) => {
-  console.log(`📨 Received message: ${ctx.message?.text || 'No text'} from ${ctx.from?.username || 'Unknown'} (${ctx.from?.id})`);
+  console.log(
+    `📨 Received message: ${ctx.message?.text || "No text"} from ${
+      ctx.from?.username || "Unknown"
+    } (${ctx.from?.id})`
+  );
   return next();
 });
 
 // Test command to verify bot is responding
 bot.command("test", async (ctx) => {
   console.log("🧪 Test command received");
-  await ctx.reply("✅ Bot is responding! Database status: " + (prisma ? "Connected" : "Not connected"));
+  await ctx.reply(
+    "✅ Bot is responding! Database status: " +
+      (prisma ? "Connected" : "Not connected")
+  );
+});
+
+// Global error handler
+bot.catch((err, ctx) => {
+  console.error("❌ Bot error:", err);
+  console.error("❌ Error context:", {
+    message: ctx.message?.text,
+    user: ctx.from?.username,
+    userId: ctx.from?.id,
+    chatId: ctx.chat?.id
+  });
+  
+  // Try to reply with error info
+  ctx.reply("❌ An error occurred. Please try again.").catch(console.error);
 });
 
 // Force redeploy - /kick command now has personal message restriction
@@ -624,7 +645,9 @@ async function getUserOrCreate(telegramId, telegramUser) {
 
     // Sync to Google Sheets even with mock user
     try {
+      console.log("📊 Attempting to sync mock user to Google Sheets...");
       await syncToGoogleSheets(mockUser);
+      console.log("✅ Mock user synced to Google Sheets successfully");
     } catch (error) {
       console.error("❌ Error syncing mock user to Google Sheets:", error);
       // Continue with mock user even if Google Sheets fails
@@ -634,11 +657,13 @@ async function getUserOrCreate(telegramId, telegramUser) {
   }
 
   try {
+    console.log("🔍 Searching for user in database...");
     let user = await prisma.user.findUnique({
       where: { telegramId: telegramId.toString() },
     });
 
     if (!user) {
+      console.log("👤 User not found, creating new user...");
       user = await prisma.user.create({
         data: {
           telegramId: telegramId.toString(),
@@ -650,8 +675,10 @@ async function getUserOrCreate(telegramId, telegramUser) {
         `✅ User created: ${telegramUser} (${telegramId}) - Role: ${user.role}`
       );
     } else {
+      console.log("👤 User found, checking for updates...");
       // Update username if changed
       if (user.telegramUser !== telegramUser) {
+        console.log("🔄 Updating username...");
         user = await prisma.user.update({
           where: { telegramId: telegramId.toString() },
           data: { telegramUser: telegramUser },
@@ -664,12 +691,15 @@ async function getUserOrCreate(telegramId, telegramUser) {
 
     // Sync to Google Sheets
     try {
+      console.log("📊 Attempting to sync user to Google Sheets...");
       await syncToGoogleSheets(user);
+      console.log("✅ User synced to Google Sheets successfully");
     } catch (error) {
       console.error("❌ Error syncing user to Google Sheets:", error);
       // Continue with user even if Google Sheets fails
     }
 
+    console.log("✅ getUserOrCreate completed successfully");
     return user;
   } catch (error) {
     console.error("❌ Database error in getUserOrCreate:", error);
@@ -732,7 +762,11 @@ function isAdmin(user) {
 // Bot commands
 bot.start(async (ctx) => {
   try {
+    console.log("🚀 /start command received");
+    console.log("📋 User info:", { id: ctx.from.id, username: ctx.from.username });
+    
     const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+    console.log("👤 User created/retrieved:", { id: user.id, role: user.role });
 
     await ctx.reply(
       `🎉 Welcome to SweetflipsStreamBot!\n\n` +
@@ -749,8 +783,11 @@ bot.start(async (ctx) => {
         `Ready to play? Link your Kick account first with /kick!`,
       { parse_mode: "HTML" }
     );
+    
+    console.log("✅ /start command completed successfully");
   } catch (error) {
     console.error("❌ Error in start command:", error);
+    console.error("❌ Error stack:", error.stack);
     await ctx.reply(`❌ An error occurred. Please try again.`);
   }
 });
