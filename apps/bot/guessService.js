@@ -12,7 +12,7 @@ export class GuessService {
       let round = await this.getCurrentRound(gameType);
       
       if (!round) {
-        // Create new round if none exists
+        // Create new round if none exists - using only basic fields that exist in database
         round = await this.prisma.gameRound.create({
           data: {
             type: gameType,
