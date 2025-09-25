@@ -16,9 +16,7 @@ try {
   console.log("✅ Database connection initialized");
 
   // Initialize GuessService for database storage
-  const { GuessService } = await import(
-    "../api/src/modules/games/guess/guessService.js"
-  );
+  const { GuessService } = await import("./guessService.js");
   guessService = new GuessService(prisma);
   console.log("✅ GuessService initialized for database storage");
 } catch (error) {
