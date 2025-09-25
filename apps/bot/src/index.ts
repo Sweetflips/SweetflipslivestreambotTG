@@ -1,0 +1,38 @@
+import { createBot } from "./bot";
+import { createPrismaClient } from "./services/prismaClient";
+import { createGoogleSheetsService } from "./services/googleSheets";
+import { createLiveBalanceService } from "./services/liveBalanceService";
+import { createInitialState } from "./state/botState";
+import { createStartCommand } from "./commands/start";
+import { createHelpCommand } from "./commands/help";
+import { createUserService } from "./services/userService";
+import { createKickCommand } from "./commands/kick";
+import { handleKickLinking } from "./handlers/accountLinking";
+
+const bootstrap = async () => {
+  const [prisma, sheets] = await Promise.all([
+    Promise.resolve(createPrismaClient()),
+    createGoogleSheetsService(),
+  ]);
+
+  const liveBalance = createLiveBalanceService();
+  const state = createInitialState();
+
+  const users = createUserService(prisma, sheets);
+  const bot = createBot({ prisma, sheets, liveBalance, state, users });
+
+  bot.start(createStartCommand());
+  bot.help(createHelpCommand());
+  bot.command("kick", createKickCommand());
+  bot.on("text", handleKickLinking);
+
+  await bot.launch();
+  console.info("Bot launched");
+};
+
+bootstrap().catch((error) => {
+  const message = error instanceof Error ? error.message : "Unknown error";
+  console.error(`Failed to start bot: ${message}`);
+  process.exitCode = 1;
+});
+
