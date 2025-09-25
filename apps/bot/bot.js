@@ -1,14 +1,17 @@
-const { Telegraf } = require("telegraf");
-const { PrismaClient } = require("@prisma/client");
-const { google } = require("googleapis");
-const fs = require("fs");
-const path = require("path");
-const cron = require("node-cron");
+import { Telegraf } from "telegraf";
+import { PrismaClient } from "@prisma/client";
+import { google } from "googleapis";
+import fs from "fs";
+import path from "path";
+import cron from "node-cron";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Initialize Prisma with error handling
 let prisma = null;
 try {
-  const { PrismaClient } = require("@prisma/client");
   prisma = new PrismaClient();
   console.log("✅ Database connection initialized");
 } catch (error) {
