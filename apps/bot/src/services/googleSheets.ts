@@ -30,7 +30,11 @@ const createEnvCredentialClient = async () => {
 
 const createFileCredentialClient = async () => {
   try {
-    const keyFile = path.join(process.cwd(), "credentials", "sweetflips-7086906ae249.json");
+    const keyFile = path.join(
+      process.cwd(),
+      "credentials",
+      "sweetflips-7086906ae249.json"
+    );
     const auth = new google.auth.GoogleAuth({
       keyFile,
       scopes: sheetsScopes,
@@ -44,26 +48,28 @@ const createFileCredentialClient = async () => {
   }
 };
 
-export const createGoogleSheetsService = async (): Promise<GoogleSheetsService | null> => {
-  if (!env.GOOGLE_SPREADSHEET_ID) {
-    return null;
-  }
+export const createGoogleSheetsService =
+  async (): Promise<GoogleSheetsService | null> => {
+    if (!env.GOOGLE_SPREADSHEET_ID) {
+      return null;
+    }
 
-  const client = (await createEnvCredentialClient()) ?? (await createFileCredentialClient());
+    const client =
+      (await createEnvCredentialClient()) ??
+      (await createFileCredentialClient());
 
-  if (!client) {
-    return null;
-  }
+    if (!client) {
+      return null;
+    }
 
-  const appendUser = async (entries: string[][]) => {
-    await client.spreadsheets.values.append({
-      spreadsheetId: env.GOOGLE_SPREADSHEET_ID,
-      range: "Sheet1!A:C",
-      valueInputOption: "RAW",
-      requestBody: { values: entries },
-    });
+    const appendUser = async (entries: string[][]) => {
+      await client.spreadsheets.values.append({
+        spreadsheetId: env.GOOGLE_SPREADSHEET_ID,
+        range: "Sheet1!A:C",
+        valueInputOption: "RAW",
+        requestBody: { values: entries },
+      });
+    };
+
+    return { appendUser };
   };
-
-  return { appendUser };
-};
-

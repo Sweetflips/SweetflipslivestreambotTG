@@ -3,7 +3,10 @@ import type { BotContext } from "../dependencies";
 
 const isValidKickName = (value: string) => /^[a-zA-Z0-9_]{3,20}$/.test(value);
 
-export const handleKickLinking: MiddlewareFn<BotContext> = async (ctx, next) => {
+export const handleKickLinking: MiddlewareFn<BotContext> = async (
+  ctx,
+  next
+) => {
   if (!ctx.from) {
     await next();
     return;
@@ -19,7 +22,9 @@ export const handleKickLinking: MiddlewareFn<BotContext> = async (ctx, next) => 
   const kickName = ctx.message?.text?.trim() ?? "";
 
   if (!isValidKickName(kickName)) {
-    await ctx.reply("Invalid Kick username. Use alphanumeric characters and underscores (3-20).");
+    await ctx.reply(
+      "Invalid Kick username. Use alphanumeric characters and underscores (3-20)."
+    );
     return;
   }
 
@@ -41,7 +46,8 @@ export const handleKickLinking: MiddlewareFn<BotContext> = async (ctx, next) => 
   }
 
   await ctx.reply(
-    `Account linked successfully. Telegram: @${updated.telegramUser ?? "unknown"}, Kick: @${kickName}`
+    `Account linked successfully. Telegram: @${
+      updated.telegramUser ?? "unknown"
+    }, Kick: @${kickName}`
   );
 };
-

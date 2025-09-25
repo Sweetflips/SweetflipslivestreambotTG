@@ -954,10 +954,10 @@ bot.command("guess", async (ctx) => {
 bot.command("balanceboard", async (ctx) => {
   try {
     // Log command usage for debugging
-    const chatType = ctx.chat?.type || 'unknown';
-    const chatId = ctx.chat?.id || 'unknown';
+    const chatType = ctx.chat?.type || "unknown";
+    const chatId = ctx.chat?.id || "unknown";
     console.log(`📊 /balanceboard command used in ${chatType} chat: ${chatId}`);
-    
+
     const liveBalance = await liveBalanceService.fetchCurrentBalance();
 
     if (liveBalance === null) {
@@ -1034,10 +1034,10 @@ bot.command("balanceboard", async (ctx) => {
 bot.command("bonusboard", async (ctx) => {
   try {
     // Log command usage for debugging
-    const chatType = ctx.chat?.type || 'unknown';
-    const chatId = ctx.chat?.id || 'unknown';
+    const chatType = ctx.chat?.type || "unknown";
+    const chatId = ctx.chat?.id || "unknown";
     console.log(`🎁 /bonusboard command used in ${chatType} chat: ${chatId}`);
-    
+
     let leaderboardText = `🎁 <b>Active Bonuses: ${gameState.bonus.bonusAmount}</b>\n\n`;
 
     if (gameState.bonus.bonusList.length > 0) {
@@ -2077,229 +2077,231 @@ bot.command("findgroups", async (ctx) => {
 bot.command("schedule", async (ctx) => {
   try {
     // Log command usage for debugging
-    const chatType = ctx.chat?.type || 'unknown';
-    const chatId = ctx.chat?.id || 'unknown';
+    const chatType = ctx.chat?.type || "unknown";
+    const chatId = ctx.chat?.id || "unknown";
     console.log(`📅 /schedule command used in ${chatType} chat: ${chatId}`);
-    
+
     const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
     const args = ctx.message.text.split(" ").slice(1);
 
-  // If no arguments, show schedule (for everyone)
-  if (args.length === 0) {
-    try {
-      const schedules = await getScheduleForWeek();
+    // If no arguments, show schedule (for everyone)
+    if (args.length === 0) {
+      try {
+        const schedules = await getScheduleForWeek();
 
-      if (schedules.length === 0) {
+        if (schedules.length === 0) {
+          await ctx.reply(
+            `📅 <b>Stream Schedule</b>\n\n` +
+              `No scheduled streams found for the next 7 days.\n\n` +
+              `<b>Stream Times:</b>\n` +
+              `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n` +
+              `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
+              `Check back later for updates!`,
+            { parse_mode: "HTML" }
+          );
+          return;
+        }
+
+        let message = `📅 <b>Stream Schedule - Next 7 Days</b>\n\n`;
+
+        // Group schedules by day
+        const schedulesByDay = {};
+        for (const schedule of schedules) {
+          if (!schedulesByDay[schedule.dayOfWeek]) {
+            schedulesByDay[schedule.dayOfWeek] = [];
+          }
+          schedulesByDay[schedule.dayOfWeek].push(schedule);
+        }
+
+        // Display schedule for each day
+        for (let day = 0; day < 7; day++) {
+          const dayName = getDayName(day);
+          const daySchedules = schedulesByDay[day] || [];
+
+          if (daySchedules.length > 0) {
+            message += `<b>${dayName}</b>\n`;
+
+            for (const schedule of daySchedules) {
+              const times = getStreamTimes(schedule.streamNumber);
+              message += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
+              message += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
+            }
+            message += `\n`;
+          }
+        }
+
+        message += `<b>Stream Times:</b>\n`;
+        message += `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n`;
+        message += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
+        message += `🎮 Join us at https://kick.com/sweetflips`;
+
+        await ctx.reply(message, { parse_mode: "HTML" });
+      } catch (error) {
+        console.error("❌ Error in schedule command:", error);
+        await ctx.reply("❌ Error loading schedule. Please try again.");
+      }
+      return;
+    }
+
+    // Admin commands require admin privileges
+    if (!isAdmin(user)) {
+      await ctx.reply(`⛔️ Mods only.`);
+      return;
+    }
+
+    const action = args[0].toLowerCase();
+
+    if (action === "add") {
+      // /schedule add <day> <stream> <title>
+      if (args.length < 4) {
         await ctx.reply(
-          `📅 <b>Stream Schedule</b>\n\n` +
-            `No scheduled streams found for the next 7 days.\n\n` +
-            `<b>Stream Times:</b>\n` +
-            `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n` +
-            `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
-            `Check back later for updates!`,
+          `❌ <b>Invalid format for /schedule add</b>\n\n` +
+            `<b>Usage:</b> <code>/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt;</code>\n\n` +
+            `<b>Examples:</b>\n` +
+            `• <code>/schedule add monday 1 Gaming Stream</code>\n` +
+            `• <code>/schedule add friday 2 Bonus Hunt</code>\n\n` +
+            `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
+            `<b>Streams:</b> 1 (7AM UTC) or 2 (5PM UTC)`,
           { parse_mode: "HTML" }
         );
         return;
       }
 
-      let message = `📅 <b>Stream Schedule - Next 7 Days</b>\n\n`;
+      const dayName = args[1].toLowerCase();
+      const streamNumber = parseInt(args[2]);
+      const eventTitle = args.slice(3).join(" ");
 
-      // Group schedules by day
-      const schedulesByDay = {};
-      for (const schedule of schedules) {
-        if (!schedulesByDay[schedule.dayOfWeek]) {
-          schedulesByDay[schedule.dayOfWeek] = [];
-        }
-        schedulesByDay[schedule.dayOfWeek].push(schedule);
+      // Validate day
+      const dayMap = {
+        sunday: 0,
+        monday: 1,
+        tuesday: 2,
+        wednesday: 3,
+        thursday: 4,
+        friday: 5,
+        saturday: 6,
+      };
+
+      const dayOfWeek = dayMap[dayName];
+      if (dayOfWeek === undefined) {
+        await ctx.reply(
+          `❌ <b>Invalid day name.</b>\n\n` +
+            `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`,
+          { parse_mode: "HTML" }
+        );
+        return;
       }
 
-      // Display schedule for each day
-      for (let day = 0; day < 7; day++) {
-        const dayName = getDayName(day);
-        const daySchedules = schedulesByDay[day] || [];
-
-        if (daySchedules.length > 0) {
-          message += `<b>${dayName}</b>\n`;
-
-          for (const schedule of daySchedules) {
-            const times = getStreamTimes(schedule.streamNumber);
-            message += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
-            message += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
-          }
-          message += `\n`;
-        }
+      // Validate stream number
+      if (streamNumber !== 1 && streamNumber !== 2) {
+        await ctx.reply(
+          `❌ <b>Invalid stream number.</b>\n\n` +
+            `Valid streams: 1 (7AM UTC) or 2 (5PM UTC)`,
+          { parse_mode: "HTML" }
+        );
+        return;
       }
 
-      message += `<b>Stream Times:</b>\n`;
-      message += `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n`;
-      message += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
-      message += `🎮 Join us at https://kick.com/sweetflips`;
+      // Add schedule entry
+      const success = await addScheduleEntry(
+        dayOfWeek,
+        streamNumber,
+        eventTitle,
+        user.id
+      );
 
-      await ctx.reply(message, { parse_mode: "HTML" });
-    } catch (error) {
-      console.error("❌ Error in schedule command:", error);
-      await ctx.reply("❌ Error loading schedule. Please try again.");
-    }
-    return;
-  }
+      if (success) {
+        const times = getStreamTimes(streamNumber);
+        await ctx.reply(
+          `✅ <b>Schedule Entry Added!</b>\n\n` +
+            `<b>Day:</b> ${getDayName(dayOfWeek)}\n` +
+            `<b>Stream:</b> ${streamNumber}\n` +
+            `<b>Title:</b> ${eventTitle}\n` +
+            `<b>Times:</b>\n` +
+            `🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}`,
+          { parse_mode: "HTML" }
+        );
+      } else {
+        await ctx.reply("❌ Failed to add schedule entry. Please try again.");
+      }
+    } else if (action === "remove") {
+      // /schedule remove <day> <stream>
+      if (args.length < 3) {
+        await ctx.reply(
+          `❌ <b>Invalid format for /schedule remove</b>\n\n` +
+            `<b>Usage:</b> <code>/schedule remove &lt;day&gt; &lt;stream&gt;</code>\n\n` +
+            `<b>Examples:</b>\n` +
+            `• <code>/schedule remove monday 1</code>\n` +
+            `• <code>/schedule remove friday 2</code>\n\n` +
+            `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
+            `<b>Streams:</b> 1 (7AM UTC) or 2 (5PM UTC)`,
+          { parse_mode: "HTML" }
+        );
+        return;
+      }
 
-  // Admin commands require admin privileges
-  if (!isAdmin(user)) {
-    await ctx.reply(`⛔️ Mods only.`);
-    return;
-  }
+      const dayName = args[1].toLowerCase();
+      const streamNumber = parseInt(args[2]);
 
-  const action = args[0].toLowerCase();
+      // Validate day
+      const dayMap = {
+        sunday: 0,
+        monday: 1,
+        tuesday: 2,
+        wednesday: 3,
+        thursday: 4,
+        friday: 5,
+        saturday: 6,
+      };
 
-  if (action === "add") {
-    // /schedule add <day> <stream> <title>
-    if (args.length < 4) {
+      const dayOfWeek = dayMap[dayName];
+      if (dayOfWeek === undefined) {
+        await ctx.reply(
+          `❌ <b>Invalid day name.</b>\n\n` +
+            `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`,
+          { parse_mode: "HTML" }
+        );
+        return;
+      }
+
+      // Validate stream number
+      if (streamNumber !== 1 && streamNumber !== 2) {
+        await ctx.reply(
+          `❌ <b>Invalid stream number.</b>\n\n` +
+            `Valid streams: 1 (7AM UTC) or 2 (5PM UTC)`,
+          { parse_mode: "HTML" }
+        );
+        return;
+      }
+
+      // Remove schedule entry
+      const success = await removeScheduleEntry(dayOfWeek, streamNumber);
+
+      if (success) {
+        await ctx.reply(
+          `✅ <b>Schedule Entry Removed!</b>\n\n` +
+            `<b>Day:</b> ${getDayName(dayOfWeek)}\n` +
+            `<b>Stream:</b> ${streamNumber}`,
+          { parse_mode: "HTML" }
+        );
+      } else {
+        await ctx.reply(
+          "❌ Failed to remove schedule entry. Please try again."
+        );
+      }
+    } else {
       await ctx.reply(
-        `❌ <b>Invalid format for /schedule add</b>\n\n` +
-          `<b>Usage:</b> <code>/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt;</code>\n\n` +
+        `❌ <b>Invalid schedule command.</b>\n\n` +
+          `<b>Available commands:</b>\n` +
+          `• <code>/schedule</code> - View schedule (everyone)\n` +
+          `• <code>/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt;</code> - Add schedule entry (mods only)\n` +
+          `• <code>/schedule remove &lt;day&gt; &lt;stream&gt;</code> - Remove schedule entry (mods only)\n\n` +
           `<b>Examples:</b>\n` +
           `• <code>/schedule add monday 1 Gaming Stream</code>\n` +
-          `• <code>/schedule add friday 2 Bonus Hunt</code>\n\n` +
-          `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
-          `<b>Streams:</b> 1 (7AM UTC) or 2 (5PM UTC)`,
+          `• <code>/schedule remove friday 2</code>`,
         { parse_mode: "HTML" }
       );
-      return;
     }
-
-    const dayName = args[1].toLowerCase();
-    const streamNumber = parseInt(args[2]);
-    const eventTitle = args.slice(3).join(" ");
-
-    // Validate day
-    const dayMap = {
-      sunday: 0,
-      monday: 1,
-      tuesday: 2,
-      wednesday: 3,
-      thursday: 4,
-      friday: 5,
-      saturday: 6,
-    };
-
-    const dayOfWeek = dayMap[dayName];
-    if (dayOfWeek === undefined) {
-      await ctx.reply(
-        `❌ <b>Invalid day name.</b>\n\n` +
-          `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`,
-        { parse_mode: "HTML" }
-      );
-      return;
-    }
-
-    // Validate stream number
-    if (streamNumber !== 1 && streamNumber !== 2) {
-      await ctx.reply(
-        `❌ <b>Invalid stream number.</b>\n\n` +
-          `Valid streams: 1 (7AM UTC) or 2 (5PM UTC)`,
-        { parse_mode: "HTML" }
-      );
-      return;
-    }
-
-    // Add schedule entry
-    const success = await addScheduleEntry(
-      dayOfWeek,
-      streamNumber,
-      eventTitle,
-      user.id
-    );
-
-    if (success) {
-      const times = getStreamTimes(streamNumber);
-      await ctx.reply(
-        `✅ <b>Schedule Entry Added!</b>\n\n` +
-          `<b>Day:</b> ${getDayName(dayOfWeek)}\n` +
-          `<b>Stream:</b> ${streamNumber}\n` +
-          `<b>Title:</b> ${eventTitle}\n` +
-          `<b>Times:</b>\n` +
-          `🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}`,
-        { parse_mode: "HTML" }
-      );
-    } else {
-      await ctx.reply("❌ Failed to add schedule entry. Please try again.");
-    }
-  } else if (action === "remove") {
-    // /schedule remove <day> <stream>
-    if (args.length < 3) {
-      await ctx.reply(
-        `❌ <b>Invalid format for /schedule remove</b>\n\n` +
-          `<b>Usage:</b> <code>/schedule remove &lt;day&gt; &lt;stream&gt;</code>\n\n` +
-          `<b>Examples:</b>\n` +
-          `• <code>/schedule remove monday 1</code>\n` +
-          `• <code>/schedule remove friday 2</code>\n\n` +
-          `<b>Days:</b> monday, tuesday, wednesday, thursday, friday, saturday, sunday\n` +
-          `<b>Streams:</b> 1 (7AM UTC) or 2 (5PM UTC)`,
-        { parse_mode: "HTML" }
-      );
-      return;
-    }
-
-    const dayName = args[1].toLowerCase();
-    const streamNumber = parseInt(args[2]);
-
-    // Validate day
-    const dayMap = {
-      sunday: 0,
-      monday: 1,
-      tuesday: 2,
-      wednesday: 3,
-      thursday: 4,
-      friday: 5,
-      saturday: 6,
-    };
-
-    const dayOfWeek = dayMap[dayName];
-    if (dayOfWeek === undefined) {
-      await ctx.reply(
-        `❌ <b>Invalid day name.</b>\n\n` +
-          `Valid days: monday, tuesday, wednesday, thursday, friday, saturday, sunday`,
-        { parse_mode: "HTML" }
-      );
-      return;
-    }
-
-    // Validate stream number
-    if (streamNumber !== 1 && streamNumber !== 2) {
-      await ctx.reply(
-        `❌ <b>Invalid stream number.</b>\n\n` +
-          `Valid streams: 1 (7AM UTC) or 2 (5PM UTC)`,
-        { parse_mode: "HTML" }
-      );
-      return;
-    }
-
-    // Remove schedule entry
-    const success = await removeScheduleEntry(dayOfWeek, streamNumber);
-
-    if (success) {
-      await ctx.reply(
-        `✅ <b>Schedule Entry Removed!</b>\n\n` +
-          `<b>Day:</b> ${getDayName(dayOfWeek)}\n` +
-          `<b>Stream:</b> ${streamNumber}`,
-        { parse_mode: "HTML" }
-      );
-    } else {
-      await ctx.reply("❌ Failed to remove schedule entry. Please try again.");
-    }
-  } else {
-    await ctx.reply(
-      `❌ <b>Invalid schedule command.</b>\n\n` +
-        `<b>Available commands:</b>\n` +
-        `• <code>/schedule</code> - View schedule (everyone)\n` +
-        `• <code>/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt;</code> - Add schedule entry (mods only)\n` +
-        `• <code>/schedule remove &lt;day&gt; &lt;stream&gt;</code> - Remove schedule entry (mods only)\n\n` +
-        `<b>Examples:</b>\n` +
-        `• <code>/schedule add monday 1 Gaming Stream</code>\n` +
-        `• <code>/schedule remove friday 2</code>`,
-      { parse_mode: "HTML" }
-    );
-  }
   } catch (error) {
     console.error("❌ Error in schedule command:", error);
     await ctx.reply("❌ Error processing schedule command. Please try again.");

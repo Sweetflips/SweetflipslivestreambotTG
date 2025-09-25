@@ -10,12 +10,21 @@ export interface StoredUser {
 }
 
 export interface UserService {
-  getUserOrCreate: (telegramId: number, username: string | undefined) => Promise<StoredUser>;
+  getUserOrCreate: (
+    telegramId: number,
+    username: string | undefined
+  ) => Promise<StoredUser>;
   isAdmin: (user: StoredUser) => boolean;
   isOwner: (user: StoredUser) => boolean;
-  setKickName: (telegramId: number, kickName: string) => Promise<StoredUser | null>;
+  setKickName: (
+    telegramId: number,
+    kickName: string
+  ) => Promise<StoredUser | null>;
   findByKickName: (kickName: string) => Promise<StoredUser | null>;
-  setRole: (telegramId: string, role: "MOD" | "OWNER") => Promise<StoredUser | null>;
+  setRole: (
+    telegramId: string,
+    role: "MOD" | "OWNER"
+  ) => Promise<StoredUser | null>;
   listUsers: () => Promise<StoredUser[]>;
 }
 
@@ -27,7 +36,10 @@ const toStoredUser = (user: User): StoredUser => ({
   kickName: user.kickName,
 });
 
-const createMockUser = (telegramId: number, username: string | undefined): StoredUser => ({
+const createMockUser = (
+  telegramId: number,
+  username: string | undefined
+): StoredUser => ({
   id: telegramId.toString(),
   telegramId: telegramId.toString(),
   telegramUser: username ?? null,
@@ -43,14 +55,23 @@ const syncToSheets = async (
     return;
   }
 
-  await sheets.appendUser([[user.telegramUser ?? "Unknown", user.kickName ?? "Not linked", new Date().toISOString()]]);
+  await sheets.appendUser([
+    [
+      user.telegramUser ?? "Unknown",
+      user.kickName ?? "Not linked",
+      new Date().toISOString(),
+    ],
+  ]);
 };
 
 export const createUserService = (
   prisma: PrismaClient | null,
   sheets: GoogleSheetsService | null
 ): UserService => {
-  const getUserOrCreate = async (telegramId: number, username: string | undefined) => {
+  const getUserOrCreate = async (
+    telegramId: number,
+    username: string | undefined
+  ) => {
     if (!prisma) {
       const mock = createMockUser(telegramId, username);
       await syncToSheets(sheets, mock);
@@ -58,7 +79,9 @@ export const createUserService = (
     }
 
     const telegramIdString = telegramId.toString();
-    let user = await prisma.user.findUnique({ where: { telegramId: telegramIdString } });
+    let user = await prisma.user.findUnique({
+      where: { telegramId: telegramIdString },
+    });
 
     if (!user) {
       user = await prisma.user.create({
@@ -80,7 +103,8 @@ export const createUserService = (
     return stored;
   };
 
-  const isAdmin = (user: StoredUser) => user.role === "MOD" || user.role === "OWNER";
+  const isAdmin = (user: StoredUser) =>
+    user.role === "MOD" || user.role === "OWNER";
   const isOwner = (user: StoredUser) => user.role === "OWNER";
 
   const setKickName = async (telegramId: number, kickName: string) => {
@@ -113,7 +137,10 @@ export const createUserService = (
       return null;
     }
 
-    const updated = await prisma.user.update({ where: { telegramId }, data: { role } });
+    const updated = await prisma.user.update({
+      where: { telegramId },
+      data: { role },
+    });
     return toStoredUser(updated);
   };
 
@@ -122,10 +149,19 @@ export const createUserService = (
       return [];
     }
 
-    const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+    });
     return users.map(toStoredUser);
   };
 
-  return { getUserOrCreate, isAdmin, isOwner, setKickName, findByKickName, setRole, listUsers };
+  return {
+    getUserOrCreate,
+    isAdmin,
+    isOwner,
+    setKickName,
+    findByKickName,
+    setRole,
+    listUsers,
+  };
 };
-

@@ -65,7 +65,10 @@ export const loadActiveGroups = async (
   });
 };
 
-export const markGroupInactive = async (prisma: PrismaClient | null, groupId: string) => {
+export const markGroupInactive = async (
+  prisma: PrismaClient | null,
+  groupId: string
+) => {
   if (!prisma) {
     return;
   }
@@ -99,4 +102,3 @@ export const updateGroupDetails = async (
     },
   });
 };
-

@@ -95,7 +95,9 @@ export const createLiveBalanceService = (
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `API request failed: ${response.status} ${response.statusText}`
+        );
       }
 
       const data = await response.json();
@@ -122,4 +124,3 @@ export const createLiveBalanceService = (
 
   return { fetchCurrentBalance };
 };
-

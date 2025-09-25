@@ -12,4 +12,3 @@ export const createPrismaClient = (): PrismaClient | null => {
     return null;
   }
 };
-

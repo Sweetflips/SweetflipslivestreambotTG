@@ -1,13 +1,13 @@
 import { createBot } from "./bot";
-import { createPrismaClient } from "./services/prismaClient";
+import { createHelpCommand } from "./commands/help";
+import { createKickCommand } from "./commands/kick";
+import { createStartCommand } from "./commands/start";
+import { handleKickLinking } from "./handlers/accountLinking";
 import { createGoogleSheetsService } from "./services/googleSheets";
 import { createLiveBalanceService } from "./services/liveBalanceService";
-import { createInitialState } from "./state/botState";
-import { createStartCommand } from "./commands/start";
-import { createHelpCommand } from "./commands/help";
+import { createPrismaClient } from "./services/prismaClient";
 import { createUserService } from "./services/userService";
-import { createKickCommand } from "./commands/kick";
-import { handleKickLinking } from "./handlers/accountLinking";
+import { createInitialState } from "./state/botState";
 
 const bootstrap = async () => {
   const [prisma, sheets] = await Promise.all([
@@ -35,4 +35,3 @@ bootstrap().catch((error) => {
   console.error(`Failed to start bot: ${message}`);
   process.exitCode = 1;
 });
-

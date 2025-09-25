@@ -32,14 +32,19 @@ const adminHelp =
   `/setrole &lt;telegram_id&gt; &lt;MOD|OWNER&gt; - Set user role\n` +
   `/listusers - List all users`;
 
-export const createHelpCommand = (): MiddlewareFn<BotContext> => async (ctx) => {
-  if (!ctx.from) {
-    return;
-  }
+export const createHelpCommand =
+  (): MiddlewareFn<BotContext> => async (ctx) => {
+    if (!ctx.from) {
+      return;
+    }
 
-  const user = await ctx.dependencies.users.getUserOrCreate(ctx.from.id, ctx.from.username);
+    const user = await ctx.dependencies.users.getUserOrCreate(
+      ctx.from.id,
+      ctx.from.username
+    );
 
-  const message = ctx.dependencies.users.isAdmin(user) ? adminHelp : viewerHelp;
-  await ctx.reply(message, { parse_mode: "HTML" });
-};
-
+    const message = ctx.dependencies.users.isAdmin(user)
+      ? adminHelp
+      : viewerHelp;
+    await ctx.reply(message, { parse_mode: "HTML" });
+  };

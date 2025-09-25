@@ -48,4 +48,3 @@ export const createInitialState = (): BotState => ({
     bonusList: [],
   },
 });
-

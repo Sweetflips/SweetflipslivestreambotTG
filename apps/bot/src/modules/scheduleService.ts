@@ -85,7 +85,10 @@ export const getActiveSchedule = async (
   });
 
   return entries.map((entry) => {
-    const times = formatStreamTimes(entry.streamNumber === 1 ? "07:00" : "17:00", entry.streamNumber as 1 | 2)
+    const times = formatStreamTimes(
+      entry.streamNumber === 1 ? "07:00" : "17:00",
+      entry.streamNumber as 1 | 2
+    )
       .map((item) => `${item.label}: ${item.time}`)
       .join(" | ");
 
@@ -97,4 +100,3 @@ export const getActiveSchedule = async (
     };
   });
 };
-

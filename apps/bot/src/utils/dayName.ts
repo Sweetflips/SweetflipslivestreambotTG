@@ -9,4 +9,3 @@ const days = [
 ] as const;
 
 export const getDayName = (dayOfWeek: number) => days[dayOfWeek] ?? "Unknown";
-

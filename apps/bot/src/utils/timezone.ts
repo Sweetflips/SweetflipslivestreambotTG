@@ -3,7 +3,10 @@ export interface StreamTime {
   time: string;
 }
 
-export const formatStreamTimes = (utcTime: string, streamNumber: 1 | 2): StreamTime[] => {
+export const formatStreamTimes = (
+  utcTime: string,
+  streamNumber: 1 | 2
+): StreamTime[] => {
   const times = {
     1: { ist: "12:30", pst: "23:00" },
     2: { ist: "22:30", pst: "09:00" },
@@ -17,4 +20,3 @@ export const formatStreamTimes = (utcTime: string, streamNumber: 1 | 2): StreamT
     { label: "PST", time: pst },
   ];
 };
-

@@ -22,4 +22,3 @@ const parseEnvironment = () => {
 };
 
 export const env = parseEnvironment();
-
