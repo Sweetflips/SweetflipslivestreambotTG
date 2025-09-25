@@ -30,7 +30,7 @@ model User {
 model GameRound {
   id          String   @id @default(cuid())
   type        String   // "BONUS", "TRIVIA", "GUESS_BALANCE", "GUESS_BONUS"
-  phase       String   @default("IDLE") // "IDLE", "OPEN", "CLOSED", "REVEALED"
+  phase       String   @default("IDLE") // "IDLE", "OPEN", "CLOSED", "REVEALED", "COMPLETED"
   finalValue  Int?
   graceWindow Int      @default(30) // seconds
   windowMin   Int      @default(0)  // minutes, 0 = manual close only
@@ -39,6 +39,7 @@ model GameRound {
   createdAt   DateTime @default(now())
   closedAt    DateTime?
   revealedAt  DateTime?
+  completedAt DateTime? // When the game round is fully completed and archived
   updatedAt   DateTime @updatedAt
 
   // Relations
@@ -56,6 +57,7 @@ model Guess {
   value     Int
   createdAt DateTime @default(now())
   editedAt  DateTime?
+  isArchived Boolean @default(false) // Whether this guess has been archived with a completed game
 
   // Relations
   gameRound GameRound @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
@@ -156,4 +158,20 @@ model Schedule {
 
   @@unique([dayOfWeek, streamNumber])
   @@map("schedules")
+}
+
+// Archive table for completed game rounds and their data
+model CompletedGameArchive {
+  id          String   @id @default(cuid())
+  originalGameRoundId String @unique // Reference to the original game round
+  gameType    String   // "BONUS", "TRIVIA", "GUESS_BALANCE", "GUESS_BONUS"
+  finalValue  Int?
+  totalGuesses Int     @default(0)
+  winnerUserId String? // ID of the winning user
+  winnerGuess  Int?    // The winning guess value
+  gameData    String   // JSON string containing all game data (guesses, results, etc.)
+  completedAt DateTime @default(now())
+  archivedAt  DateTime @default(now())
+
+  @@map("completed_game_archives")
 }

@@ -627,12 +627,19 @@ export class GuessCommands {
       if (args.length < 2) {
         await ctx.reply(
           '🔧 **Game Admin Commands**\n\n' +
-            'Available commands:\n' +
+            '**Basic Commands:**\n' +
             '• `/game open <bonus|balance>` - Open guessing\n' +
             '• `/game close <bonus|balance>` - Close guessing\n' +
-            '• `/game reset <bonus|balance>` - Reset game (OWNER only)\n' +
             '• `/game show <bonus|balance> [top=<n>]` - Show standings\n' +
-            '• `/game export <bonus|balance>` - Export guesses',
+            '• `/game export <bonus|balance>` - Export guesses\n\n' +
+            '**Game Lifecycle (OWNER only):**\n' +
+            '• `/game complete <bonus|balance>` - Complete and archive game\n' +
+            '• `/game new <bonus|balance>` - Start new game round\n' +
+            '• `/game reset <bonus|balance> CONFIRM` - Reset game (archives data)\n\n' +
+            '**Archive Management (OWNER only):**\n' +
+            '• `/game archive <bonus|balance> [limit]` - View archived games\n' +
+            '• `/game stats <bonus|balance>` - Show game statistics\n' +
+            '• `/game cleanup <bonus|balance> [days]` - Clean old archives',
           { parse_mode: 'Markdown' }
         );
         return;
@@ -668,13 +675,31 @@ export class GuessCommands {
           }
           if (remainingArgs.length === 0 || remainingArgs[0] !== 'CONFIRM') {
             await ctx.reply(
-              `⚠️ **Reset Confirmation Required**\n\nThis will clear all guesses and results.\n\nUse \`/game reset ${gameType} CONFIRM\` to proceed.`,
+              `⚠️ **Reset Confirmation Required**\n\nThis will clear all guesses and results (data will be archived).\n\nUse \`/game reset ${gameType} CONFIRM\` to proceed.`,
               { parse_mode: 'Markdown' }
             );
             return;
           }
           const resetResult = await this.guessService.resetRound(actualGameType, user.id);
           await ctx.reply(resetResult, { parse_mode: 'Markdown' });
+          break;
+
+        case 'complete':
+          if (!(await this.guessService.isOwner(telegramId))) {
+            await ctx.reply('⛔️ Owner only.');
+            return;
+          }
+          const completeResult = await this.guessService.completeGameRound(actualGameType, user.id);
+          await ctx.reply(completeResult, { parse_mode: 'Markdown' });
+          break;
+
+        case 'new':
+          if (!(await this.guessService.isOwner(telegramId))) {
+            await ctx.reply('⛔️ Owner only.');
+            return;
+          }
+          const newResult = await this.guessService.startNewRound(actualGameType, user.id);
+          await ctx.reply(newResult, { parse_mode: 'Markdown' });
           break;
 
         case 'show':
@@ -690,6 +715,56 @@ export class GuessCommands {
             `📊 **${gameName} Guesses Export:**\n\n\`\`\`csv\n${exportResult}\n\`\`\``,
             { parse_mode: 'Markdown' }
           );
+          break;
+
+        case 'archive':
+          if (!(await this.guessService.isOwner(telegramId))) {
+            await ctx.reply('⛔️ Owner only.');
+            return;
+          }
+          const limit = this.parseTopN(remainingArgs) || 10;
+          const archives = await this.guessService.getArchivedGames(actualGameType, limit);
+          if (archives.length === 0) {
+            await ctx.reply('📁 No archived games found.');
+            return;
+          }
+          let archiveText = `📁 **Recent Archived Games:**\n\n`;
+          archives.forEach((archive, index) => {
+            const gameName = archive.gameType === 'GUESS_BALANCE' ? 'Balance' : 'Bonus';
+            const winnerText = archive.winnerGuess ? ` (Winner: ${archive.winnerGuess})` : '';
+            archiveText += `${index + 1}) ${gameName} - ${archive.totalGuesses} guesses${winnerText}\n`;
+            archiveText += `   Final: ${archive.finalValue || 'N/A'} - ${archive.completedAt.toLocaleDateString()}\n\n`;
+          });
+          await ctx.reply(archiveText, { parse_mode: 'Markdown' });
+          break;
+
+        case 'stats':
+          const stats = await this.guessService.getGameStatistics(actualGameType);
+          const gameName = gameType === 'bonus' ? 'Bonus' : 'Balance';
+          let statsText = `📊 **${gameName} Game Statistics:**\n\n`;
+          statsText += `• Total archived games: ${stats.totalArchives}\n`;
+          statsText += `• Total guesses across all games: ${stats.totalGuesses}\n\n`;
+          if (stats.recentGames.length > 0) {
+            statsText += `**Recent Games:**\n`;
+            stats.recentGames.forEach((game, index) => {
+              statsText += `${index + 1}) ${game.totalGuesses} guesses - Final: ${game.finalValue || 'N/A'}\n`;
+            });
+          }
+          await ctx.reply(statsText, { parse_mode: 'Markdown' });
+          break;
+
+        case 'cleanup':
+          if (!(await this.guessService.isOwner(telegramId))) {
+            await ctx.reply('⛔️ Owner only.');
+            return;
+          }
+          const daysToKeep = remainingArgs.length > 0 ? parseInt(remainingArgs[0]) : 90;
+          if (isNaN(daysToKeep) || daysToKeep < 1) {
+            await ctx.reply('❌ Invalid days parameter. Use a number greater than 0.');
+            return;
+          }
+          const cleanupResult = await this.guessService.cleanupOldArchives(daysToKeep, user.id);
+          await ctx.reply(cleanupResult, { parse_mode: 'Markdown' });
           break;
 
         default:
