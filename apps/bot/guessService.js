@@ -10,7 +10,7 @@ export class GuessService {
     try {
       // Get or create current game round
       let round = await this.getCurrentRound(gameType);
-      
+
       if (!round) {
         // Create new round if none exists - using only basic fields that exist in database
         round = await this.prisma.gameRound.create({
@@ -38,7 +38,8 @@ export class GuessService {
       if (existingGuess) {
         return {
           success: false,
-          message: "⛔️ You already have a guess recorded. Only one guess per game allowed.",
+          message:
+            "⛔️ You already have a guess recorded. Only one guess per game allowed.",
         };
       }
 
@@ -53,7 +54,8 @@ export class GuessService {
       if (duplicateGuess) {
         return {
           success: false,
-          message: "⛔️ This guess has already been submitted by another player. Please choose a different number.",
+          message:
+            "⛔️ This guess has already been submitted by another player. Please choose a different number.",
         };
       }
 
@@ -68,7 +70,11 @@ export class GuessService {
 
       return {
         success: true,
-        message: `✅ Saved *${value}*. You can edit once within ${round.graceWindow}s with /${gameType === "GUESS_BALANCE" ? "gtbalance" : "gtbonus"} again.`,
+        message: `✅ Saved *${value}*. You can edit once within ${
+          round.graceWindow
+        }s with /${
+          gameType === "GUESS_BALANCE" ? "gtbalance" : "gtbonus"
+        } again.`,
         isEdit: false,
         graceWindowRemaining: round.graceWindow,
       };
@@ -76,7 +82,8 @@ export class GuessService {
       console.error("Error in submitGuess:", error);
       return {
         success: false,
-        message: "❌ An error occurred while saving your guess. Please try again.",
+        message:
+          "❌ An error occurred while saving your guess. Please try again.",
       };
     }
   }

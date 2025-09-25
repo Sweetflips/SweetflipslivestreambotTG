@@ -56,7 +56,6 @@ model Guess {
   value     Int
   createdAt DateTime @default(now())
   editedAt  DateTime?
-  isArchived Boolean @default(false) // Whether this guess has been archived with a completed game
 
   // Relations
   gameRound GameRound @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
