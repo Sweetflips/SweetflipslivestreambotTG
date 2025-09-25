@@ -1193,13 +1193,28 @@ bot.command("balance", async (ctx) => {
       break;
 
     case "reset":
-      gameState.balance = {
-        isOpen: false,
-        isFinalized: false,
-        finalBalance: null,
-        guesses: new Map(),
-      };
-      await ctx.reply(`🔄 Balance game reset. All guesses cleared.`);
+      try {
+        if (!guessService) {
+          await ctx.reply(`❌ Database service not available.`);
+          return;
+        }
+
+        // Close any open balance rounds in database
+        await guessService.resetRound("GUESS_BALANCE", user.id);
+
+        // Reset in-memory game state
+        gameState.balance = {
+          isOpen: false,
+          isFinalized: false,
+          finalBalance: null,
+          guesses: new Map(),
+        };
+
+        await ctx.reply(`🔄 Balance game reset. All guesses cleared from database and memory.`);
+      } catch (error) {
+        console.error("Error resetting balance game:", error);
+        await ctx.reply(`❌ Error resetting balance game. Please try again.`);
+      }
       break;
 
     case "show":
@@ -1288,15 +1303,30 @@ bot.command("bonus", async (ctx) => {
       break;
 
     case "reset":
-      gameState.bonus = {
-        isOpen: false,
-        isFinalized: false,
-        finalBonus: null,
-        guesses: new Map(),
-        bonusAmount: 0,
-        bonusList: [],
-      };
-      await ctx.reply(`🔄 Bonus game reset. All guesses and bonuses cleared.`);
+      try {
+        if (!guessService) {
+          await ctx.reply(`❌ Database service not available.`);
+          return;
+        }
+
+        // Close any open bonus rounds in database
+        await guessService.resetRound("GUESS_BONUS", user.id);
+
+        // Reset in-memory game state
+        gameState.bonus = {
+          isOpen: false,
+          isFinalized: false,
+          finalBonus: null,
+          guesses: new Map(),
+          bonusAmount: 0,
+          bonusList: [],
+        };
+
+        await ctx.reply(`🔄 Bonus game reset. All guesses and bonuses cleared from database and memory.`);
+      } catch (error) {
+        console.error("Error resetting bonus game:", error);
+        await ctx.reply(`❌ Error resetting bonus game. Please try again.`);
+      }
       break;
 
     case "show":
