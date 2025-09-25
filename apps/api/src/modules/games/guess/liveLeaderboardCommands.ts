@@ -41,7 +41,7 @@ export class LiveLeaderboardCommands {
       if (guesses.length === 0) {
         await ctx.reply(
           `📊 **Current Balance: ${currentBalance.toLocaleString()}**\n\n` +
-            `No guesses recorded yet. Use /guess balance <number> to make a guess!`
+            `No guesses recorded yet. Use /gtbalance <number> to make a guess!`
         );
         return;
       }
