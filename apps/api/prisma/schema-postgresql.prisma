@@ -89,6 +89,7 @@ model BonusEntry {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([gameId, userId])
+  @@unique([gameId, guess])
   @@map("bonus_entries")
 }
 
@@ -219,6 +220,7 @@ model Guess {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([gameRoundId, userId])
+  @@unique([gameRoundId, value])
   @@map("guesses")
 }
 

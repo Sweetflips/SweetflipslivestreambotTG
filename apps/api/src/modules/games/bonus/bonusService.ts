@@ -176,6 +176,20 @@ export class BonusService {
       throw new ConflictError('You have already submitted a guess');
     }
 
+    // Check if this guess value is already taken by another user
+    const existingGuess = await this.prisma.bonusEntry.findUnique({
+      where: {
+        gameId_guess: {
+          gameId,
+          guess,
+        },
+      },
+    });
+
+    if (existingGuess) {
+      throw new ConflictError('This guess has already been submitted by another player. Please choose a different number.');
+    }
+
     const entry = await this.prisma.bonusEntry.create({
       data: {
         gameId,
