@@ -1,5 +1,5 @@
 import { Telegraf } from "telegraf";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, GameType } from "@prisma/client";
 import { google } from "googleapis";
 import fs from "fs";
 import path from "path";
@@ -11,13 +11,20 @@ const __dirname = path.dirname(__filename);
 
 // Initialize Prisma with error handling
 let prisma = null;
+let guessService = null;
 try {
   prisma = new PrismaClient();
   console.log("✅ Database connection initialized");
+  
+  // Initialize GuessService for database storage
+  const { GuessService } = await import("../api/src/modules/games/guess/guessService.js");
+  guessService = new GuessService(prisma);
+  console.log("✅ GuessService initialized for database storage");
 } catch (error) {
   console.error("❌ Database initialization failed:", error.message);
   console.log("⚠️ Bot will run without database features");
   prisma = null;
+  guessService = null;
 }
 
 // Function to wait for database to be ready
@@ -905,46 +912,56 @@ bot.command("guess", async (ctx) => {
         return;
       }
 
-      // Check if user already has a guess
-      if (gameState.balance.guesses.has(ctx.from.id)) {
-        await ctx.reply(
-          `⛔️ You already have a balance guess recorded. Only one guess per game allowed.`
+      // Use database storage if available, otherwise fall back to memory
+      if (guessService && prisma) {
+        try {
+          const result = await guessService.submitGuess(
+            user.id,
+            GameType.GUESS_BALANCE,
+            Math.round(guess)
+          );
+          
+          if (result.success) {
+            console.log(`✅ Balance guess stored in database for user ${ctx.from.id}: ${guess}`);
+            await ctx.reply(result.message, { parse_mode: 'Markdown' });
+          } else {
+            await ctx.reply(result.message, { parse_mode: 'Markdown' });
+          }
+        } catch (error) {
+          console.error("❌ Database guess storage failed:", error);
+          await ctx.reply("❌ Failed to store guess in database. Please try again.");
+        }
+      } else {
+        // Fallback to memory storage
+        if (gameState.balance.guesses.has(ctx.from.id)) {
+          await ctx.reply(
+            `⛔️ You already have a balance guess recorded. Only one guess per game allowed.`
+          );
+          return;
+        }
+
+        const existingGuess = Array.from(gameState.balance.guesses.values()).find(
+          entry => entry.guess === guess
         );
-        return;
+
+        if (existingGuess) {
+          console.log(`Duplicate balance guess detected: User ${ctx.from.id} tried to guess ${guess} but it's already taken`);
+          await ctx.reply(
+            `⛔️ This guess has already been submitted by another player. Please choose a different number.`
+          );
+          return;
+        }
+
+        gameState.balance.guesses.set(ctx.from.id, {
+          user: user.telegramUser,
+          kickName: user.kickName,
+          guess: guess,
+          timestamp: Date.now(),
+        });
+
+        console.log(`✅ Balance guess recorded in memory for user ${ctx.from.id}: ${guess}`);
+        await ctx.reply(`✅ Balance guess recorded: ${guess}`);
       }
-
-      // Check if this guess value is already taken by another user
-      const existingGuess = Array.from(gameState.balance.guesses.values()).find(
-        entry => entry.guess === guess
-      );
-
-      if (existingGuess) {
-        console.log(`Duplicate balance guess detected: User ${ctx.from.id} tried to guess ${guess} but it's already taken`);
-        await ctx.reply(
-          `⛔️ This guess has already been submitted by another player. Please choose a different number.`
-        );
-        return;
-      }
-
-      gameState.balance.guesses.set(ctx.from.id, {
-        user: user.telegramUser,
-        kickName: user.kickName,
-        guess: guess,
-        timestamp: Date.now(),
-      });
-
-      console.log(
-        `✅ Balance guess recorded for user ${ctx.from.id}: ${guess}`
-      );
-      console.log(
-        `📊 Total balance guesses: ${gameState.balance.guesses.size}`
-      );
-      console.log(
-        `📊 Game state balance guesses:`,
-        Array.from(gameState.balance.guesses.entries())
-      );
-
-      await ctx.reply(`✅ Balance guess recorded: ${guess}`);
     } else if (gameType === "bonus") {
       if (!gameState.bonus.isOpen) {
         await ctx.reply(
@@ -958,35 +975,56 @@ bot.command("guess", async (ctx) => {
         return;
       }
 
-      // Check if user already has a guess
-      if (gameState.bonus.guesses.has(ctx.from.id)) {
-        await ctx.reply(
-          `⛔️ You already have a bonus guess recorded. Only one guess per game allowed.`
+      // Use database storage if available, otherwise fall back to memory
+      if (guessService && prisma) {
+        try {
+          const result = await guessService.submitGuess(
+            user.id,
+            GameType.GUESS_BONUS,
+            Math.round(guess)
+          );
+          
+          if (result.success) {
+            console.log(`✅ Bonus guess stored in database for user ${ctx.from.id}: ${guess}`);
+            await ctx.reply(result.message, { parse_mode: 'Markdown' });
+          } else {
+            await ctx.reply(result.message, { parse_mode: 'Markdown' });
+          }
+        } catch (error) {
+          console.error("❌ Database guess storage failed:", error);
+          await ctx.reply("❌ Failed to store guess in database. Please try again.");
+        }
+      } else {
+        // Fallback to memory storage
+        if (gameState.bonus.guesses.has(ctx.from.id)) {
+          await ctx.reply(
+            `⛔️ You already have a bonus guess recorded. Only one guess per game allowed.`
+          );
+          return;
+        }
+
+        const existingGuess = Array.from(gameState.bonus.guesses.values()).find(
+          entry => entry.guess === guess
         );
-        return;
+
+        if (existingGuess) {
+          console.log(`Duplicate bonus guess detected: User ${ctx.from.id} tried to guess ${guess} but it's already taken`);
+          await ctx.reply(
+            `⛔️ This guess has already been submitted by another player. Please choose a different number.`
+          );
+          return;
+        }
+
+        gameState.bonus.guesses.set(ctx.from.id, {
+          user: user.telegramUser,
+          kickName: user.kickName,
+          guess: guess,
+          timestamp: Date.now(),
+        });
+
+        console.log(`✅ Bonus guess recorded in memory for user ${ctx.from.id}: ${guess}`);
+        await ctx.reply(`✅ Bonus guess recorded: ${guess}`);
       }
-
-      // Check if this guess value is already taken by another user
-      const existingGuess = Array.from(gameState.bonus.guesses.values()).find(
-        entry => entry.guess === guess
-      );
-
-      if (existingGuess) {
-        console.log(`Duplicate bonus guess detected: User ${ctx.from.id} tried to guess ${guess} but it's already taken`);
-        await ctx.reply(
-          `⛔️ This guess has already been submitted by another player. Please choose a different number.`
-        );
-        return;
-      }
-
-      gameState.bonus.guesses.set(ctx.from.id, {
-        user: user.telegramUser,
-        kickName: user.kickName,
-        guess: guess,
-        timestamp: Date.now(),
-      });
-
-      await ctx.reply(`✅ Bonus guess recorded: ${guess}`);
     } else {
       await ctx.reply(`❌ Invalid game type. Use 'balance' or 'bonus'.`);
     }
