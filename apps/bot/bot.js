@@ -1203,25 +1203,45 @@ bot.command("balance", async (ctx) => {
       break;
 
     case "show":
-      console.log(
-        `📊 Balance show - Total guesses: ${gameState.balance.guesses.size}`
-      );
-      console.log(
-        `📊 Balance show - Game state guesses:`,
-        Array.from(gameState.balance.guesses.entries())
-      );
+      try {
+        if (!guessService) {
+          await ctx.reply(`❌ Database service not available.`);
+          return;
+        }
 
-      const balanceGuesses = Array.from(gameState.balance.guesses.values());
-      if (balanceGuesses.length === 0) {
-        await ctx.reply(`📊 No balance guesses recorded yet.`);
-      } else {
-        let showText = `📊 <b>Balance Guesses (${balanceGuesses.length}):</b>\n\n`;
-        balanceGuesses.forEach((guess, index) => {
-          showText += `${index + 1}. @${
-            guess.kickName
-          } - ${guess.guess.toLocaleString()}\n`;
+        // Get current balance round from database
+        const currentRound = await guessService.getCurrentRound("GUESS_BALANCE");
+        if (!currentRound) {
+          await ctx.reply(`📊 No active balance guessing round found.`);
+          return;
+        }
+
+        // Fetch all guesses for this round from database
+        const guesses = await prisma.guess.findMany({
+          where: {
+            gameRoundId: currentRound.id,
+          },
+          include: {
+            user: true,
+          },
+          orderBy: {
+            value: 'asc',
+          },
         });
-        await ctx.reply(showText, { parse_mode: "HTML" });
+
+        if (guesses.length === 0) {
+          await ctx.reply(`📊 No balance guesses recorded yet.`);
+        } else {
+          let showText = `📊 <b>Balance Guesses (${guesses.length}):</b>\n\n`;
+          guesses.forEach((guess, index) => {
+            const kickName = guess.user.kickName || guess.user.telegramUser || 'Unknown';
+            showText += `${index + 1}. @${kickName} - ${guess.value.toLocaleString()}\n`;
+          });
+          await ctx.reply(showText, { parse_mode: "HTML" });
+        }
+      } catch (error) {
+        console.error("Error showing balance guesses:", error);
+        await ctx.reply(`❌ Error fetching balance guesses from database.`);
       }
       break;
 
@@ -1280,17 +1300,45 @@ bot.command("bonus", async (ctx) => {
       break;
 
     case "show":
-      const bonusGuesses = Array.from(gameState.bonus.guesses.values());
-      if (bonusGuesses.length === 0) {
-        await ctx.reply(`📊 No bonus guesses recorded yet.`);
-      } else {
-        let showText = `📊 <b>Bonus Guesses (${bonusGuesses.length}):</b>\n\n`;
-        bonusGuesses.forEach((guess, index) => {
-          showText += `${index + 1}. @${
-            guess.kickName
-          } - ${guess.guess.toLocaleString()}\n`;
+      try {
+        if (!guessService) {
+          await ctx.reply(`❌ Database service not available.`);
+          return;
+        }
+
+        // Get current bonus round from database
+        const currentRound = await guessService.getCurrentRound("GUESS_BONUS");
+        if (!currentRound) {
+          await ctx.reply(`📊 No active bonus guessing round found.`);
+          return;
+        }
+
+        // Fetch all guesses for this round from database
+        const guesses = await prisma.guess.findMany({
+          where: {
+            gameRoundId: currentRound.id,
+          },
+          include: {
+            user: true,
+          },
+          orderBy: {
+            value: 'asc',
+          },
         });
-        await ctx.reply(showText, { parse_mode: "HTML" });
+
+        if (guesses.length === 0) {
+          await ctx.reply(`📊 No bonus guesses recorded yet.`);
+        } else {
+          let showText = `📊 <b>Bonus Guesses (${guesses.length}):</b>\n\n`;
+          guesses.forEach((guess, index) => {
+            const kickName = guess.user.kickName || guess.user.telegramUser || 'Unknown';
+            showText += `${index + 1}. @${kickName} - ${guess.value.toLocaleString()}\n`;
+          });
+          await ctx.reply(showText, { parse_mode: "HTML" });
+        }
+      } catch (error) {
+        console.error("Error showing bonus guesses:", error);
+        await ctx.reply(`❌ Error fetching bonus guesses from database.`);
       }
       break;
 
