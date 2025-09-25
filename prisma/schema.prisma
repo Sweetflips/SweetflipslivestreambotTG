@@ -27,30 +27,87 @@ model User {
   @@map("users")
 }
 
-model Guess {
-  id        String   @id @default(cuid())
-  userId    String
-  gameType  String   // "balance" or "bonus"
-  guess     Float
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model GameRound {
+  id          String   @id @default(cuid())
+  type        String   // "BONUS", "TRIVIA", "GUESS_BALANCE", "GUESS_BONUS"
+  phase       String   @default("IDLE") // "IDLE", "OPEN", "CLOSED", "REVEALED", "COMPLETED"
+  finalValue  Int?
+  graceWindow Int      @default(30) // seconds
+  windowMin   Int      @default(0)  // minutes, 0 = manual close only
+  minRange    Int      @default(1)
+  maxRange    Int      @default(1000000)
+  createdAt   DateTime @default(now())
+  closedAt    DateTime?
+  revealedAt  DateTime?
+  completedAt DateTime? // When the game round is fully completed and archived
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guesses   Guess[]
+  bonusItems BonusItem[]
+  auditLogs AuditLog[]
 
-  @@unique([userId, gameType])
+  @@map("game_rounds")
+}
+
+model Guess {
+  id        String   @id @default(cuid())
+  gameRoundId String
+  userId    String
+  value     Int
+  createdAt DateTime @default(now())
+  editedAt  DateTime?
+  isArchived Boolean @default(false) // Whether this guess has been archived with a completed game
+
+  // Relations
+  gameRound GameRound @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gameRoundId, userId])
+  @@unique([gameRoundId, value])
   @@map("guesses")
+}
+
+model BonusItem {
+  id        String   @id @default(cuid())
+  gameRoundId String
+  name      String
+  payoutX   Int?     // multiplier, null if not yet paid out
+  createdAt DateTime @default(now())
+
+  // Relations
+  gameRound GameRound @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
+
+  @@map("bonus_items")
+}
+
+// Archive table for completed game rounds and their data
+model CompletedGameArchive {
+  id          String   @id @default(cuid())
+  originalGameRoundId String @unique // Reference to the original game round
+  gameType    String   // "BONUS", "TRIVIA", "GUESS_BALANCE", "GUESS_BONUS"
+  finalValue  Int?
+  totalGuesses Int     @default(0)
+  winnerUserId String? // ID of the winning user
+  winnerGuess  Int?    // The winning guess value
+  gameData    String   // JSON string containing all game data (guesses, results, etc.)
+  completedAt DateTime @default(now())
+  archivedAt  DateTime @default(now())
+
+  @@map("completed_game_archives")
 }
 
 model AuditLog {
   id        String   @id @default(cuid())
+  gameRoundId String?
   userId    String
-  action    String
-  details   String?
+  command   String
+  params    String?  // JSON as string instead of Json type
   createdAt DateTime @default(now())
 
   // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameRound GameRound? @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
 }
