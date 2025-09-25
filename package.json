@@ -17,6 +17,7 @@
     "logs:pm2": "pm2 logs sweetflips-bot",
     "status": "forever list",
     "status:pm2": "pm2 status",
+    "build": "npx prisma generate",
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
     "db:migrate": "npx prisma migrate dev",
