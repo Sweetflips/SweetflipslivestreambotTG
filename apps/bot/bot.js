@@ -1165,18 +1165,58 @@ bot.command("balance", async (ctx) => {
 
   switch (action) {
     case "open":
-      gameState.balance.isOpen = true;
-      gameState.balance.isFinalized = false;
-      await ctx.reply(
-        `✅ Balance guessing is now OPEN! Users can submit their guesses.`
-      );
+      try {
+        if (!guessService) {
+          await ctx.reply(`❌ Database service not available.`);
+          return;
+        }
+
+        // Open new balance round in database
+        const result = await guessService.openRound("GUESS_BALANCE", user.id);
+        
+        // Update in-memory game state
+        gameState.balance.isOpen = true;
+        gameState.balance.isFinalized = false;
+        
+        await ctx.reply(
+          `✅ Balance guessing is now OPEN! Users can submit their guesses.`
+        );
+      } catch (error) {
+        console.error("Error opening balance game:", error);
+        await ctx.reply(`❌ Error opening balance game. Please try again.`);
+      }
       break;
 
     case "close":
-      gameState.balance.isOpen = false;
-      await ctx.reply(
-        `⛔️ Balance guessing is now CLOSED. ${gameState.balance.guesses.size} guesses collected.`
-      );
+      try {
+        if (!guessService) {
+          await ctx.reply(`❌ Database service not available.`);
+          return;
+        }
+
+        // Close balance round in database
+        const result = await guessService.closeRound("GUESS_BALANCE", user.id);
+        
+        // Update in-memory game state
+        gameState.balance.isOpen = false;
+        
+        // Get guess count from database for accurate reporting
+        const currentRound = await guessService.getCurrentRound("GUESS_BALANCE");
+        let guessCount = 0;
+        if (currentRound) {
+          const guesses = await prisma.guess.findMany({
+            where: { gameRoundId: currentRound.id },
+          });
+          guessCount = guesses.length;
+        }
+        
+        await ctx.reply(
+          `⛔️ Balance guessing is now CLOSED. ${guessCount} guesses collected.`
+        );
+      } catch (error) {
+        console.error("Error closing balance game:", error);
+        await ctx.reply(`❌ Error closing balance game. Please try again.`);
+      }
       break;
 
     case "finalize":
@@ -1280,18 +1320,58 @@ bot.command("bonus", async (ctx) => {
 
   switch (action) {
     case "open":
-      gameState.bonus.isOpen = true;
-      gameState.bonus.isFinalized = false;
-      await ctx.reply(
-        `✅ Bonus guessing is now OPEN! Users can submit their guesses.`
-      );
+      try {
+        if (!guessService) {
+          await ctx.reply(`❌ Database service not available.`);
+          return;
+        }
+
+        // Open new bonus round in database
+        const result = await guessService.openRound("GUESS_BONUS", user.id);
+        
+        // Update in-memory game state
+        gameState.bonus.isOpen = true;
+        gameState.bonus.isFinalized = false;
+        
+        await ctx.reply(
+          `✅ Bonus guessing is now OPEN! Users can submit their guesses.`
+        );
+      } catch (error) {
+        console.error("Error opening bonus game:", error);
+        await ctx.reply(`❌ Error opening bonus game. Please try again.`);
+      }
       break;
 
     case "close":
-      gameState.bonus.isOpen = false;
-      await ctx.reply(
-        `⛔️ Bonus guessing is now CLOSED. ${gameState.bonus.guesses.size} guesses collected.`
-      );
+      try {
+        if (!guessService) {
+          await ctx.reply(`❌ Database service not available.`);
+          return;
+        }
+
+        // Close bonus round in database
+        const result = await guessService.closeRound("GUESS_BONUS", user.id);
+        
+        // Update in-memory game state
+        gameState.bonus.isOpen = false;
+        
+        // Get guess count from database for accurate reporting
+        const currentRound = await guessService.getCurrentRound("GUESS_BONUS");
+        let guessCount = 0;
+        if (currentRound) {
+          const guesses = await prisma.guess.findMany({
+            where: { gameRoundId: currentRound.id },
+          });
+          guessCount = guesses.length;
+        }
+        
+        await ctx.reply(
+          `⛔️ Bonus guessing is now CLOSED. ${guessCount} guesses collected.`
+        );
+      } catch (error) {
+        console.error("Error closing bonus game:", error);
+        await ctx.reply(`❌ Error closing bonus game. Please try again.`);
+      }
       break;
 
     case "finalize":
