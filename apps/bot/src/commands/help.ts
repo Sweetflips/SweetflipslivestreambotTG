@@ -20,6 +20,9 @@ const adminHelp =
   `\n\n⚙️ <b>Admin Commands:</b>\n` +
   `/balance open|close|finalize|reset|show - Manage balance game\n` +
   `/bonus open|close|finalize|reset|show - Manage bonus game\n` +
+  `/game open|close|show|export - Basic game management\n` +
+  `/game complete|new|reset - Game lifecycle (OWNER only)\n` +
+  `/game archive|stats|cleanup - Archive management (OWNER only)\n` +
   `/add &lt;bonus&gt; - Add a bonus entry\n` +
   `/remove &lt;bonus&gt; - Remove a bonus entry\n` +
   `/live - Send live announcement to all groups\n` +

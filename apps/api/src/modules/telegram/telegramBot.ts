@@ -159,6 +159,23 @@ export class TelegramBot {
 /bonus \\<command\\> - Manage bonus guessing game
 /game \\<command\\> - Generic game management
 
+**Game Management Commands:**
+/game open \\<bonus\\|balance\\> - Open guessing
+/game close \\<bonus\\|balance\\> - Close guessing
+/game show \\<bonus\\|balance\\> [top=<n>] - Show standings
+/game export \\<bonus\\|balance\\> - Export guesses
+
+**Game Lifecycle (OWNER only):**
+/game complete \\<bonus\\|balance\\> - Complete and archive game
+/game new \\<bonus\\|balance\\> - Start new game round
+/game reset \\<bonus\\|balance\\> CONFIRM - Reset game (archives data)
+
+**Archive Management (OWNER only):**
+/game archive \\<bonus\\|balance\\> [limit] - View archived games
+/game stats \\<bonus\\|balance\\> - Show game statistics
+/game cleanup \\<bonus\\|balance\\> [days] - Clean old archives
+
+**Legacy Game Commands:**
 /start_hunt - Start a new bonus hunt
 /add_bonus \\<name\\> - Add a bonus to the hunt
 /open_bonus \\<name\\> \\<amount\\> - Record a bonus payout
@@ -204,6 +221,23 @@ Mod Commands:
 /bonus <command> - Manage bonus guessing game
 /game <command> - Generic game management
 
+Game Management Commands:
+/game open <bonus|balance> - Open guessing
+/game close <bonus|balance> - Close guessing
+/game show <bonus|balance> [top=<n>] - Show standings
+/game export <bonus|balance> - Export guesses
+
+Game Lifecycle (OWNER only):
+/game complete <bonus|balance> - Complete and archive game
+/game new <bonus|balance> - Start new game round
+/game reset <bonus|balance> CONFIRM - Reset game (archives data)
+
+Archive Management (OWNER only):
+/game archive <bonus|balance> [limit] - View archived games
+/game stats <bonus|balance> - Show game statistics
+/game cleanup <bonus|balance> [days] - Clean old archives
+
+Legacy Game Commands:
 /start_hunt - Start a new bonus hunt
 /add_bonus <name> - Add a bonus to the hunt
 /open_bonus <name> <amount> - Record a bonus payout

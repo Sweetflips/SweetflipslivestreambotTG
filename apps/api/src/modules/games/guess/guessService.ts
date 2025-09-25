@@ -147,32 +147,35 @@ export class GuessService {
         where: {
           gameRoundId: round.id,
           value: value,
-          id: { not: existingGuess.id }
+          id: { not: existingGuess.id },
         },
       });
 
       if (existingValueGuess) {
-        console.log(`Duplicate guess detected in edit: User ${userId} tried to edit to ${value} but it's already taken by user ${existingValueGuess.userId}`);
+        console.log(
+          `Duplicate guess detected in edit: User ${userId} tried to edit to ${value} but it's already taken by user ${existingValueGuess.userId}`
+        );
         return {
           success: false,
-          message: "⛔️ This guess has already been submitted by another player. Please choose a different number.",
+          message:
+            '⛔️ This guess has already been submitted by another player. Please choose a different number.',
         };
       }
 
       // Use transaction to ensure atomicity
       try {
-        await this.prisma.$transaction(async (tx) => {
+        await this.prisma.$transaction(async tx => {
           // Double-check within transaction to prevent race conditions
           const doubleCheck = await tx.guess.findFirst({
             where: {
               gameRoundId: round.id,
               value: value,
-              id: { not: existingGuess.id }
+              id: { not: existingGuess.id },
             },
           });
 
           if (doubleCheck) {
-            throw new Error("DUPLICATE_GUESS");
+            throw new Error('DUPLICATE_GUESS');
           }
 
           // Update existing guess
@@ -185,10 +188,11 @@ export class GuessService {
           });
         });
       } catch (error) {
-        if (error.message === "DUPLICATE_GUESS") {
+        if (error.message === 'DUPLICATE_GUESS') {
           return {
             success: false,
-            message: "⛔️ This guess has already been submitted by another player. Please choose a different number.",
+            message:
+              '⛔️ This guess has already been submitted by another player. Please choose a different number.',
           };
         }
         throw error; // Re-throw other errors
@@ -213,16 +217,19 @@ export class GuessService {
     });
 
     if (existingValueGuess) {
-      console.log(`Duplicate guess detected: User ${userId} tried to guess ${value} but it's already taken by user ${existingValueGuess.userId}`);
+      console.log(
+        `Duplicate guess detected: User ${userId} tried to guess ${value} but it's already taken by user ${existingValueGuess.userId}`
+      );
       return {
         success: false,
-        message: "⛔️ This guess has already been submitted by another player. Please choose a different number.",
+        message:
+          '⛔️ This guess has already been submitted by another player. Please choose a different number.',
       };
     }
 
     // Use transaction to ensure atomicity
     try {
-      await this.prisma.$transaction(async (tx) => {
+      await this.prisma.$transaction(async tx => {
         // Double-check within transaction to prevent race conditions
         const doubleCheck = await tx.guess.findFirst({
           where: {
@@ -232,7 +239,7 @@ export class GuessService {
         });
 
         if (doubleCheck) {
-          throw new Error("DUPLICATE_GUESS");
+          throw new Error('DUPLICATE_GUESS');
         }
 
         // Create new guess
@@ -245,10 +252,11 @@ export class GuessService {
         });
       });
     } catch (error) {
-      if (error.message === "DUPLICATE_GUESS") {
+      if (error.message === 'DUPLICATE_GUESS') {
         return {
           success: false,
-          message: "⛔️ This guess has already been submitted by another player. Please choose a different number.",
+          message:
+            '⛔️ This guess has already been submitted by another player. Please choose a different number.',
         };
       }
       throw error; // Re-throw other errors
@@ -441,19 +449,21 @@ export class GuessService {
         createdAt: guess.createdAt,
         editedAt: guess.editedAt,
       })),
-      winner: winner ? {
-        userId: winner.userId,
-        username: winner.username,
-        kickName: winner.kickName,
-        guess: winner.guess,
-        delta: winner.delta,
-        isExact: winner.isExact,
-      } : null,
+      winner: winner
+        ? {
+            userId: winner.userId,
+            username: winner.username,
+            kickName: winner.kickName,
+            guess: winner.guess,
+            delta: winner.delta,
+            isExact: winner.isExact,
+          }
+        : null,
       totalGuesses: guesses.length,
     };
 
     // Use transaction to ensure data consistency
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async tx => {
       // Create archive record
       await tx.completedGameArchive.create({
         data: {
@@ -493,7 +503,7 @@ export class GuessService {
     });
 
     const gameName = gameType === GameType.GUESS_BALANCE ? 'Balance' : 'Bonus';
-    const winnerText = winner 
+    const winnerText = winner
       ? `\n🏆 Winner: @${winner.kickName || winner.username} (${winner.guess})`
       : '\n🏆 No winner (no guesses submitted)';
 
@@ -698,14 +708,12 @@ export class GuessService {
       },
     });
 
-    await this.logAudit(userId, `reset_${gameType.toLowerCase()}`, { 
-      gameType, 
-      archivedGuesses: guessCount 
+    await this.logAudit(userId, `reset_${gameType.toLowerCase()}`, {
+      gameType,
+      archivedGuesses: guessCount,
     });
 
-    const archiveNote = guessCount > 0 
-      ? ` (${guessCount} guesses archived before reset)`
-      : '';
+    const archiveNote = guessCount > 0 ? ` (${guessCount} guesses archived before reset)` : '';
 
     return `✅ ${
       gameType === GameType.GUESS_BALANCE ? 'Balance' : 'Bonus'
@@ -739,9 +747,9 @@ export class GuessService {
       },
     });
 
-    await this.logAudit(userId, `new_${gameType.toLowerCase()}`, { 
-      gameType, 
-      newRoundId: newRound.id 
+    await this.logAudit(userId, `new_${gameType.toLowerCase()}`, {
+      gameType,
+      newRoundId: newRound.id,
     });
 
     return `✅ New ${
@@ -846,7 +854,7 @@ export class GuessService {
   // Get archived games
   async getArchivedGames(gameType?: GameType, limit: number = 10): Promise<any[]> {
     const whereClause = gameType ? { gameType } : {};
-    
+
     const archives = await this.prisma.completedGameArchive.findMany({
       where: whereClause,
       orderBy: { completedAt: 'desc' },
@@ -907,9 +915,9 @@ export class GuessService {
       },
     });
 
-    await this.logAudit(userId, 'cleanup_archives', { 
-      daysToKeep, 
-      deletedCount: oldArchives.length 
+    await this.logAudit(userId, 'cleanup_archives', {
+      daysToKeep,
+      deletedCount: oldArchives.length,
     });
 
     return `✅ Cleaned up ${oldArchives.length} archived games older than ${daysToKeep} days.`;
@@ -918,7 +926,7 @@ export class GuessService {
   // Get game statistics
   async getGameStatistics(gameType?: GameType): Promise<any> {
     const whereClause = gameType ? { gameType } : {};
-    
+
     const totalArchives = await this.prisma.completedGameArchive.count({
       where: whereClause,
     });
