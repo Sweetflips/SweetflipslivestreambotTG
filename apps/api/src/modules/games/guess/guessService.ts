@@ -152,20 +152,47 @@ export class GuessService {
       });
 
       if (existingValueGuess) {
+        console.log(`Duplicate guess detected in edit: User ${userId} tried to edit to ${value} but it's already taken by user ${existingValueGuess.userId}`);
         return {
           success: false,
           message: "⛔️ This guess has already been submitted by another player. Please choose a different number.",
         };
       }
 
-      // Update existing guess
-      await this.prisma.guess.update({
-        where: { id: existingGuess.id },
-        data: {
-          value,
-          editedAt: now,
-        },
-      });
+      // Use transaction to ensure atomicity
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          // Double-check within transaction to prevent race conditions
+          const doubleCheck = await tx.guess.findFirst({
+            where: {
+              gameRoundId: round.id,
+              value: value,
+              id: { not: existingGuess.id }
+            },
+          });
+
+          if (doubleCheck) {
+            throw new Error("DUPLICATE_GUESS");
+          }
+
+          // Update existing guess
+          await tx.guess.update({
+            where: { id: existingGuess.id },
+            data: {
+              value,
+              editedAt: now,
+            },
+          });
+        });
+      } catch (error) {
+        if (error.message === "DUPLICATE_GUESS") {
+          return {
+            success: false,
+            message: "⛔️ This guess has already been submitted by another player. Please choose a different number.",
+          };
+        }
+        throw error; // Re-throw other errors
+      }
 
       const remainingSeconds = Math.max(0, Math.floor((graceEnd.getTime() - now.getTime()) / 1000));
 
@@ -186,20 +213,46 @@ export class GuessService {
     });
 
     if (existingValueGuess) {
+      console.log(`Duplicate guess detected: User ${userId} tried to guess ${value} but it's already taken by user ${existingValueGuess.userId}`);
       return {
         success: false,
         message: "⛔️ This guess has already been submitted by another player. Please choose a different number.",
       };
     }
 
-    // Create new guess
-    await this.prisma.guess.create({
-      data: {
-        gameRoundId: round.id,
-        userId,
-        value,
-      },
-    });
+    // Use transaction to ensure atomicity
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Double-check within transaction to prevent race conditions
+        const doubleCheck = await tx.guess.findFirst({
+          where: {
+            gameRoundId: round.id,
+            value: value,
+          },
+        });
+
+        if (doubleCheck) {
+          throw new Error("DUPLICATE_GUESS");
+        }
+
+        // Create new guess
+        await tx.guess.create({
+          data: {
+            gameRoundId: round.id,
+            userId,
+            value,
+          },
+        });
+      });
+    } catch (error) {
+      if (error.message === "DUPLICATE_GUESS") {
+        return {
+          success: false,
+          message: "⛔️ This guess has already been submitted by another player. Please choose a different number.",
+        };
+      }
+      throw error; // Re-throw other errors
+    }
 
     return {
       success: true,

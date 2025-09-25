@@ -185,15 +185,32 @@ export class BonusService {
     });
 
     if (existingGuess) {
+      console.log(`Duplicate bonus guess detected: User ${userId} tried to guess ${guess} but it's already taken by user ${existingGuess.userId}`);
       throw new ConflictError('This guess has already been submitted by another player. Please choose a different number.');
     }
 
-    const entry = await this.prisma.bonusEntry.create({
-      data: {
-        gameId,
-        userId,
-        guess,
-      },
+    // Use transaction to ensure atomicity
+    const entry = await this.prisma.$transaction(async (tx) => {
+      // Double-check within transaction to prevent race conditions
+      const doubleCheck = await tx.bonusEntry.findFirst({
+        where: {
+          gameId: gameId,
+          guess: guess,
+        },
+      });
+
+      if (doubleCheck) {
+        throw new ConflictError('This guess has already been submitted by another player. Please choose a different number.');
+      }
+
+      // Create new entry
+      return await tx.bonusEntry.create({
+        data: {
+          gameId,
+          userId,
+          guess,
+        },
+      });
     });
 
     logger.info('Bonus hunt guess submitted', {
