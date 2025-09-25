@@ -143,16 +143,15 @@ export class GuessService {
       }
 
       // Check if the new value is already taken by another user
-      const existingValueGuess = await this.prisma.guess.findUnique({
+      const existingValueGuess = await this.prisma.guess.findFirst({
         where: {
-          gameRoundId_value: {
-            gameRoundId: round.id,
-            value,
-          },
+          gameRoundId: round.id,
+          value: value,
+          id: { not: existingGuess.id }
         },
       });
 
-      if (existingValueGuess && existingValueGuess.id !== existingGuess.id) {
+      if (existingValueGuess) {
         return {
           success: false,
           message: "⛔️ This guess has already been submitted by another player. Please choose a different number.",
@@ -179,12 +178,10 @@ export class GuessService {
     }
 
     // Check if this guess value is already taken by another user
-    const existingValueGuess = await this.prisma.guess.findUnique({
+    const existingValueGuess = await this.prisma.guess.findFirst({
       where: {
-        gameRoundId_value: {
-          gameRoundId: round.id,
-          value,
-        },
+        gameRoundId: round.id,
+        value: value,
       },
     });
 

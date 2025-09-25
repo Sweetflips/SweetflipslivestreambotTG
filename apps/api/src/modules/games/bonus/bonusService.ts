@@ -177,12 +177,10 @@ export class BonusService {
     }
 
     // Check if this guess value is already taken by another user
-    const existingGuess = await this.prisma.bonusEntry.findUnique({
+    const existingGuess = await this.prisma.bonusEntry.findFirst({
       where: {
-        gameId_guess: {
-          gameId,
-          guess,
-        },
+        gameId: gameId,
+        guess: guess,
       },
     });
 

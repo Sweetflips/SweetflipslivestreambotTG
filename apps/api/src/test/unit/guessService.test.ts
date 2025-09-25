@@ -11,6 +11,7 @@ const mockPrisma = {
   },
   guess: {
     findUnique: vi.fn(),
+    findFirst: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     findMany: vi.fn(),
@@ -157,6 +158,96 @@ describe('GuessService', () => {
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('⛔️ Edit window has expired');
+    });
+
+    it('should reject duplicate guess value from different user', async () => {
+      const mockRound = {
+        id: 'round-1',
+        type: GameType.GUESS_BALANCE,
+        phase: GameStatus.OPEN,
+        minRange: 1,
+        maxRange: 1000000,
+        graceWindow: 30,
+      };
+
+      const mockExistingGuess = {
+        id: 'guess-2',
+        gameRoundId: 'round-1',
+        value: 50000,
+        userId: 'user-2',
+      };
+
+      mockPrisma.gameRound.findFirst.mockResolvedValue(mockRound);
+      mockPrisma.guess.findUnique.mockResolvedValue(null); // User hasn't guessed yet
+      mockPrisma.guess.findFirst.mockResolvedValue(mockExistingGuess); // But value is taken
+
+      const result = await guessService.submitGuess('user-1', GameType.GUESS_BALANCE, 50000);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('⛔️ This guess has already been submitted by another player');
+      expect(mockPrisma.guess.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject edit to duplicate guess value from different user', async () => {
+      const mockRound = {
+        id: 'round-1',
+        type: GameType.GUESS_BALANCE,
+        phase: GameStatus.OPEN,
+        minRange: 1,
+        maxRange: 1000000,
+        graceWindow: 30,
+      };
+
+      const mockExistingGuess = {
+        id: 'guess-1',
+        createdAt: new Date(Date.now() - 10000), // 10 seconds ago (within grace window)
+        value: 50000,
+      };
+
+      const mockDuplicateGuess = {
+        id: 'guess-2',
+        gameRoundId: 'round-1',
+        value: 75000,
+        userId: 'user-2',
+      };
+
+      mockPrisma.gameRound.findFirst.mockResolvedValue(mockRound);
+      mockPrisma.guess.findUnique.mockResolvedValue(mockExistingGuess);
+      mockPrisma.guess.findFirst.mockResolvedValue(mockDuplicateGuess);
+
+      const result = await guessService.submitGuess('user-1', GameType.GUESS_BALANCE, 75000, true);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('⛔️ This guess has already been submitted by another player');
+      expect(mockPrisma.guess.update).not.toHaveBeenCalled();
+    });
+
+    it('should allow edit to same value (no change)', async () => {
+      const mockRound = {
+        id: 'round-1',
+        type: GameType.GUESS_BALANCE,
+        phase: GameStatus.OPEN,
+        minRange: 1,
+        maxRange: 1000000,
+        graceWindow: 30,
+      };
+
+      const mockExistingGuess = {
+        id: 'guess-1',
+        createdAt: new Date(Date.now() - 10000), // 10 seconds ago (within grace window)
+        value: 50000,
+      };
+
+      mockPrisma.gameRound.findFirst.mockResolvedValue(mockRound);
+      mockPrisma.guess.findUnique.mockResolvedValue(mockExistingGuess);
+      mockPrisma.guess.findFirst.mockResolvedValue(null); // No duplicate found (same user's guess)
+      mockPrisma.guess.update.mockResolvedValue({ id: 'guess-1' });
+
+      const result = await guessService.submitGuess('user-1', GameType.GUESS_BALANCE, 50000, true);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('✏️ Updated to *50000*');
+      expect(mockPrisma.guess.update).toHaveBeenCalled();
     });
   });
 
