@@ -505,6 +505,12 @@ export class TelegramCommands {
   }
 
   // Guess Game Commands
+  async guess(ctx: TelegramContext) {
+    const args = ctx.message && 'text' in ctx.message ? ctx.message.text.split(' ').slice(1) : [];
+
+    await this.guessCommands.handleGuess(ctx, args);
+  }
+
   async gtBalance(ctx: TelegramContext) {
     const args = ctx.message && 'text' in ctx.message ? ctx.message.text.split(' ').slice(1) : [];
 

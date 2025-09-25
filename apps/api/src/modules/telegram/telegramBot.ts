@@ -123,6 +123,9 @@ export class TelegramBot {
     );
 
     // Guess Game Commands (viewer commands)
+    this.bot.command('guess', viewerMiddleware, viewerRateLimit, ctx =>
+      this.commands.guess(ctx)
+    );
     this.bot.command('gtbalance', viewerMiddleware, viewerRateLimit, ctx =>
       this.commands.gtBalance(ctx)
     );
@@ -144,8 +147,10 @@ export class TelegramBot {
 🤖 **SweetflipsStreamBot Commands**
 
 **Viewer Commands:**
-/gtbalance [number] - Guess the balance (requires linked Kick account)
-/gtbonus [number] - Guess the bonus total (requires linked Kick account)
+/guess balance <number> - Guess the balance (requires linked Kick account)
+/guess bonus <number> - Guess the bonus total (requires linked Kick account)
+/gtbalance [number] - Guess the balance (legacy command)
+/gtbonus [number] - Guess the bonus total (legacy command)
 /link - Generate account linking code
 /unlink - Unlink your accounts
 

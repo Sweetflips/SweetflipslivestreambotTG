@@ -84,6 +84,70 @@ export class GuessCommands {
     }
   }
 
+  // Handle /guess command (balance or bonus)
+  async handleGuess(ctx: Context, args: string[]): Promise<void> {
+    try {
+      const telegramId = ctx.from?.id?.toString();
+      if (!telegramId) {
+        await ctx.reply('❌ Unable to identify user.');
+        return;
+      }
+
+      // Check if user is linked
+      if (!(await this.isUserLinked(telegramId))) {
+        await ctx.reply(
+          '🔗 **Account Linking Required**\n\n' +
+            'You must link your Kick account before participating in games.\n\n' +
+            'Use /kick to link your account.',
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+
+      const user = await this.getUser(telegramId);
+
+      // Check if we have the required arguments
+      if (args.length < 2) {
+        await ctx.reply(
+          '🎯 **Guess Commands**\n\n' +
+            'Usage:\n' +
+            '• `/guess balance <number>` - Guess the balance\n' +
+            '• `/guess bonus <number>` - Guess the bonus total\n\n' +
+            'Example: `/guess balance 50000`',
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+
+      const gameType = args[0].toLowerCase();
+      const guessValue = parseInt(args[1]);
+
+      // Validate game type
+      if (gameType !== 'balance' && gameType !== 'bonus') {
+        await ctx.reply('❌ Invalid game type. Use "balance" or "bonus".');
+        return;
+      }
+
+      // Validate number
+      if (isNaN(guessValue)) {
+        await ctx.reply('❌ Please provide a valid number.');
+        return;
+      }
+
+      // Submit guess based on game type
+      const result = await this.guessService.submitGuess(
+        user.id,
+        gameType === 'balance' ? GameType.GUESS_BALANCE : GameType.GUESS_BONUS,
+        guessValue
+      );
+
+      await ctx.reply(result.message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('Error in handleGuess:', error);
+      await ctx.reply('❌ An error occurred. Please try again.');
+    }
+  }
+
   // Handle /gtbonus command
   async handleGtBonus(ctx: Context, args: string[]): Promise<void> {
     try {
