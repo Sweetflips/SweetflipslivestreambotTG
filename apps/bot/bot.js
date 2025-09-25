@@ -905,6 +905,27 @@ bot.command("guess", async (ctx) => {
         return;
       }
 
+      // Check if user already has a guess
+      if (gameState.balance.guesses.has(ctx.from.id)) {
+        await ctx.reply(
+          `⛔️ You already have a balance guess recorded. Only one guess per game allowed.`
+        );
+        return;
+      }
+
+      // Check if this guess value is already taken by another user
+      const existingGuess = Array.from(gameState.balance.guesses.values()).find(
+        entry => entry.guess === guess
+      );
+
+      if (existingGuess) {
+        console.log(`Duplicate balance guess detected: User ${ctx.from.id} tried to guess ${guess} but it's already taken`);
+        await ctx.reply(
+          `⛔️ This guess has already been submitted by another player. Please choose a different number.`
+        );
+        return;
+      }
+
       gameState.balance.guesses.set(ctx.from.id, {
         user: user.telegramUser,
         kickName: user.kickName,
@@ -934,6 +955,27 @@ bot.command("guess", async (ctx) => {
 
       if (gameState.bonus.isFinalized) {
         await ctx.reply(`❌ Bonus game is finalized. Wait for the next round.`);
+        return;
+      }
+
+      // Check if user already has a guess
+      if (gameState.bonus.guesses.has(ctx.from.id)) {
+        await ctx.reply(
+          `⛔️ You already have a bonus guess recorded. Only one guess per game allowed.`
+        );
+        return;
+      }
+
+      // Check if this guess value is already taken by another user
+      const existingGuess = Array.from(gameState.bonus.guesses.values()).find(
+        entry => entry.guess === guess
+      );
+
+      if (existingGuess) {
+        console.log(`Duplicate bonus guess detected: User ${ctx.from.id} tried to guess ${guess} but it's already taken`);
+        await ctx.reply(
+          `⛔️ This guess has already been submitted by another player. Please choose a different number.`
+        );
         return;
       }
 
