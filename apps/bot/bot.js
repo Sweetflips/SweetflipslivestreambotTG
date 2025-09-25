@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import { google } from "googleapis";
 import cron from "node-cron";
 import path from "path";
 import { Telegraf } from "telegraf";
@@ -432,10 +431,7 @@ bot.catch((err, ctx) => {
     chatId: ctx.chat?.id,
   });
 
-  // Check if it's a timeout error
-  if (err.message && err.message.includes('timeout')) {
-    console.error("⏰ Timeout error detected - this may be due to Google Sheets API issues");
-  }
+  // Log error details for debugging
 
   // Try to reply with error info
   ctx.reply("❌ An error occurred. Please try again.").catch(console.error);
@@ -584,52 +580,8 @@ class LiveBalanceService {
 
 const liveBalanceService = new LiveBalanceService();
 
-// Google Sheets setup (optional)
-let sheets = null;
-let SPREADSHEET_ID = null;
-
-try {
-  // Try environment variable first
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-    try {
-      const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
-      const auth = new google.auth.GoogleAuth({
-        credentials: credentials,
-        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-      });
-      sheets = google.sheets({ version: "v4", auth });
-      SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
-      console.log(
-        "✅ Google Sheets integration enabled (environment variable)"
-      );
-    } catch (envError) {
-      console.log("⚠️ Environment variable failed, trying file-based auth...");
-      throw envError; // This will trigger the file-based fallback
-    }
-  } else {
-    throw new Error("No environment variable set");
-  }
-} catch (error) {
-  // Fallback to file-based authentication
-  try {
-    const auth = new google.auth.GoogleAuth({
-      keyFile: path.join(
-        __dirname,
-        "credentials",
-        "sweetflips-7086906ae249.json"
-      ),
-      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-    });
-    sheets = google.sheets({ version: "v4", auth });
-    SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
-    console.log("✅ Google Sheets integration enabled (file-based)");
-  } catch (fileError) {
-    console.error("❌ Google Sheets setup failed:", fileError.message);
-    console.log("⚠️ Bot will run without Google Sheets integration");
-    sheets = null;
-    SPREADSHEET_ID = null;
-  }
-}
+// Google Sheets integration removed - using database storage instead
+console.log("✅ Bot configured to use database storage only");
 
 // Helper functions
 async function getUserOrCreate(telegramId, telegramUser) {
@@ -648,13 +600,7 @@ async function getUserOrCreate(telegramId, telegramUser) {
       kickName: null,
     };
 
-    // Sync to Google Sheets even with mock user (non-blocking)
-    console.log("📊 Starting background Google Sheets sync for mock user...");
-    syncToGoogleSheets(mockUser).then(() => {
-      console.log("✅ Mock user synced to Google Sheets successfully");
-    }).catch((error) => {
-      console.error("❌ Error syncing mock user to Google Sheets:", error.message);
-    });
+    // Google Sheets sync removed - using database storage instead
 
     return mockUser;
   }
@@ -692,13 +638,7 @@ async function getUserOrCreate(telegramId, telegramUser) {
       );
     }
 
-    // Sync to Google Sheets (non-blocking)
-    console.log("📊 Starting background Google Sheets sync...");
-    syncToGoogleSheets(user).then(() => {
-      console.log("✅ User synced to Google Sheets successfully");
-    }).catch((error) => {
-      console.error("❌ Error syncing user to Google Sheets:", error.message);
-    });
+    // Google Sheets sync removed - using database storage instead
 
     console.log("✅ getUserOrCreate completed successfully");
     return user;
@@ -725,44 +665,7 @@ async function getUserOrCreate(telegramId, telegramUser) {
   }
 }
 
-async function syncToGoogleSheets(user) {
-  // Skip if Google Sheets is not available
-  if (!sheets || !SPREADSHEET_ID) {
-    console.log("⚠️ Google Sheets not available - skipping sync");
-    return;
-  }
-
-  try {
-    const values = [
-      [
-        user.telegramUser || "Unknown",
-        user.kickName || "Not linked",
-        new Date().toISOString(),
-      ],
-    ];
-
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Google Sheets sync timeout')), 10000); // 10 second timeout
-    });
-
-    const syncPromise = sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: "Sheet1!A:C",
-      valueInputOption: "RAW",
-      resource: { values },
-    });
-
-    await Promise.race([syncPromise, timeoutPromise]);
-
-    console.log(
-      `📊 Synced to Google Sheets: ${user.telegramUser} -> ${user.kickName}`
-    );
-  } catch (error) {
-    console.error("❌ Error syncing to Google Sheets:", error.message);
-    // Don't throw the error - just log it and continue
-  }
-}
+// Google Sheets sync function removed - using database storage instead
 
 function isAdmin(user) {
   return ["MOD", "OWNER"].includes(user.role);
