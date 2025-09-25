@@ -72,9 +72,7 @@ export class GuessService {
         success: true,
         message: `✅ Saved *${value}*. You can edit once within ${
           round.graceWindow
-        }s with /${
-          gameType === "GUESS_BALANCE" ? "gtbalance" : "gtbonus"
-        } again.`,
+        }s.`,
         isEdit: false,
         graceWindowRemaining: round.graceWindow,
       };
