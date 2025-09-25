@@ -146,61 +146,59 @@ export class TelegramBot {
         const helpText = `
 🤖 **SweetflipsStreamBot Commands**
 
-**Viewer Commands:**
-/guess balance <number> - Guess the balance (requires linked Kick account)
-/guess bonus <number> - Guess the bonus total (requires linked Kick account)
-/gtbalance [number] - Guess the balance (legacy command)
-/gtbonus [number] - Guess the bonus total (legacy command)
-/link - Generate account linking code
-/unlink - Unlink your accounts
+**🎮 Gaming Commands:**
+/guess balance \\<number\\> - Guess the end balance (requires linked Kick account)
+/guess bonus \\<number\\> - Guess the bonus total (requires linked Kick account)
+/balanceboard - View live balance leaderboard with top 5 guessers
+/bonusboard - View active bonus leaderboard with top 5 guessers
 
-**Mod Commands:**
-/balance \\<command\\> - Manage balance guessing game
-/bonus \\<command\\> - Manage bonus guessing game
-/game \\<command\\> - Generic game management
+**📅 Schedule Commands:**
+/schedule - View stream schedule for next 7 days
 
-**Game Management Commands:**
-/game open \\<bonus\\|balance\\> - Open guessing
-/game close \\<bonus\\|balance\\> - Close guessing
-/game show \\<bonus\\|balance\\> [top=<n>] - Show standings
-/game export \\<bonus\\|balance\\> - Export guesses
+**🔗 Account Commands:**
+/start - Welcome message and setup
+/help - Show this help
+/kick - Link your Kick account (one-time setup)
 
-**Game Lifecycle (OWNER only):**
-/game complete \\<bonus\\|balance\\> - Complete and archive game
-/game new \\<bonus\\|balance\\> - Start new game round
-/game reset \\<bonus\\|balance\\> CONFIRM - Reset game (archives data)
+**⚙️ Admin Commands:**
+/balance open - Open balance guessing
+/balance close - Close balance guessing
+/balance finalize - Finalize balance game with live balance
+/balance reset - Reset balance game
+/balance show - Show current balance standings
 
-**Archive Management (OWNER only):**
-/game archive \\<bonus\\|balance\\> [limit] - View archived games
-/game stats \\<bonus\\|balance\\> - Show game statistics
-/game cleanup \\<bonus\\|balance\\> [days] - Clean old archives
+/bonus open - Open bonus guessing
+/bonus close - Close bonus guessing
+/bonus finalize - Finalize bonus game with active bonus
+/bonus reset - Reset bonus game
+/bonus show - Show current bonus standings
 
-**Legacy Game Commands:**
-/start_hunt - Start a new bonus hunt
-/add_bonus \\<name\\> - Add a bonus to the hunt
-/open_bonus \\<name\\> \\<amount\\> - Record a bonus payout
-/close_hunt - Close the hunt and compute results
+/game open \\<bonus\\|balance\\> - Open guessing (new)
+/game close \\<bonus\\|balance\\> - Close guessing (new)
+/game show \\<bonus\\|balance\\> - Show standings (new)
+/game export \\<bonus\\|balance\\> - Export guesses (new)
+/game complete \\<bonus\\|balance\\> - Complete and archive game (OWNER only)
+/game new \\<bonus\\|balance\\> - Start new game round (OWNER only)
+/game reset \\<bonus\\|balance\\> CONFIRM - Reset game (archives data) (OWNER only)
+/game archive \\<bonus\\|balance\\> - View archived games (OWNER only)
+/game stats \\<bonus\\|balance\\> - Show game statistics (OWNER only)
+/game cleanup \\<bonus\\|balance\\> \\<days\\> - Clean old archives (OWNER only)
 
-/start_trivia - Start a new trivia game
-/q \\<question\\> \\| \\<answer\\> - Post a trivia question
-/lock_round - Lock the current round
-/stop_trivia - End the trivia game
+/add \\<bonus name\\> - Add a bonus (counts as +1)
+/remove \\<bonus name\\> - Remove a bonus (counts as -1)
 
-/state - Show current game state
-/reset_game - Reset any active game
-/payout_preview - Generate payout instructions
-/link_status @username - Check user link status
+/live - Send live announcement to all groups
+/broadcastschedule - Manually send schedule to all groups
+/findgroups - Find all group chats where bot is a member
+/groupstats - Show detailed group management statistics
+/testgroups - Test group detection functionality
+/addgroup - Manually add a group ID for live announcements
 
-**Admin Management:**
-/setrole \\<telegram_id\\> \\<MOD\\|OWNER\\> - Set user role (OWNER only)
-/listusers [limit] - List all users (MOD+)
+/schedule add \\<day\\> \\<stream\\> \\<title\\> - Add schedule entry
+/schedule remove \\<day\\> \\<stream\\> - Remove schedule entry
 
-**Kick Chat Commands:**
-!guess \\<number\\> - Submit a bonus hunt guess
-!link \\<code\\> - Link your accounts
-!answer \\<text\\> - Answer trivia question
-
-Use /help_admin for detailed admin command help.
+/setrole \\<telegram_id\\> \\<MOD\\|OWNER\\> - Set user role
+/listusers - List all users
         `;
 
         await ctx.reply(helpText, { parse_mode: 'Markdown' });
@@ -210,59 +208,59 @@ Use /help_admin for detailed admin command help.
         const fallbackText = `
 🤖 SweetflipsStreamBot Commands
 
-Viewer Commands:
-/gtbalance [number] - Guess the balance (requires linked Kick account)
-/gtbonus [number] - Guess the bonus total (requires linked Kick account)
-/link - Generate account linking code
-/unlink - Unlink your accounts
+🎮 Gaming Commands:
+/guess balance <number> - Guess the end balance (requires linked Kick account)
+/guess bonus <number> - Guess the bonus total (requires linked Kick account)
+/balanceboard - View live balance leaderboard with top 5 guessers
+/bonusboard - View active bonus leaderboard with top 5 guessers
 
-Mod Commands:
-/balance <command> - Manage balance guessing game
-/bonus <command> - Manage bonus guessing game
-/game <command> - Generic game management
+📅 Schedule Commands:
+/schedule - View stream schedule for next 7 days
 
-Game Management Commands:
-/game open <bonus|balance> - Open guessing
-/game close <bonus|balance> - Close guessing
-/game show <bonus|balance> [top=<n>] - Show standings
-/game export <bonus|balance> - Export guesses
+🔗 Account Commands:
+/start - Welcome message and setup
+/help - Show this help
+/kick - Link your Kick account (one-time setup)
 
-Game Lifecycle (OWNER only):
-/game complete <bonus|balance> - Complete and archive game
-/game new <bonus|balance> - Start new game round
-/game reset <bonus|balance> CONFIRM - Reset game (archives data)
+⚙️ Admin Commands:
+/balance open - Open balance guessing
+/balance close - Close balance guessing
+/balance finalize - Finalize balance game with live balance
+/balance reset - Reset balance game
+/balance show - Show current balance standings
 
-Archive Management (OWNER only):
-/game archive <bonus|balance> [limit] - View archived games
-/game stats <bonus|balance> - Show game statistics
-/game cleanup <bonus|balance> [days] - Clean old archives
+/bonus open - Open bonus guessing
+/bonus close - Close bonus guessing
+/bonus finalize - Finalize bonus game with active bonus
+/bonus reset - Reset bonus game
+/bonus show - Show current bonus standings
 
-Legacy Game Commands:
-/start_hunt - Start a new bonus hunt
-/add_bonus <name> - Add a bonus to the hunt
-/open_bonus <name> <amount> - Record a bonus payout
-/close_hunt - Close the hunt and compute results
+/game open <bonus|balance> - Open guessing (new)
+/game close <bonus|balance> - Close guessing (new)
+/game show <bonus|balance> - Show standings (new)
+/game export <bonus|balance> - Export guesses (new)
+/game complete <bonus|balance> - Complete and archive game (OWNER only)
+/game new <bonus|balance> - Start new game round (OWNER only)
+/game reset <bonus|balance> CONFIRM - Reset game (archives data) (OWNER only)
+/game archive <bonus|balance> - View archived games (OWNER only)
+/game stats <bonus|balance> - Show game statistics (OWNER only)
+/game cleanup <bonus|balance> <days> - Clean old archives (OWNER only)
 
-/start_trivia - Start a new trivia game
-/q <question> | <answer> - Post a trivia question
-/lock_round - Lock the current round
-/stop_trivia - End the trivia game
+/add <bonus name> - Add a bonus (counts as +1)
+/remove <bonus name> - Remove a bonus (counts as -1)
 
-/state - Show current game state
-/reset_game - Reset any active game
-/payout_preview - Generate payout instructions
-/link_status @username - Check user link status
+/live - Send live announcement to all groups
+/broadcastschedule - Manually send schedule to all groups
+/findgroups - Find all group chats where bot is a member
+/groupstats - Show detailed group management statistics
+/testgroups - Test group detection functionality
+/addgroup - Manually add a group ID for live announcements
 
-Admin Management:
-/setrole <telegram_id> <MOD|OWNER> - Set user role (OWNER only)
-/listusers [limit] - List all users (MOD+)
+/schedule add <day> <stream> <title> - Add schedule entry
+/schedule remove <day> <stream> - Remove schedule entry
 
-Kick Chat Commands:
-!guess <number> - Submit a bonus hunt guess
-!link <code> - Link your accounts
-!answer <text> - Answer trivia question
-
-Use /help_admin for detailed admin command help.
+/setrole <telegram_id> <MOD|OWNER> - Set user role
+/listusers - List all users
         `;
         await ctx.reply(fallbackText);
       }
