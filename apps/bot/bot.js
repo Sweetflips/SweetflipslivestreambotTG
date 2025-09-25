@@ -429,9 +429,14 @@ bot.catch((err, ctx) => {
     message: ctx.message?.text,
     user: ctx.from?.username,
     userId: ctx.from?.id,
-    chatId: ctx.chat?.id
+    chatId: ctx.chat?.id,
   });
-  
+
+  // Check if it's a timeout error
+  if (err.message && err.message.includes('timeout')) {
+    console.error("⏰ Timeout error detected - this may be due to Google Sheets API issues");
+  }
+
   // Try to reply with error info
   ctx.reply("❌ An error occurred. Please try again.").catch(console.error);
 });
@@ -643,15 +648,13 @@ async function getUserOrCreate(telegramId, telegramUser) {
       kickName: null,
     };
 
-    // Sync to Google Sheets even with mock user
-    try {
-      console.log("📊 Attempting to sync mock user to Google Sheets...");
-      await syncToGoogleSheets(mockUser);
+    // Sync to Google Sheets even with mock user (non-blocking)
+    console.log("📊 Starting background Google Sheets sync for mock user...");
+    syncToGoogleSheets(mockUser).then(() => {
       console.log("✅ Mock user synced to Google Sheets successfully");
-    } catch (error) {
-      console.error("❌ Error syncing mock user to Google Sheets:", error);
-      // Continue with mock user even if Google Sheets fails
-    }
+    }).catch((error) => {
+      console.error("❌ Error syncing mock user to Google Sheets:", error.message);
+    });
 
     return mockUser;
   }
@@ -689,15 +692,13 @@ async function getUserOrCreate(telegramId, telegramUser) {
       );
     }
 
-    // Sync to Google Sheets
-    try {
-      console.log("📊 Attempting to sync user to Google Sheets...");
-      await syncToGoogleSheets(user);
+    // Sync to Google Sheets (non-blocking)
+    console.log("📊 Starting background Google Sheets sync...");
+    syncToGoogleSheets(user).then(() => {
       console.log("✅ User synced to Google Sheets successfully");
-    } catch (error) {
-      console.error("❌ Error syncing user to Google Sheets:", error);
-      // Continue with user even if Google Sheets fails
-    }
+    }).catch((error) => {
+      console.error("❌ Error syncing user to Google Sheets:", error.message);
+    });
 
     console.log("✅ getUserOrCreate completed successfully");
     return user;
@@ -740,18 +741,26 @@ async function syncToGoogleSheets(user) {
       ],
     ];
 
-    await sheets.spreadsheets.values.append({
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Google Sheets sync timeout')), 10000); // 10 second timeout
+    });
+
+    const syncPromise = sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
       range: "Sheet1!A:C",
       valueInputOption: "RAW",
       resource: { values },
     });
 
+    await Promise.race([syncPromise, timeoutPromise]);
+
     console.log(
       `📊 Synced to Google Sheets: ${user.telegramUser} -> ${user.kickName}`
     );
   } catch (error) {
-    console.error("❌ Error syncing to Google Sheets:", error);
+    console.error("❌ Error syncing to Google Sheets:", error.message);
+    // Don't throw the error - just log it and continue
   }
 }
 
@@ -763,8 +772,11 @@ function isAdmin(user) {
 bot.start(async (ctx) => {
   try {
     console.log("🚀 /start command received");
-    console.log("📋 User info:", { id: ctx.from.id, username: ctx.from.username });
-    
+    console.log("📋 User info:", {
+      id: ctx.from.id,
+      username: ctx.from.username,
+    });
+
     const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
     console.log("👤 User created/retrieved:", { id: user.id, role: user.role });
 
@@ -783,7 +795,7 @@ bot.start(async (ctx) => {
         `Ready to play? Link your Kick account first with /kick!`,
       { parse_mode: "HTML" }
     );
-    
+
     console.log("✅ /start command completed successfully");
   } catch (error) {
     console.error("❌ Error in start command:", error);
