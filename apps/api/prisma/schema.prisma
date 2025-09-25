@@ -1,4 +1,4 @@
-// Simplified Prisma schema for SQLite
+// This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -14,15 +14,15 @@ model User {
   id          String   @id @default(cuid())
   telegramId  String   @unique
   telegramUser String?
-  kickName    String?
-  role        String   @default("VIEWER") // "VIEWER", "MOD", "OWNER"
+  kickName    String?  @unique
+  role        String   @default("VIEWER")
   linkedAt    DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  guesses     Guess[]
-  auditLogs   AuditLog[]
+  guesses   Guess[]
+  auditLogs AuditLog[]
 
   @@map("users")
 }
@@ -81,6 +81,22 @@ model BonusItem {
   @@map("bonus_items")
 }
 
+// Archive table for completed game rounds and their data
+model CompletedGameArchive {
+  id          String   @id @default(cuid())
+  originalGameRoundId String @unique // Reference to the original game round
+  gameType    String   // "BONUS", "TRIVIA", "GUESS_BALANCE", "GUESS_BONUS"
+  finalValue  Int?
+  totalGuesses Int     @default(0)
+  winnerUserId String? // ID of the winning user
+  winnerGuess  Int?    // The winning guess value
+  gameData    String   // JSON string containing all game data (guesses, results, etc.)
+  completedAt DateTime @default(now())
+  archivedAt  DateTime @default(now())
+
+  @@map("completed_game_archives")
+}
+
 model AuditLog {
   id        String   @id @default(cuid())
   gameRoundId String?
@@ -94,41 +110,6 @@ model AuditLog {
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
-}
-
-// Legacy models for existing functionality
-model BonusHunt {
-  id        String   @id @default(cuid())
-  isActive  Boolean  @default(false)
-  guesses   String   @default("{}") // JSON as string
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("bonus_hunts")
-}
-
-model TriviaGame {
-  id        String   @id @default(cuid())
-  isActive  Boolean  @default(false)
-  questions String   @default("[]") // JSON as string
-  answers   String   @default("{}") // JSON as string
-  scores    String   @default("{}") // JSON as string
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("trivia_games")
-}
-
-model LinkCode {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  telegramId String
-  kickName  String
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  @@map("link_codes")
 }
 
 model TelegramGroup {
@@ -147,31 +128,15 @@ model TelegramGroup {
 }
 
 model Schedule {
-  id          String   @id @default(cuid())
-  dayOfWeek   Int      // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  streamNumber Int     // 1 or 2 (7AM UTC or 5PM UTC)
-  eventTitle  String   // Title of the stream/event
-  isActive    Boolean  @default(true) // Whether this schedule entry is active
-  createdBy   String?  // User ID who created this schedule entry
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  dayOfWeek    Int      // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  streamNumber Int      // 1 or 2 (for different stream times)
+  eventTitle   String   // Title of the stream event
+  isActive     Boolean  @default(true) // Whether this schedule entry is active
+  createdBy    String?  // User ID who created this entry
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([dayOfWeek, streamNumber])
   @@map("schedules")
-}
-
-// Archive table for completed game rounds and their data
-model CompletedGameArchive {
-  id          String   @id @default(cuid())
-  originalGameRoundId String @unique // Reference to the original game round
-  gameType    String   // "BONUS", "TRIVIA", "GUESS_BALANCE", "GUESS_BONUS"
-  finalValue  Int?
-  totalGuesses Int     @default(0)
-  winnerUserId String? // ID of the winning user
-  winnerGuess  Int?    // The winning guess value
-  gameData    String   // JSON string containing all game data (guesses, results, etc.)
-  completedAt DateTime @default(now())
-  archivedAt  DateTime @default(now())
-
-  @@map("completed_game_archives")
 }
