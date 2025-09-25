@@ -11,19 +11,15 @@ const __dirname = path.dirname(__filename);
 // Initialize Prisma with error handling
 let prisma = null;
 let guessService = null;
+
+// Initialize Prisma client
 try {
   prisma = new PrismaClient();
   console.log("✅ Database connection initialized");
-
-  // Initialize GuessService for database storage
-  const { GuessService } = await import("./guessService.js");
-  guessService = new GuessService(prisma);
-  console.log("✅ GuessService initialized for database storage");
 } catch (error) {
   console.error("❌ Database initialization failed:", error.message);
   console.log("⚠️ Bot will run without database features");
   prisma = null;
-  guessService = null;
 }
 
 // Function to wait for database to be ready
@@ -406,6 +402,18 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 
 // Initialize bot
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
+
+// Add debugging middleware to log all messages
+bot.use((ctx, next) => {
+  console.log(`📨 Received message: ${ctx.message?.text || 'No text'} from ${ctx.from?.username || 'Unknown'} (${ctx.from?.id})`);
+  return next();
+});
+
+// Test command to verify bot is responding
+bot.command("test", async (ctx) => {
+  console.log("🧪 Test command received");
+  await ctx.reply("✅ Bot is responding! Database status: " + (prisma ? "Connected" : "Not connected"));
+});
 
 // Force redeploy - /kick command now has personal message restriction
 
@@ -3101,6 +3109,17 @@ async function startBot() {
       console.log(
         "⚠️ Database not ready, starting bot without database features"
       );
+    } else {
+      // Initialize GuessService for database storage
+      try {
+        const { GuessService } = await import("./guessService.js");
+        guessService = new GuessService(prisma);
+        console.log("✅ GuessService initialized for database storage");
+      } catch (error) {
+        console.error("❌ GuessService initialization failed:", error.message);
+        console.log("⚠️ Bot will run without GuessService features");
+        guessService = null;
+      }
     }
 
     // Launch the bot
