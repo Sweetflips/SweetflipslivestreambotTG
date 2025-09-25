@@ -1,9 +1,8 @@
-import { Telegraf } from "telegraf";
-import { PrismaClient, GameType } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { google } from "googleapis";
-import fs from "fs";
-import path from "path";
 import cron from "node-cron";
+import path from "path";
+import { Telegraf } from "telegraf";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,9 +14,11 @@ let guessService = null;
 try {
   prisma = new PrismaClient();
   console.log("✅ Database connection initialized");
-  
+
   // Initialize GuessService for database storage
-  const { GuessService } = await import("../api/src/modules/games/guess/guessService.js");
+  const { GuessService } = await import(
+    "../api/src/modules/games/guess/guessService.js"
+  );
   guessService = new GuessService(prisma);
   console.log("✅ GuessService initialized for database storage");
 } catch (error) {
@@ -917,19 +918,23 @@ bot.command("guess", async (ctx) => {
         try {
           const result = await guessService.submitGuess(
             user.id,
-            GameType.GUESS_BALANCE,
+            "GUESS_BALANCE",
             Math.round(guess)
           );
-          
+
           if (result.success) {
-            console.log(`✅ Balance guess stored in database for user ${ctx.from.id}: ${guess}`);
-            await ctx.reply(result.message, { parse_mode: 'Markdown' });
+            console.log(
+              `✅ Balance guess stored in database for user ${ctx.from.id}: ${guess}`
+            );
+            await ctx.reply(result.message, { parse_mode: "Markdown" });
           } else {
-            await ctx.reply(result.message, { parse_mode: 'Markdown' });
+            await ctx.reply(result.message, { parse_mode: "Markdown" });
           }
         } catch (error) {
           console.error("❌ Database guess storage failed:", error);
-          await ctx.reply("❌ Failed to store guess in database. Please try again.");
+          await ctx.reply(
+            "❌ Failed to store guess in database. Please try again."
+          );
         }
       } else {
         // Fallback to memory storage
@@ -940,12 +945,14 @@ bot.command("guess", async (ctx) => {
           return;
         }
 
-        const existingGuess = Array.from(gameState.balance.guesses.values()).find(
-          entry => entry.guess === guess
-        );
+        const existingGuess = Array.from(
+          gameState.balance.guesses.values()
+        ).find((entry) => entry.guess === guess);
 
         if (existingGuess) {
-          console.log(`Duplicate balance guess detected: User ${ctx.from.id} tried to guess ${guess} but it's already taken`);
+          console.log(
+            `Duplicate balance guess detected: User ${ctx.from.id} tried to guess ${guess} but it's already taken`
+          );
           await ctx.reply(
             `⛔️ This guess has already been submitted by another player. Please choose a different number.`
           );
@@ -959,7 +966,9 @@ bot.command("guess", async (ctx) => {
           timestamp: Date.now(),
         });
 
-        console.log(`✅ Balance guess recorded in memory for user ${ctx.from.id}: ${guess}`);
+        console.log(
+          `✅ Balance guess recorded in memory for user ${ctx.from.id}: ${guess}`
+        );
         await ctx.reply(`✅ Balance guess recorded: ${guess}`);
       }
     } else if (gameType === "bonus") {
@@ -980,19 +989,23 @@ bot.command("guess", async (ctx) => {
         try {
           const result = await guessService.submitGuess(
             user.id,
-            GameType.GUESS_BONUS,
+            "GUESS_BONUS",
             Math.round(guess)
           );
-          
+
           if (result.success) {
-            console.log(`✅ Bonus guess stored in database for user ${ctx.from.id}: ${guess}`);
-            await ctx.reply(result.message, { parse_mode: 'Markdown' });
+            console.log(
+              `✅ Bonus guess stored in database for user ${ctx.from.id}: ${guess}`
+            );
+            await ctx.reply(result.message, { parse_mode: "Markdown" });
           } else {
-            await ctx.reply(result.message, { parse_mode: 'Markdown' });
+            await ctx.reply(result.message, { parse_mode: "Markdown" });
           }
         } catch (error) {
           console.error("❌ Database guess storage failed:", error);
-          await ctx.reply("❌ Failed to store guess in database. Please try again.");
+          await ctx.reply(
+            "❌ Failed to store guess in database. Please try again."
+          );
         }
       } else {
         // Fallback to memory storage
@@ -1004,11 +1017,13 @@ bot.command("guess", async (ctx) => {
         }
 
         const existingGuess = Array.from(gameState.bonus.guesses.values()).find(
-          entry => entry.guess === guess
+          (entry) => entry.guess === guess
         );
 
         if (existingGuess) {
-          console.log(`Duplicate bonus guess detected: User ${ctx.from.id} tried to guess ${guess} but it's already taken`);
+          console.log(
+            `Duplicate bonus guess detected: User ${ctx.from.id} tried to guess ${guess} but it's already taken`
+          );
           await ctx.reply(
             `⛔️ This guess has already been submitted by another player. Please choose a different number.`
           );
@@ -1022,7 +1037,9 @@ bot.command("guess", async (ctx) => {
           timestamp: Date.now(),
         });
 
-        console.log(`✅ Bonus guess recorded in memory for user ${ctx.from.id}: ${guess}`);
+        console.log(
+          `✅ Bonus guess recorded in memory for user ${ctx.from.id}: ${guess}`
+        );
         await ctx.reply(`✅ Bonus guess recorded: ${guess}`);
       }
     } else {
