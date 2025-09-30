@@ -2,7 +2,7 @@
 
 ## Fix Sweet Calls Table Schema
 
-The `fix-sweet-calls-table.js` script fixes the missing columns in the `sweet_calls_rounds` table that are causing the "column does not exist" error.
+The `run-prisma-migration.js` script fixes the missing columns in the `sweet_calls_rounds` table that are causing the "column does not exist" error using proper Prisma migrations.
 
 ### Problem
 The database table `sweet_calls_rounds` is missing the following columns:
@@ -12,22 +12,37 @@ The database table `sweet_calls_rounds` is missing the following columns:
 - `updatedAt`
 
 ### Solution
-Run the migration script to add these missing columns:
+Run the Prisma migration script to add these missing columns:
 
 ```bash
 cd apps/api
-node scripts/fix-sweet-calls-table.js
+node scripts/run-prisma-migration.js
 ```
 
 ### What the script does:
-1. Adds missing columns to the `sweet_calls_rounds` table
-2. Sets appropriate default values and constraints
-3. Creates a trigger to automatically update the `updatedAt` column
-4. Verifies the table structure after migration
+1. Checks current table structure using Prisma
+2. Adds missing columns using proper PostgreSQL syntax
+3. Sets appropriate default values and constraints
+4. Creates a trigger to automatically update the `updatedAt` column
+5. Verifies the table structure after migration
+6. Tests Prisma ORM access to ensure everything works
 
-### Manual SQL Migration
-If you prefer to run the SQL manually, you can execute the contents of:
-`apps/api/prisma/migrations/001_add_missing_columns_to_sweet_calls_rounds.sql`
+### Prisma Migration Commands
+For standard Prisma migrations, use:
+
+```bash
+# Create a new migration
+npx prisma migrate dev --name migration_name
+
+# Apply migrations to production
+npx prisma migrate deploy
+
+# Reset database and apply all migrations
+npx prisma migrate reset
+
+# Push schema changes without creating migration files
+npx prisma db push
+```
 
 ### Verification
 After running the migration, you can verify it worked by:
@@ -41,3 +56,4 @@ If you encounter issues:
 2. Check that the `DATABASE_URL` environment variable is set correctly
 3. Verify the database connection is working
 4. Check the console logs for specific error messages
+5. Ensure you're using PostgreSQL (not SQLite) for Railway deployments

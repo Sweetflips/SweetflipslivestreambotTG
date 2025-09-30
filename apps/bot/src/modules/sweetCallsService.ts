@@ -34,9 +34,8 @@ export const checkDatabaseHealth = async (prisma: PrismaClient | null): Promise<
     // Test basic connection
     await prisma.$queryRaw`SELECT 1`;
     
-    // Test if sweet_calls_rounds table exists and is accessible
-    // Use raw query to avoid Prisma schema issues
-    await prisma.$queryRaw`SELECT id FROM sweet_calls_rounds LIMIT 1`;
+    // Test if sweet_calls_rounds table exists and is accessible using Prisma ORM
+    await prisma.sweetCallsRound.findFirst();
     
     return { healthy: true };
   } catch (error) {
@@ -55,25 +54,22 @@ export const createNewRound = async (prisma: PrismaClient | null): Promise<Sweet
     // Test database connection first
     await prisma.$queryRaw`SELECT 1`;
     
-    // Close any existing open rounds using raw SQL to avoid schema issues
-    await prisma.$executeRaw`
-      UPDATE sweet_calls_rounds 
-      SET phase = 'CLOSED', "closedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
-      WHERE phase = 'OPEN'
-    `;
+    // Close any existing open rounds using Prisma ORM
+    await prisma.sweetCallsRound.updateMany({
+      where: { phase: "OPEN" },
+      data: { 
+        phase: "CLOSED",
+        closedAt: new Date(),
+        updatedAt: new Date()
+      }
+    });
 
-    // Create new round using raw SQL to avoid schema issues
-    const result = await prisma.$queryRaw`
-      INSERT INTO sweet_calls_rounds (id, phase, "createdAt", "updatedAt")
-      VALUES (gen_random_uuid()::text, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      RETURNING id, phase, "createdAt", "closedAt", "revealedAt"
-    ` as any[];
-
-    if (!result || result.length === 0) {
-      throw new Error("Failed to create new round");
-    }
-
-    const newRound = result[0];
+    // Create new round using Prisma ORM
+    const newRound = await prisma.sweetCallsRound.create({
+      data: {
+        phase: "OPEN"
+      }
+    });
 
     const round: SweetCallsRound = {
       id: newRound.id,
@@ -101,7 +97,7 @@ export const createNewRound = async (prisma: PrismaClient | null): Promise<Sweet
       } else if (error.message.includes('permission')) {
         console.error("❌ Database permission issue");
       } else if (error.message.includes('column') && error.message.includes('does not exist')) {
-        console.error("❌ Database schema mismatch - missing columns. Run migration script.");
+        console.error("❌ Database schema mismatch - missing columns. Run Prisma migration.");
       } else {
         console.error(`❌ Database error: ${error.message}`);
       }
@@ -124,42 +120,40 @@ export const getActiveRound = async (prisma: PrismaClient | null): Promise<Sweet
       }
     }
 
-    // If not in memory, check database using raw SQL
-    const result = await prisma.$queryRaw`
-      SELECT id, phase, "createdAt", "closedAt", "revealedAt"
-      FROM sweet_calls_rounds 
-      WHERE phase = 'OPEN' 
-      ORDER BY "createdAt" DESC 
-      LIMIT 1
-    ` as any[];
-
-    const dbRound = result && result.length > 0 ? result[0] : null;
+    // If not in memory, check database using Prisma ORM
+    const dbRound = await prisma.sweetCallsRound.findFirst({
+      where: { phase: "OPEN" },
+      include: {
+        calls: {
+          include: {
+            user: {
+              select: {
+                telegramUser: true,
+                kickName: true
+              }
+            }
+          },
+          orderBy: { createdAt: "asc" }
+        }
+      },
+      orderBy: { createdAt: "desc" }
+    });
 
     if (dbRound) {
-      // Load calls for this round using raw SQL
-      const callsResult = await prisma.$queryRaw`
-        SELECT sc.id, sc."userId", sc."slotName", sc."createdAt", 
-               u."telegramUser", u."kickName"
-        FROM sweet_calls sc
-        JOIN users u ON sc."userId" = u.id
-        WHERE sc."roundId" = ${dbRound.id}
-        ORDER BY sc."createdAt" ASC
-      ` as any[];
-
       const round: SweetCallsRound = {
         id: dbRound.id,
         phase: dbRound.phase,
         createdAt: dbRound.createdAt,
         closedAt: dbRound.closedAt,
         revealedAt: dbRound.revealedAt,
-        calls: callsResult.map(call => ({
+        calls: dbRound.calls.map(call => ({
           id: call.id,
           userId: call.userId,
           slotName: call.slotName,
           createdAt: call.createdAt,
           user: {
-            telegramUser: call.telegramUser,
-            kickName: call.kickName
+            telegramUser: call.user.telegramUser,
+            kickName: call.user.kickName
           }
         }))
       };
