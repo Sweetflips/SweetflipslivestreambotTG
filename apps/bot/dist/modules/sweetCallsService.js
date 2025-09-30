@@ -215,6 +215,7 @@ export const getRoundCalls = async (prisma, roundId) => {
             id: call.id,
             userId: call.userId,
             slotName: call.slotName,
+            multiplier: call.multiplier,
             createdAt: call.createdAt,
             user: {
                 telegramUser: call.user.telegramUser,
@@ -269,7 +270,8 @@ export const formatCallsDisplay = (calls) => {
     let message = `📞 <b>Sweet Calls - Current Round</b>\n\n`;
     calls.forEach((call, index) => {
         const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
-        message += `${index + 1}. <b>${call.slotName}</b> - ${displayName}\n`;
+        const multiplierText = call.multiplier ? ` (${call.multiplier}x)` : "";
+        message += `${index + 1}. <b>${call.slotName}</b> - ${displayName}${multiplierText}\n`;
     });
     message += `\n📊 Total calls: ${calls.length}`;
     return message;
@@ -308,5 +310,60 @@ export const raffleCall = async (prisma) => {
     catch (error) {
         console.error("Error in raffle call:", error);
         return { success: false, message: "An error occurred during the raffle" };
+    }
+};
+export const setSlotMultiplier = async (prisma, slotName, multiplier) => {
+    if (!prisma) {
+        return { success: false, message: "Database not available" };
+    }
+    try {
+        // Validate multiplier
+        if (multiplier < 0 || multiplier > 1000) {
+            return { success: false, message: "Multiplier must be between 0 and 1000" };
+        }
+        // Get active round
+        const activeRound = await getActiveRound(prisma);
+        if (!activeRound) {
+            return { success: false, message: "No active round found" };
+        }
+        // Find the call with this slot name
+        const call = await prisma.sweetCall.findUnique({
+            where: {
+                roundId_slotName: {
+                    roundId: activeRound.id,
+                    slotName: slotName
+                }
+            },
+            include: {
+                user: {
+                    select: {
+                        telegramUser: true,
+                        kickName: true
+                    }
+                }
+            }
+        });
+        if (!call) {
+            return { success: false, message: `Slot "${slotName}" not found in current round` };
+        }
+        // Update the multiplier
+        await prisma.sweetCall.update({
+            where: { id: call.id },
+            data: { multiplier: multiplier }
+        });
+        const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
+        const action = call.multiplier === null ? "set" : "updated";
+        return {
+            success: true,
+            message: `✅ <b>Multiplier ${action}!</b>\n\n` +
+                `📞 <b>Slot:</b> ${slotName}\n` +
+                `👤 <b>User:</b> ${displayName}\n` +
+                `🎯 <b>Multiplier:</b> ${multiplier}x\n\n` +
+                `🎮 <b>Action:</b> ${action}`
+        };
+    }
+    catch (error) {
+        console.error("Error setting slot multiplier:", error);
+        return { success: false, message: "An error occurred while setting the multiplier" };
     }
 };

@@ -162,6 +162,7 @@ model SweetCall {
   roundId   String
   userId    String
   slotName  String
+  multiplier Float?  // Outcome multiplier for this slot (set by MOD/Owner)
   createdAt DateTime @default(now())
   isArchived Boolean @default(false) // Whether this call has been archived with a completed round
 

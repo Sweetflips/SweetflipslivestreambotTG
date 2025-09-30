@@ -907,7 +907,9 @@ bot.help(async (ctx) => {
         `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
         `📞 <b>Sweet Calls Game:</b>\n` +
         `/call &lt;slot name&gt; - Call a slot in the current round\n` +
-        `/call raffle - Randomly pick a winner (mods only)\n\n` +
+        `/call raffle - Randomly pick a winner (mods only)\n` +
+        `/sc &lt;slot name&gt; &lt;multiplier&gt; - Set multiplier for a slot (mods only)\n` +
+        `/sc change &lt;slot name&gt; &lt;new multiplier&gt; - Update multiplier (mods only)\n\n` +
         `📅 <b>Schedule Commands:</b>\n` +
         `/schedule - View stream schedule for next 7 days\n\n` +
         `🔗 <b>Account Commands:</b>\n` +
@@ -3045,6 +3047,121 @@ bot.command("call", async (ctx) => {
   }
 });
 
+// Sweet Calls multiplier command for MOD/Owner
+bot.command("sc", async (ctx) => {
+  try {
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+
+    if (!isAdmin(user)) {
+      await ctx.reply(`⛔️ Mods only.`);
+      return;
+    }
+
+    const args = ctx.message.text.split(" ").slice(1);
+
+    if (args.length === 0) {
+      await ctx.reply(
+        `🎯 <b>Sweet Calls Multiplier Management</b>\n\n` +
+          `📋 <b>Commands:</b>\n` +
+          `<code>/sc &lt;slot name&gt; &lt;multiplier&gt;</code> - Set multiplier for a slot\n` +
+          `<code>/sc change &lt;slot name&gt; &lt;new multiplier&gt;</code> - Update multiplier for a slot\n\n` +
+          `📋 <b>Examples:</b>\n` +
+          `<code>/sc Red 2.5</code>\n` +
+          `<code>/sc change Blue 3.0</code>\n\n` +
+          `🎯 <b>Current Round:</b>\n` +
+          await getCurrentCallsDisplay(),
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
+
+    // Handle change subcommand
+    if (args[0].toLowerCase() === "change") {
+      if (args.length < 3) {
+        await ctx.reply(
+          `❌ <b>Invalid Command</b>\n\n` +
+            `📝 <b>Usage:</b> <code>/sc change &lt;slot name&gt; &lt;new multiplier&gt;</code>\n\n` +
+            `📋 <b>Example:</b> <code>/sc change Red 2.5</code>`,
+          { parse_mode: "HTML" }
+        );
+        return;
+      }
+
+      const slotName = args[1];
+      const multiplier = parseFloat(args[2]);
+
+      if (isNaN(multiplier)) {
+        await ctx.reply(
+          `❌ <b>Invalid Multiplier</b>\n\n` +
+            `📝 <b>Multiplier must be a number between 0 and 1000</b>\n\n` +
+            `📋 <b>Example:</b> <code>/sc change Red 2.5</code>`,
+          { parse_mode: "HTML" }
+        );
+        return;
+      }
+
+      const result = await setSlotMultiplier(slotName, multiplier);
+
+      if (result.success) {
+        await ctx.reply(result.message, { parse_mode: "HTML" });
+      } else {
+        await ctx.reply(
+          `❌ <b>Failed to Update Multiplier</b>\n\n` +
+            `📝 <b>Reason:</b> ${result.message}\n\n` +
+            `💡 <b>Make sure:</b>\n` +
+            `• The slot name exists in the current round\n` +
+            `• The multiplier is between 0 and 1000`,
+          { parse_mode: "HTML" }
+        );
+      }
+      return;
+    }
+
+    // Handle regular set command
+    if (args.length < 2) {
+      await ctx.reply(
+        `❌ <b>Invalid Command</b>\n\n` +
+          `📝 <b>Usage:</b> <code>/sc &lt;slot name&gt; &lt;multiplier&gt;</code>\n\n` +
+          `📋 <b>Example:</b> <code>/sc Red 2.5</code>`,
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
+
+    const slotName = args[0];
+    const multiplier = parseFloat(args[1]);
+
+    if (isNaN(multiplier)) {
+      await ctx.reply(
+        `❌ <b>Invalid Multiplier</b>\n\n` +
+          `📝 <b>Multiplier must be a number between 0 and 1000</b>\n\n` +
+          `📋 <b>Example:</b> <code>/sc Red 2.5</code>`,
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
+
+    const result = await setSlotMultiplier(slotName, multiplier);
+
+    if (result.success) {
+      await ctx.reply(result.message, { parse_mode: "HTML" });
+    } else {
+      await ctx.reply(
+        `❌ <b>Failed to Set Multiplier</b>\n\n` +
+          `📝 <b>Reason:</b> ${result.message}\n\n` +
+          `💡 <b>Make sure:</b>\n` +
+          `• The slot name exists in the current round\n` +
+          `• The multiplier is between 0 and 1000`,
+        { parse_mode: "HTML" }
+      );
+    }
+
+  } catch (error) {
+    console.error("❌ Error in sc command:", error);
+    await ctx.reply("❌ Error processing multiplier command. Please try again.");
+  }
+});
+
 // Handle when bot is added to a new group
 bot.on("my_chat_member", async (ctx) => {
   const update = ctx.update;
@@ -3809,7 +3926,8 @@ async function getCurrentCallsDisplay() {
     let message = "";
     calls.forEach((call, index) => {
       const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
-      message += `${index + 1}. <b>${call.slotName}</b> - ${displayName}\n`;
+      const multiplierText = call.multiplier ? ` (${call.multiplier}x)` : "";
+      message += `${index + 1}. <b>${call.slotName}</b> - ${displayName}${multiplierText}\n`;
     });
 
     message += `\n📊 Total calls: ${calls.length}`;
@@ -3870,6 +3988,69 @@ async function runSweetCallsRaffle() {
   } catch (error) {
     console.error("Error in raffle call:", error);
     return { success: false, message: "An error occurred during the raffle" };
+  }
+}
+
+async function setSlotMultiplier(slotName, multiplier) {
+  if (!prisma) {
+    return { success: false, message: "Database not available" };
+  }
+
+  try {
+    // Validate multiplier
+    if (multiplier < 0 || multiplier > 1000) {
+      return { success: false, message: "Multiplier must be between 0 and 1000" };
+    }
+
+    // Get active round
+    const activeRound = await getActiveSweetCallsRound();
+    if (!activeRound) {
+      return { success: false, message: "No active round found" };
+    }
+
+    // Find the call with this slot name
+    const call = await prisma.sweetCall.findUnique({
+      where: {
+        roundId_slotName: {
+          roundId: activeRound.id,
+          slotName: slotName
+        }
+      },
+      include: {
+        user: {
+          select: {
+            telegramUser: true,
+            kickName: true
+          }
+        }
+      }
+    });
+
+    if (!call) {
+      return { success: false, message: `Slot "${slotName}" not found in current round` };
+    }
+
+    // Update the multiplier
+    await prisma.sweetCall.update({
+      where: { id: call.id },
+      data: { multiplier: multiplier }
+    });
+
+    const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
+    const action = call.multiplier === null ? "set" : "updated";
+
+    return {
+      success: true,
+      message: `✅ <b>Multiplier ${action}!</b>\n\n` +
+        `📞 <b>Slot:</b> ${slotName}\n` +
+        `👤 <b>User:</b> ${displayName}\n` +
+        `🎯 <b>Multiplier:</b> ${multiplier}x\n\n` +
+        `🎮 <b>Action:</b> ${action}`
+    };
+
+  } catch (error) {
+    console.error("Error setting slot multiplier:", error);
+    return { success: false, message: "An error occurred while setting the multiplier" };
   }
 }
 
