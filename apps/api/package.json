@@ -11,6 +11,8 @@
     "start:with-db": "node start-with-db.js",
     "start:with-migration": "node scripts/start-with-migration.js",
     "migrate": "node scripts/ensure-database-schema.js",
+    "fix-db": "node scripts/fix-sweet-calls-round-schema.js",
+    "railway-fix": "node scripts/railway-fix-db.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src --ext .ts",

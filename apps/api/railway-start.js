@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { ensureDatabaseSchema } from './scripts/ensure-database-schema.js';
+import { fixSweetCallsRoundSchema } from './scripts/fix-sweet-calls-round-schema.js';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -12,8 +12,8 @@ async function railwayStart() {
   try {
     console.log('🚀 Starting Railway deployment with database migration...');
     
-    // Ensure database schema is ready
-    await ensureDatabaseSchema();
+    // Fix SweetCallsRound schema
+    await fixSweetCallsRoundSchema();
     
     console.log('✅ Database schema ready, starting bot...');
     
