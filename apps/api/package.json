@@ -21,6 +21,7 @@
     "railway:delete-tables": "node scripts/railway-delete-tables.js",
     "railway:deploy": "node scripts/railway-postgresql-deploy.js",
     "health-check": "node scripts/health-check.js",
+    "test:call-sessions": "node scripts/test-call-sessions.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src --ext .ts",

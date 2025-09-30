@@ -23,6 +23,7 @@ model User {
   // Relations
   guesses   Guess[]
   auditLogs AuditLog[]
+  callEntries CallEntry[]
 
   @@map("users")
 }
@@ -85,6 +86,7 @@ model BonusItem {
 model AuditLog {
   id        String   @id @default(cuid())
   gameRoundId String? @map("game_round_id")
+  callSessionId String? @map("call_session_id")
   userId    String   @map("user_id")
   command   String
   params    String?  // JSON as string instead of Json type
@@ -92,6 +94,7 @@ model AuditLog {
 
   // Relations
   gameRound GameRound? @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
+  callSession CallSession? @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
@@ -138,4 +141,38 @@ model StreamNotification {
 
   @@unique([dayOfWeek, streamNumber, notificationType, eventDate])
   @@map("stream_notifications")
+}
+
+model CallSession {
+  id          String   @id @default(cuid())
+  sessionName String   @map("session_name") // "IDLE", "OPEN", "CLOSED", "REVEALED"
+  status      String   @default("IDLE") // "IDLE", "OPEN", "CLOSED", "REVEALED"
+  createdAt   DateTime @default(now()) @map("created_at")
+  closedAt    DateTime? @map("closed_at")
+  revealedAt  DateTime? @map("revealed_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  callEntries CallEntry[]
+  auditLogs   AuditLog[]
+
+  @@map("call_sessions")
+}
+
+model CallEntry {
+  id        String   @id @default(cuid())
+  sessionId String   @map("session_id")
+  userId    String   @map("user_id")
+  slotName  String   @map("slot_name")
+  multiplier Float?  // Outcome multiplier for this slot (set by MOD/Owner)
+  createdAt DateTime @default(now()) @map("created_at")
+  isArchived Boolean @default(false) @map("is_archived") // Whether this call has been archived with a completed session
+
+  // Relations
+  session   CallSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId]) // Each user can only call once per session
+  @@unique([sessionId, slotName]) // Each slot can only be called once per session
+  @@map("call_entries")
 }
