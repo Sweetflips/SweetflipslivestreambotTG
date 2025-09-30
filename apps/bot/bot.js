@@ -3811,72 +3811,12 @@ async function makeSweetCall(userId, slotName) {
   }
 
   try {
-    // Get or create active round
-    let activeRound = await getActiveSweetCallsRound();
-    if (!activeRound) {
-      const newRound = await createNewSweetCallsRound();
-      if (!newRound) {
-        return { 
-          success: false, 
-          message: "Failed to create new round. Please check database connection and try again." 
-        };
-      }
-      activeRound = newRound;
-    }
-
-    // Validate slot name
-    if (!slotName || slotName.trim().length === 0) {
-      return { success: false, message: "Slot name cannot be empty" };
-    }
-
-    if (slotName.length > 50) {
-      return { success: false, message: "Slot name must be 50 characters or less" };
-    }
-
-    const trimmedSlotName = slotName.trim();
-
-    // Check if user already called in this round
-    const existingUserCall = await prisma.sweetCall.findUnique({
-      where: {
-        roundId_userId: {
-          roundId: activeRound.id,
-          userId: userId
-        }
-      }
-    });
-
-    if (existingUserCall) {
-      return { success: false, message: "You have already called a slot in this round" };
-    }
-
-    // Check if slot name is already taken
-    const existingSlotCall = await prisma.sweetCall.findUnique({
-      where: {
-        roundId_slotName: {
-          roundId: activeRound.id,
-          slotName: trimmedSlotName
-        }
-      }
-    });
-
-    if (existingSlotCall) {
-      return { success: false, message: `Slot "${trimmedSlotName}" is already taken` };
-    }
-
-    // Create the call
-    await prisma.sweetCall.create({
-      data: {
-        roundId: activeRound.id,
-        userId: userId,
-        slotName: trimmedSlotName
-      }
-    });
-
-    return { 
-      success: true, 
-      message: `Successfully called slot "${trimmedSlotName}"!`,
-      roundId: activeRound.id
-    };
+    // Import the updated service functions
+    const { makeCall } = await import("./src/modules/sweetCallsService.js");
+    
+    // Use the new service function
+    const result = await makeCall(prisma, userId, slotName);
+    return result;
 
   } catch (error) {
     console.error("Error making Sweet Call:", error);
@@ -3904,71 +3844,39 @@ async function checkDatabaseHealth() {
   }
 }
 
-async function getActiveSweetCallsRound() {
+async function getActiveSweetCallsSession() {
   if (!prisma) {
     return null;
   }
 
   try {
-    const round = await prisma.sweetCallsRound.findFirst({
-      where: { phase: "OPEN" },
-      orderBy: { createdAt: "desc" }
-    });
-
-    return round;
+    // Import the updated service functions
+    const { getActiveSession } = await import("./src/modules/sweetCallsService.js");
+    
+    // Use the new service function
+    const activeSession = await getActiveSession(prisma);
+    return activeSession;
   } catch (error) {
-    console.error("Error getting active Sweet Calls round:", error);
+    console.error("Error getting active Sweet Calls session:", error);
     return null;
   }
 }
 
-async function createNewSweetCallsRound() {
+async function createNewSweetCallsSession() {
   if (!prisma) {
     console.error("❌ Prisma client is null - database not available");
     return null;
   }
 
   try {
-    // Test database connection first
-    await prisma.$queryRaw`SELECT 1`;
+    // Import the updated service functions
+    const { createNewSession } = await import("./src/modules/sweetCallsService.js");
     
-    // Close any existing open rounds using Prisma ORM
-    await prisma.sweetCallsRound.updateMany({
-      where: { phase: "OPEN" },
-      data: { 
-        phase: "CLOSED",
-        closedAt: new Date(),
-        updatedAt: new Date()
-      }
-    });
-
-    // Create new round using Prisma ORM
-    const newRound = await prisma.sweetCallsRound.create({
-      data: {
-        phase: "OPEN"
-      }
-    });
-
-    console.log(`✅ Created new Sweet Calls round: ${newRound.id}`);
-    return newRound;
+    // Use the new service function
+    const newSession = await createNewSession(prisma);
+    return newSession;
   } catch (error) {
-    console.error("❌ Error creating new Sweet Calls round:", error);
-    
-    // Provide more specific error information
-    if (error instanceof Error) {
-      if (error.message.includes('connect')) {
-        console.error("❌ Database connection failed");
-      } else if (error.message.includes('relation') || error.message.includes('table')) {
-        console.error("❌ Database schema issue - table may not exist");
-      } else if (error.message.includes('permission')) {
-        console.error("❌ Database permission issue");
-      } else if (error.message.includes('column') && error.message.includes('does not exist')) {
-        console.error("❌ Database schema mismatch - missing columns. Run Prisma migration.");
-      } else {
-        console.error(`❌ Database error: ${error.message}`);
-      }
-    }
-    
+    console.error("❌ Error creating new Sweet Calls session:", error);
     return null;
   }
 }
@@ -3979,41 +3887,20 @@ async function getCurrentCallsDisplay() {
   }
 
   try {
-    const activeRound = await getActiveSweetCallsRound();
-    if (!activeRound) {
-      return "No active round";
-    }
-
-    const calls = await prisma.sweetCall.findMany({
-      where: { 
-        roundId: activeRound.id,
-        isArchived: false
-      },
-      include: {
-        user: {
-          select: {
-            telegramUser: true,
-            kickName: true
-          }
-        }
-      },
-      orderBy: { createdAt: "asc" }
-    });
-
-    if (calls.length === 0) {
-      return "No calls yet!";
-    }
-
-    let message = "";
-    calls.forEach((call, index) => {
-      const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
-      const multiplierText = call.multiplier ? ` (${call.multiplier}x)` : "";
-      message += `${index + 1}. <b>${call.slotName}</b> - ${displayName}${multiplierText}\n`;
-    });
-
-    message += `\n📊 Total calls: ${calls.length}`;
+    // Import the updated service functions
+    const { getActiveSession, getSessionCalls, formatCallsDisplay } = await import("./src/modules/sweetCallsService.js");
     
-    return message;
+    // Get active session
+    const activeSession = await getActiveSession(prisma);
+    if (!activeSession) {
+      return "No active session";
+    }
+
+    // Get calls for the session
+    const calls = await getSessionCalls(prisma, activeSession.id);
+    
+    // Format the display
+    return formatCallsDisplay(calls);
   } catch (error) {
     console.error("Error getting current calls display:", error);
     return "Error loading calls";
@@ -4026,45 +3913,12 @@ async function runSweetCallsRaffle() {
   }
 
   try {
-    // Get active round
-    const activeRound = await getActiveSweetCallsRound();
-    if (!activeRound) {
-      return { success: false, message: "No active round found" };
-    }
-
-    // Get all calls for the current round
-    const calls = await prisma.sweetCall.findMany({
-      where: { 
-        roundId: activeRound.id,
-        isArchived: false
-      },
-      include: {
-        user: {
-          select: {
-            telegramUser: true,
-            kickName: true
-          }
-        }
-      },
-      orderBy: { createdAt: "asc" }
-    });
-
-    if (calls.length === 0) {
-      return { success: false, message: "No calls found in current round" };
-    }
-
-    // Randomly select a winner
-    const randomIndex = Math.floor(Math.random() * calls.length);
-    const winner = calls[randomIndex];
-
-    return {
-      success: true,
-      message: `🎉 <b>Raffle Winner!</b>\n\n` +
-        `🏆 <b>Winner:</b> ${winner.user.kickName || winner.user.telegramUser || "Unknown"}\n` +
-        `📞 <b>Called Slot:</b> ${winner.slotName}\n` +
-        `⏰ <b>Called At:</b> ${winner.createdAt.toLocaleString()}\n\n` +
-        `🎯 <b>Total Participants:</b> ${calls.length}`
-    };
+    // Import the updated service functions
+    const { raffleCall } = await import("./src/modules/sweetCallsService.js");
+    
+    // Use the new service function
+    const result = await raffleCall(prisma);
+    return result;
 
   } catch (error) {
     console.error("Error in raffle call:", error);
@@ -4078,56 +3932,12 @@ async function setSlotMultiplier(slotName, multiplier) {
   }
 
   try {
-    // Validate multiplier
-    if (multiplier < 0 || multiplier > 1000) {
-      return { success: false, message: "Multiplier must be between 0 and 1000" };
-    }
-
-    // Get active round
-    const activeRound = await getActiveSweetCallsRound();
-    if (!activeRound) {
-      return { success: false, message: "No active round found" };
-    }
-
-    // Find the call with this slot name
-    const call = await prisma.sweetCall.findUnique({
-      where: {
-        roundId_slotName: {
-          roundId: activeRound.id,
-          slotName: slotName
-        }
-      },
-      include: {
-        user: {
-          select: {
-            telegramUser: true,
-            kickName: true
-          }
-        }
-      }
-    });
-
-    if (!call) {
-      return { success: false, message: `Slot "${slotName}" not found in current round` };
-    }
-
-    // Update the multiplier
-    await prisma.sweetCall.update({
-      where: { id: call.id },
-      data: { multiplier: multiplier }
-    });
-
-    const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
-    const action = call.multiplier === null ? "set" : "updated";
-
-    return {
-      success: true,
-      message: `✅ <b>Multiplier ${action}!</b>\n\n` +
-        `📞 <b>Slot:</b> ${slotName}\n` +
-        `👤 <b>User:</b> ${displayName}\n` +
-        `🎯 <b>Multiplier:</b> ${multiplier}x\n\n` +
-        `🎮 <b>Action:</b> ${action}`
-    };
+    // Import the updated service functions
+    const { setSlotMultiplier: setMultiplier } = await import("./src/modules/sweetCallsService.js");
+    
+    // Use the new service function
+    const result = await setMultiplier(prisma, slotName, multiplier);
+    return result;
 
   } catch (error) {
     console.error("Error setting slot multiplier:", error);
@@ -4141,66 +3951,12 @@ async function getCallboardData() {
   }
 
   try {
-    // Get all calls with multipliers from all rounds
-    const calls = await prisma.sweetCall.findMany({
-      where: {
-        multiplier: {
-          not: null
-        },
-        isArchived: false
-      },
-      include: {
-        user: {
-          select: {
-            telegramUser: true,
-            kickName: true
-          }
-        },
-        round: {
-          select: {
-            id: true,
-            createdAt: true
-          }
-        }
-      },
-      orderBy: {
-        multiplier: "desc"
-      },
-      take: 10 // Top 10 results
-    });
-
-    if (calls.length === 0) {
-      return {
-        success: true,
-        message: `🏆 <b>Sweet Calls Leaderboard</b>\n\n` +
-          `📊 <b>No calls with multipliers found</b>\n\n` +
-          `💡 <b>Tip:</b> Use <code>/sc &lt;slot name&gt; &lt;multiplier&gt;</code> to set multipliers!`
-      };
-    }
-
-    // Format the leaderboard
-    let message = `🏆 <b>Sweet Calls Leaderboard</b>\n\n`;
+    // Import the updated service functions
+    const { getCallboardData: getCallboard } = await import("./src/modules/sweetCallsService.js");
     
-    calls.forEach((call, index) => {
-      const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
-      const rank = index + 1;
-      const isTop5 = rank <= 5;
-      const prizeText = isTop5 ? " 💰" : "";
-      const rankEmoji = isTop5 ? "🥇🥈🥉🏅🏅".split("")[index] : "🔸";
-      
-      message += `${rankEmoji} <b>#${rank}</b> ${displayName}${prizeText}\n`;
-      message += `   📞 <b>${call.slotName}</b> - <b>${call.multiplier}x</b>\n`;
-      message += `   📅 ${call.round.createdAt.toLocaleDateString()}\n\n`;
-    });
-
-    // Add prize information
-    message += `💰 <b>Top 5 Winners</b> - $10 Prize Each!\n`;
-    message += `📊 <b>Total Entries:</b> ${calls.length}`;
-
-    return {
-      success: true,
-      message: message
-    };
+    // Use the new service function
+    const result = await getCallboard(prisma);
+    return result;
 
   } catch (error) {
     console.error("Error getting callboard data:", error);
