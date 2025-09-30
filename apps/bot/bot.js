@@ -875,6 +875,8 @@ bot.start(async (ctx) => {
         `/guess bonus &lt;number&gt; - Guess the bonus total\n` +
         `/balanceboard - View balance leaderboard\n` +
         `/bonusboard - View bonus leaderboard\n\n` +
+        `📞 <b>Sweet Calls Game:</b>\n` +
+        `/call &lt;slot name&gt; - Call a slot in the current round\n\n` +
         `🔗 <b>Account Commands:</b>\n` +
         `/kick - Link your Kick account\n` +
         `/help - Show all commands\n\n` +
@@ -903,6 +905,8 @@ bot.help(async (ctx) => {
         `/guess bonus &lt;number&gt; - Guess the bonus total (requires linked Kick account)\n` +
         `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
         `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
+        `📞 <b>Sweet Calls Game:</b>\n` +
+        `/call &lt;slot name&gt; - Call a slot in the current round\n\n` +
         `📅 <b>Schedule Commands:</b>\n` +
         `/schedule - View stream schedule for next 7 days\n\n` +
         `🔗 <b>Account Commands:</b>\n` +
@@ -943,6 +947,8 @@ bot.help(async (ctx) => {
         `/guess bonus &lt;number&gt; - Guess the bonus total (requires linked Kick account)\n` +
         `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
         `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
+        `📞 <b>Sweet Calls Game:</b>\n` +
+        `/call &lt;slot name&gt; - Call a slot in the current round\n\n` +
         `📅 <b>Schedule Commands:</b>\n` +
         `/schedule - View stream schedule for next 7 days\n\n` +
         `🔗 <b>Account Commands:</b>\n` +
@@ -2957,6 +2963,63 @@ bot.command("broadcastschedule", async (ctx) => {
   }
 });
 
+// Sweet Calls game command
+bot.command("call", async (ctx) => {
+  try {
+    const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+    const args = ctx.message.text.split(" ").slice(1);
+
+    if (args.length === 0) {
+      await ctx.reply(
+        `📞 <b>Sweet Calls Game</b>\n\n` +
+          `🎮 <b>How to play:</b>\n` +
+          `• Use <code>/call &lt;slot name&gt;</code> to call a slot\n` +
+          `• Each user can only call once per round\n` +
+          `• Each slot can only be called once per round\n` +
+          `• Slot names must be unique and under 50 characters\n\n` +
+          `📋 <b>Example:</b>\n` +
+          `<code>/call Red</code>\n` +
+          `<code>/call Blue</code>\n` +
+          `<code>/call Lucky 7</code>\n\n` +
+          `🎯 <b>Current Round:</b>\n` +
+          await getCurrentCallsDisplay(),
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
+
+    const slotName = args.join(" ");
+
+    // Make the call
+    const result = await makeSweetCall(user.id, slotName);
+
+    if (result.success) {
+      await ctx.reply(
+        `✅ <b>Call Successful!</b>\n\n` +
+          `📞 You called: <b>${slotName}</b>\n` +
+          `👤 User: ${user.telegramUser || user.kickName || "Unknown"}\n\n` +
+          `🎯 <b>Current Round:</b>\n` +
+          await getCurrentCallsDisplay(),
+        { parse_mode: "HTML" }
+      );
+    } else {
+      await ctx.reply(
+        `❌ <b>Call Failed</b>\n\n` +
+          `📝 <b>Reason:</b> ${result.message}\n\n` +
+          `💡 <b>Try:</b>\n` +
+          `• Use a different slot name\n` +
+          `• Check if you already called in this round\n` +
+          `• Make sure slot name is under 50 characters`,
+        { parse_mode: "HTML" }
+      );
+    }
+
+  } catch (error) {
+    console.error("❌ Error in call command:", error);
+    await ctx.reply("❌ Error processing your call. Please try again.");
+  }
+});
+
 // Handle when bot is added to a new group
 bot.on("my_chat_member", async (ctx) => {
   const update = ctx.update;
@@ -3559,6 +3622,177 @@ async function cleanupOldNotifications() {
     console.log("🧹 Cleaned up old stream notifications");
   } catch (error) {
     console.error("Error cleaning up old notifications:", error);
+  }
+}
+
+// Sweet Calls game functions
+async function makeSweetCall(userId, slotName) {
+  if (!prisma) {
+    return { success: false, message: "Database not available" };
+  }
+
+  try {
+    // Get or create active round
+    let activeRound = await getActiveSweetCallsRound();
+    if (!activeRound) {
+      const newRound = await createNewSweetCallsRound();
+      if (!newRound) {
+        return { success: false, message: "Failed to create new round" };
+      }
+      activeRound = newRound;
+    }
+
+    // Validate slot name
+    if (!slotName || slotName.trim().length === 0) {
+      return { success: false, message: "Slot name cannot be empty" };
+    }
+
+    if (slotName.length > 50) {
+      return { success: false, message: "Slot name must be 50 characters or less" };
+    }
+
+    const trimmedSlotName = slotName.trim();
+
+    // Check if user already called in this round
+    const existingUserCall = await prisma.sweetCall.findUnique({
+      where: {
+        roundId_userId: {
+          roundId: activeRound.id,
+          userId: userId
+        }
+      }
+    });
+
+    if (existingUserCall) {
+      return { success: false, message: "You have already called a slot in this round" };
+    }
+
+    // Check if slot name is already taken
+    const existingSlotCall = await prisma.sweetCall.findUnique({
+      where: {
+        roundId_slotName: {
+          roundId: activeRound.id,
+          slotName: trimmedSlotName
+        }
+      }
+    });
+
+    if (existingSlotCall) {
+      return { success: false, message: `Slot "${trimmedSlotName}" is already taken` };
+    }
+
+    // Create the call
+    await prisma.sweetCall.create({
+      data: {
+        roundId: activeRound.id,
+        userId: userId,
+        slotName: trimmedSlotName
+      }
+    });
+
+    return { 
+      success: true, 
+      message: `Successfully called slot "${trimmedSlotName}"!`,
+      roundId: activeRound.id
+    };
+
+  } catch (error) {
+    console.error("Error making Sweet Call:", error);
+    return { success: false, message: "An error occurred while making your call" };
+  }
+}
+
+async function getActiveSweetCallsRound() {
+  if (!prisma) {
+    return null;
+  }
+
+  try {
+    const round = await prisma.sweetCallsRound.findFirst({
+      where: { phase: "OPEN" },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return round;
+  } catch (error) {
+    console.error("Error getting active Sweet Calls round:", error);
+    return null;
+  }
+}
+
+async function createNewSweetCallsRound() {
+  if (!prisma) {
+    return null;
+  }
+
+  try {
+    // Close any existing open rounds
+    await prisma.sweetCallsRound.updateMany({
+      where: { phase: "OPEN" },
+      data: { 
+        phase: "CLOSED",
+        closedAt: new Date(),
+        updatedAt: new Date()
+      }
+    });
+
+    // Create new round
+    const newRound = await prisma.sweetCallsRound.create({
+      data: {
+        phase: "OPEN"
+      }
+    });
+
+    return newRound;
+  } catch (error) {
+    console.error("Error creating new Sweet Calls round:", error);
+    return null;
+  }
+}
+
+async function getCurrentCallsDisplay() {
+  if (!prisma) {
+    return "Database not available";
+  }
+
+  try {
+    const activeRound = await getActiveSweetCallsRound();
+    if (!activeRound) {
+      return "No active round";
+    }
+
+    const calls = await prisma.sweetCall.findMany({
+      where: { 
+        roundId: activeRound.id,
+        isArchived: false
+      },
+      include: {
+        user: {
+          select: {
+            telegramUser: true,
+            kickName: true
+          }
+        }
+      },
+      orderBy: { createdAt: "asc" }
+    });
+
+    if (calls.length === 0) {
+      return "No calls yet!";
+    }
+
+    let message = "";
+    calls.forEach((call, index) => {
+      const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
+      message += `${index + 1}. <b>${call.slotName}</b> - ${displayName}\n`;
+    });
+
+    message += `\n📊 Total calls: ${calls.length}`;
+    
+    return message;
+  } catch (error) {
+    console.error("Error getting current calls display:", error);
+    return "Error loading calls";
   }
 }
 

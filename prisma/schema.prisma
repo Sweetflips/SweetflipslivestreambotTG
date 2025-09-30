@@ -23,6 +23,7 @@ model User {
   // Relations
   guesses   Guess[]
   auditLogs AuditLog[]
+  sweetCalls SweetCall[]
 
   @@map("users")
 }
@@ -84,6 +85,7 @@ model BonusItem {
 model AuditLog {
   id        String   @id @default(cuid())
   gameRoundId String?
+  sweetCallsRoundId String?
   userId    String
   command   String
   params    String?  // JSON as string instead of Json type
@@ -91,6 +93,7 @@ model AuditLog {
 
   // Relations
   gameRound GameRound? @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
+  sweetCallsRound SweetCallsRound? @relation(fields: [sweetCallsRoundId], references: [id], onDelete: Cascade)
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
@@ -137,4 +140,36 @@ model StreamNotification {
 
   @@unique([dayOfWeek, streamNumber, notificationType, eventDate])
   @@map("stream_notifications")
+}
+
+model SweetCallsRound {
+  id          String   @id @default(cuid())
+  phase       String   @default("IDLE") // "IDLE", "OPEN", "CLOSED", "REVEALED"
+  createdAt   DateTime @default(now())
+  closedAt    DateTime?
+  revealedAt  DateTime?
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  calls       SweetCall[]
+  auditLogs   AuditLog[]
+
+  @@map("sweet_calls_rounds")
+}
+
+model SweetCall {
+  id        String   @id @default(cuid())
+  roundId   String
+  userId    String
+  slotName  String
+  createdAt DateTime @default(now())
+  isArchived Boolean @default(false) // Whether this call has been archived with a completed round
+
+  // Relations
+  round     SweetCallsRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, userId]) // Each user can only call once per round
+  @@unique([roundId, slotName]) // Each slot can only be called once per round
+  @@map("sweet_calls")
 }
