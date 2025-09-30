@@ -3352,6 +3352,216 @@ async function gracefulRestart() {
   }
 }
 
+// Send stream reminders to all groups
+async function sendStreamReminders(streamNumber) {
+  if (!prisma) {
+    console.log("⚠️ Database not available, skipping stream reminders");
+    return;
+  }
+
+  try {
+    console.log(`🚀 Checking for Stream ${streamNumber} reminders...`);
+
+    // Get current day and time
+    const now = new Date();
+    const currentDayOfWeek = now.getDay();
+    
+    // Find active schedule for this stream on current day
+    const schedule = await prisma.schedule.findUnique({
+      where: {
+        dayOfWeek_streamNumber: {
+          dayOfWeek: currentDayOfWeek,
+          streamNumber: streamNumber
+        }
+      }
+    });
+
+    if (!schedule || !schedule.isActive) {
+      console.log(`📅 No active schedule found for Stream ${streamNumber} on ${getDayName(currentDayOfWeek)}`);
+      return;
+    }
+
+    // Check if we've already sent this reminder today
+    const eventDate = new Date();
+    eventDate.setHours(streamNumber === 1 ? 7 : 17, 0, 0, 0);
+    
+    const alreadySent = await hasNotificationBeenSent(
+      prisma,
+      currentDayOfWeek,
+      streamNumber,
+      "2hour_reminder",
+      eventDate
+    );
+
+    if (alreadySent) {
+      console.log(`📤 Reminder already sent for Stream ${streamNumber} today`);
+      return;
+    }
+
+    // Create reminder message
+    const reminderMessage = createStreamReminderMessage({
+      dayOfWeek: currentDayOfWeek,
+      streamNumber: streamNumber,
+      eventTitle: schedule.eventTitle,
+      eventDate: eventDate,
+      timeUntilStream: "2h 0m"
+    });
+
+    // Get all active groups
+    const result = await getAllGroups();
+    const allGroups = result.groupIds;
+
+    if (allGroups.length === 0) {
+      console.log("⚠️ No groups found for stream reminder");
+      return;
+    }
+
+    // Send to all groups
+    let successCount = 0;
+    let failedCount = 0;
+
+    console.log(`📢 Sending Stream ${streamNumber} reminder to ${allGroups.length} groups...`);
+
+    for (const groupId of allGroups) {
+      try {
+        await bot.telegram.sendMessage(groupId, reminderMessage, {
+          parse_mode: "HTML",
+          disable_web_page_preview: true
+        });
+        successCount++;
+        console.log(`✅ Reminder sent to group ${groupId}`);
+      } catch (error) {
+        failedCount++;
+        console.error(`❌ Failed to send reminder to group ${groupId}:`, error.message);
+        
+        // If bot was removed from group, mark as inactive
+        if (error.message.includes("bot was blocked") || 
+            error.message.includes("chat not found") ||
+            error.message.includes("bot is not a member")) {
+          await markGroupAsInactive(groupId);
+        }
+      }
+    }
+
+    // Record the notification as sent
+    await recordNotificationSent(
+      prisma,
+      currentDayOfWeek,
+      streamNumber,
+      "2hour_reminder",
+      eventDate,
+      successCount,
+      failedCount
+    );
+
+    console.log(`🚀 Stream ${streamNumber} reminder completed: ${successCount} success, ${failedCount} failed`);
+
+  } catch (error) {
+    console.error(`❌ Error sending Stream ${streamNumber} reminders:`, error);
+  }
+}
+
+// Check if notification has been sent
+async function hasNotificationBeenSent(prisma, dayOfWeek, streamNumber, notificationType, eventDate) {
+  if (!prisma) {
+    return false;
+  }
+
+  try {
+    const existing = await prisma.streamNotification.findUnique({
+      where: {
+        dayOfWeek_streamNumber_notificationType_eventDate: {
+          dayOfWeek: dayOfWeek,
+          streamNumber: streamNumber,
+          notificationType: notificationType,
+          eventDate: eventDate
+        }
+      }
+    });
+
+    return existing !== null;
+  } catch (error) {
+    console.error("Error checking notification status:", error);
+    return false;
+  }
+}
+
+// Record notification as sent
+async function recordNotificationSent(prisma, dayOfWeek, streamNumber, notificationType, eventDate, successCount, failedCount) {
+  if (!prisma) {
+    return;
+  }
+
+  try {
+    await prisma.streamNotification.upsert({
+      where: {
+        dayOfWeek_streamNumber_notificationType_eventDate: {
+          dayOfWeek: dayOfWeek,
+          streamNumber: streamNumber,
+          notificationType: notificationType,
+          eventDate: eventDate
+        }
+      },
+      update: {
+        sentAt: new Date(),
+        successCount: successCount,
+        failedCount: failedCount
+      },
+      create: {
+        dayOfWeek: dayOfWeek,
+        streamNumber: streamNumber,
+        notificationType: notificationType,
+        eventDate: eventDate,
+        successCount: successCount,
+        failedCount: failedCount
+      }
+    });
+  } catch (error) {
+    console.error("Error recording notification:", error);
+  }
+}
+
+// Create stream reminder message
+function createStreamReminderMessage(reminder) {
+  const times = getStreamTimes(reminder.streamNumber);
+
+  return `🚀 <b>Stream Reminder!</b>\n\n` +
+    `⏰ <b>Stream starting in ${reminder.timeUntilStream}!</b>\n\n` +
+    `📅 <b>${getDayName(reminder.dayOfWeek)} - Stream ${reminder.streamNumber}</b>\n` +
+    `🎮 <b>Event:</b> ${reminder.eventTitle}\n\n` +
+    `🕐 <b>Stream Times:</b>\n` +
+    `🌍 UTC: ${times.utc}\n` +
+    `🇮🇳 IST: ${times.ist}\n` +
+    `🇺🇸 PST: ${times.pst}\n\n` +
+    `🎯 <b>Join us at:</b> https://kick.com/sweetflips\n\n` +
+    `⚡ Get ready for an amazing stream!`;
+}
+
+// Cleanup old notifications
+async function cleanupOldNotifications() {
+  if (!prisma) {
+    return;
+  }
+
+  try {
+    // Delete notifications older than 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    await prisma.streamNotification.deleteMany({
+      where: {
+        sentAt: {
+          lt: sevenDaysAgo
+        }
+      }
+    });
+
+    console.log("🧹 Cleaned up old stream notifications");
+  } catch (error) {
+    console.error("Error cleaning up old notifications:", error);
+  }
+}
+
 // Setup automated schedule messaging with cron jobs
 function setupAutomatedScheduleMessaging() {
   console.log("⏰ Setting up automated schedule messaging...");
@@ -3396,13 +3606,70 @@ function setupAutomatedScheduleMessaging() {
     }
   );
 
+  // 2-hour reminder for Stream 1 (5:00 AM UTC - 2 hours before 7:00 AM)
+  const stream1Reminder = cron.schedule(
+    "0 5 * * *",
+    async () => {
+      console.log("🚀 Stream 1 reminder triggered (5:00 AM UTC)");
+      try {
+        await sendStreamReminders(1);
+      } catch (error) {
+        console.error("❌ Error in Stream 1 reminder:", error);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
+    }
+  );
+
+  // 2-hour reminder for Stream 2 (3:00 PM UTC - 2 hours before 5:00 PM)
+  const stream2Reminder = cron.schedule(
+    "0 15 * * *",
+    async () => {
+      console.log("🚀 Stream 2 reminder triggered (3:00 PM UTC)");
+      try {
+        await sendStreamReminders(2);
+      } catch (error) {
+        console.error("❌ Error in Stream 2 reminder:", error);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
+    }
+  );
+
+  // Cleanup old notifications daily at midnight
+  const cleanupSchedule = cron.schedule(
+    "0 0 * * *",
+    async () => {
+      console.log("🧹 Daily cleanup triggered (12:00 AM UTC)");
+      try {
+        await cleanupOldNotifications();
+      } catch (error) {
+        console.error("❌ Error in daily cleanup:", error);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
+    }
+  );
+
   console.log("✅ Automated schedule messaging configured:");
   console.log("   🌅 Morning broadcast: 7:00 AM UTC");
   console.log("   🌆 Afternoon broadcast: 3:00 PM UTC");
+  console.log("   🚀 Stream 1 reminder: 5:00 AM UTC (2h before)");
+  console.log("   🚀 Stream 2 reminder: 3:00 PM UTC (2h before)");
+  console.log("   🧹 Daily cleanup: 12:00 AM UTC");
 
   // Store references for cleanup
   global.morningSchedule = morningSchedule;
   global.afternoonSchedule = afternoonSchedule;
+  global.stream1Reminder = stream1Reminder;
+  global.stream2Reminder = stream2Reminder;
+  global.cleanupSchedule = cleanupSchedule;
 }
 
 // Start bot with auto-restart capabilities
@@ -3490,6 +3757,18 @@ function setupGracefulShutdown() {
     if (global.afternoonSchedule) {
       global.afternoonSchedule.stop();
       console.log("✅ Afternoon schedule broadcast stopped");
+    }
+    if (global.stream1Reminder) {
+      global.stream1Reminder.stop();
+      console.log("✅ Stream 1 reminder stopped");
+    }
+    if (global.stream2Reminder) {
+      global.stream2Reminder.stop();
+      console.log("✅ Stream 2 reminder stopped");
+    }
+    if (global.cleanupSchedule) {
+      global.cleanupSchedule.stop();
+      console.log("✅ Cleanup schedule stopped");
     }
 
     try {

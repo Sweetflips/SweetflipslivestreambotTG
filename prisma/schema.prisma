@@ -124,3 +124,17 @@ model Schedule {
   @@unique([dayOfWeek, streamNumber])
   @@map("schedules")
 }
+
+model StreamNotification {
+  id           String   @id @default(cuid())
+  dayOfWeek    Int      // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  streamNumber Int      // 1 or 2 (for different stream times)
+  notificationType String // "2hour_reminder", "schedule_broadcast", etc.
+  sentAt       DateTime @default(now())
+  eventDate    DateTime // The actual date of the stream event
+  successCount Int      @default(0) // Number of groups successfully notified
+  failedCount  Int      @default(0) // Number of groups that failed
+
+  @@unique([dayOfWeek, streamNumber, notificationType, eventDate])
+  @@map("stream_notifications")
+}
