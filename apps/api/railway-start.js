@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { fixSweetCallsRoundSchema } from './scripts/fix-sweet-calls-round-schema.js';
+import { DatabaseMigrator } from './scripts/auto-migrate.js';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -10,12 +10,13 @@ const __dirname = dirname(__filename);
 
 async function railwayStart() {
   try {
-    console.log('🚀 Starting Railway deployment with database migration...');
+    console.log('🚀 Starting Railway deployment with auto database migration...');
     
-    // Fix SweetCallsRound schema
-    await fixSweetCallsRoundSchema();
+    // Run automated database migration
+    const migrator = new DatabaseMigrator();
+    await migrator.run();
     
-    console.log('✅ Database schema ready, starting bot...');
+    console.log('✅ Database migration completed, starting bot...');
     
     // Start the bot application
     const botPath = join(__dirname, '../bot/bot.js');
