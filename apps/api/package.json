@@ -16,6 +16,7 @@
     "migrate:auto": "node scripts/auto-migrate.js",
     "migrate:health": "node scripts/migration-health-check.js",
     "migrate:rollback": "node scripts/migration-rollback.js",
+    "migrate:postgresql": "node scripts/postgresql-migration.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src --ext .ts",

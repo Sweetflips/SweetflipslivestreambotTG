@@ -9,6 +9,7 @@
 import { PrismaClient } from '@prisma/client';
 import { execSync } from 'child_process';
 import { config } from 'dotenv';
+import { PostgreSQLMigration } from './postgresql-migration.js';
 
 // Load environment variables
 config();
@@ -257,8 +258,9 @@ class DatabaseMigrator {
       // Step 4: Check migration status
       const migrationStatus = await this.checkMigrationStatus();
       
-      // Step 5: Run migrations
-      await this.runMigrationWithRetry();
+      // Step 5: Run PostgreSQL-specific migration
+      const postgresMigration = new PostgreSQLMigration();
+      await postgresMigration.run();
       
       // Step 6: Validate schema
       await this.validateSchema();
