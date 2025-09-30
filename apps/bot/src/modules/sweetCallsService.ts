@@ -454,3 +454,89 @@ export const setSlotMultiplier = async (
     return { success: false, message: "An error occurred while setting the multiplier" };
   }
 };
+
+export const getCallboardData = async (
+  prisma: PrismaClient | null
+): Promise<{ success: boolean; message: string; data?: SweetCallEntry[] }> => {
+  if (!prisma) {
+    return { success: false, message: "Database not available" };
+  }
+
+  try {
+    // Get all calls with multipliers from all rounds
+    const calls = await prisma.sweetCall.findMany({
+      where: {
+        multiplier: {
+          not: null
+        },
+        isArchived: false
+      },
+      include: {
+        user: {
+          select: {
+            telegramUser: true,
+            kickName: true
+          }
+        },
+        round: {
+          select: {
+            id: true,
+            createdAt: true
+          }
+        }
+      },
+      orderBy: {
+        multiplier: "desc"
+      },
+      take: 10 // Top 10 results
+    });
+
+    if (calls.length === 0) {
+      return {
+        success: true,
+        message: `🏆 <b>Sweet Calls Leaderboard</b>\n\n` +
+          `📊 <b>No calls with multipliers found</b>\n\n` +
+          `💡 <b>Tip:</b> Use <code>/sc &lt;slot name&gt; &lt;multiplier&gt;</code> to set multipliers!`
+      };
+    }
+
+    // Format the leaderboard
+    let message = `🏆 <b>Sweet Calls Leaderboard</b>\n\n`;
+    
+    calls.forEach((call, index) => {
+      const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
+      const rank = index + 1;
+      const isTop5 = rank <= 5;
+      const prizeText = isTop5 ? " 💰" : "";
+      const rankEmoji = isTop5 ? "🥇🥈🥉🏅🏅".split("")[index] : "🔸";
+      
+      message += `${rankEmoji} <b>#${rank}</b> ${displayName}${prizeText}\n`;
+      message += `   📞 <b>${call.slotName}</b> - <b>${call.multiplier}x</b>\n`;
+      message += `   📅 ${call.round.createdAt.toLocaleDateString()}\n\n`;
+    });
+
+    // Add prize information
+    message += `💰 <b>Top 5 Winners</b> - $10 Prize Each!\n`;
+    message += `📊 <b>Total Entries:</b> ${calls.length}`;
+
+    return {
+      success: true,
+      message: message,
+      data: calls.map(call => ({
+        id: call.id,
+        userId: call.userId,
+        slotName: call.slotName,
+        multiplier: call.multiplier,
+        createdAt: call.createdAt,
+        user: {
+          telegramUser: call.user.telegramUser,
+          kickName: call.user.kickName
+        }
+      }))
+    };
+
+  } catch (error) {
+    console.error("Error getting callboard data:", error);
+    return { success: false, message: "An error occurred while loading the leaderboard" };
+  }
+};

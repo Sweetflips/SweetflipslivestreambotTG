@@ -909,7 +909,8 @@ bot.help(async (ctx) => {
         `/call &lt;slot name&gt; - Call a slot in the current round\n` +
         `/call raffle - Randomly pick a winner (mods only)\n` +
         `/sc &lt;slot name&gt; &lt;multiplier&gt; - Set multiplier for a slot (mods only)\n` +
-        `/sc change &lt;slot name&gt; &lt;new multiplier&gt; - Update multiplier (mods only)\n\n` +
+        `/sc change &lt;slot name&gt; &lt;new multiplier&gt; - Update multiplier (mods only)\n` +
+        `/callboard - View top 10 Sweet Calls leaderboard\n\n` +
         `📅 <b>Schedule Commands:</b>\n` +
         `/schedule - View stream schedule for next 7 days\n\n` +
         `🔗 <b>Account Commands:</b>\n` +
@@ -3162,6 +3163,28 @@ bot.command("sc", async (ctx) => {
   }
 });
 
+// Sweet Calls leaderboard command
+bot.command("callboard", async (ctx) => {
+  try {
+    const result = await getCallboardData();
+
+    if (result.success) {
+      await ctx.reply(result.message, { parse_mode: "HTML" });
+    } else {
+      await ctx.reply(
+        `❌ <b>Failed to Load Leaderboard</b>\n\n` +
+          `📝 <b>Reason:</b> ${result.message}\n\n` +
+          `💡 <b>Try again later or contact an admin</b>`,
+        { parse_mode: "HTML" }
+      );
+    }
+
+  } catch (error) {
+    console.error("❌ Error in callboard command:", error);
+    await ctx.reply("❌ Error loading leaderboard. Please try again.");
+  }
+});
+
 // Handle when bot is added to a new group
 bot.on("my_chat_member", async (ctx) => {
   const update = ctx.update;
@@ -4051,6 +4074,79 @@ async function setSlotMultiplier(slotName, multiplier) {
   } catch (error) {
     console.error("Error setting slot multiplier:", error);
     return { success: false, message: "An error occurred while setting the multiplier" };
+  }
+}
+
+async function getCallboardData() {
+  if (!prisma) {
+    return { success: false, message: "Database not available" };
+  }
+
+  try {
+    // Get all calls with multipliers from all rounds
+    const calls = await prisma.sweetCall.findMany({
+      where: {
+        multiplier: {
+          not: null
+        },
+        isArchived: false
+      },
+      include: {
+        user: {
+          select: {
+            telegramUser: true,
+            kickName: true
+          }
+        },
+        round: {
+          select: {
+            id: true,
+            createdAt: true
+          }
+        }
+      },
+      orderBy: {
+        multiplier: "desc"
+      },
+      take: 10 // Top 10 results
+    });
+
+    if (calls.length === 0) {
+      return {
+        success: true,
+        message: `🏆 <b>Sweet Calls Leaderboard</b>\n\n` +
+          `📊 <b>No calls with multipliers found</b>\n\n` +
+          `💡 <b>Tip:</b> Use <code>/sc &lt;slot name&gt; &lt;multiplier&gt;</code> to set multipliers!`
+      };
+    }
+
+    // Format the leaderboard
+    let message = `🏆 <b>Sweet Calls Leaderboard</b>\n\n`;
+    
+    calls.forEach((call, index) => {
+      const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
+      const rank = index + 1;
+      const isTop5 = rank <= 5;
+      const prizeText = isTop5 ? " 💰" : "";
+      const rankEmoji = isTop5 ? "🥇🥈🥉🏅🏅".split("")[index] : "🔸";
+      
+      message += `${rankEmoji} <b>#${rank}</b> ${displayName}${prizeText}\n`;
+      message += `   📞 <b>${call.slotName}</b> - <b>${call.multiplier}x</b>\n`;
+      message += `   📅 ${call.round.createdAt.toLocaleDateString()}\n\n`;
+    });
+
+    // Add prize information
+    message += `💰 <b>Top 5 Winners</b> - $10 Prize Each!\n`;
+    message += `📊 <b>Total Entries:</b> ${calls.length}`;
+
+    return {
+      success: true,
+      message: message
+    };
+
+  } catch (error) {
+    console.error("Error getting callboard data:", error);
+    return { success: false, message: "An error occurred while loading the leaderboard" };
   }
 }
 
