@@ -23,7 +23,6 @@ model User {
   // Relations
   guesses   Guess[]
   auditLogs AuditLog[]
-  sweetCalls SweetCall[]
 
   @@map("users")
 }
@@ -86,7 +85,6 @@ model BonusItem {
 model AuditLog {
   id        String   @id @default(cuid())
   gameRoundId String? @map("game_round_id")
-  sweetCallsRoundId String? @map("sweet_calls_round_id")
   userId    String   @map("user_id")
   command   String
   params    String?  // JSON as string instead of Json type
@@ -94,7 +92,6 @@ model AuditLog {
 
   // Relations
   gameRound GameRound? @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
-  sweetCallsRound SweetCallsRound? @relation(fields: [sweetCallsRoundId], references: [id], onDelete: Cascade)
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
@@ -143,35 +140,3 @@ model StreamNotification {
   @@map("stream_notifications")
 }
 
-model SweetCallsRound {
-  id          String   @id @default(cuid())
-  phase       String   @default("IDLE") // "IDLE", "OPEN", "CLOSED", "REVEALED"
-  createdAt   DateTime @default(now()) @map("created_at")
-  closedAt    DateTime? @map("closed_at")
-  revealedAt  DateTime? @map("revealed_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  calls       SweetCall[]
-  auditLogs   AuditLog[]
-
-  @@map("sweet_calls_rounds")
-}
-
-model SweetCall {
-  id        String   @id @default(cuid())
-  roundId   String   @map("round_id")
-  userId    String   @map("user_id")
-  slotName  String   @map("slot_name")
-  multiplier Float?  // Outcome multiplier for this slot (set by MOD/Owner)
-  createdAt DateTime @default(now()) @map("created_at")
-  isArchived Boolean @default(false) @map("is_archived") // Whether this call has been archived with a completed round
-
-  // Relations
-  round     SweetCallsRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([roundId, userId]) // Each user can only call once per round
-  @@unique([roundId, slotName]) // Each slot can only be called once per round
-  @@map("sweet_calls")
-}

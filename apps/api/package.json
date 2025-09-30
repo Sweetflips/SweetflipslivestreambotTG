@@ -17,6 +17,8 @@
     "migrate:health": "node scripts/migration-health-check.js",
     "migrate:rollback": "node scripts/migration-rollback.js",
     "migrate:postgresql": "node scripts/postgresql-migration.js",
+    "delete:sweet-calls": "node scripts/delete-sweet-calls-tables.js",
+    "railway:delete-tables": "node scripts/railway-delete-tables.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src --ext .ts",
