@@ -250,6 +250,169 @@ async function getScheduleForWeek() {
   }
 }
 
+async function getScheduleWithCurrentDayFirst() {
+  if (!prisma) {
+    console.log("⚠️ Database not available, returning empty schedule");
+    return { schedules: [], currentDay: "", nextStream: null };
+  }
+
+  try {
+    // Clean up old events first
+    await cleanupOldEvents();
+
+    const entries = await prisma.schedule.findMany({
+      where: { isActive: true },
+      orderBy: [{ dayOfWeek: "asc" }, { streamNumber: "asc" }],
+    });
+
+    const now = new Date();
+    const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+
+    // Stream times in minutes from midnight UTC
+    const stream1Time = 7 * 60; // 7:00 AM UTC
+    const stream2Time = 17 * 60; // 5:00 PM UTC
+
+    // Find the next upcoming stream
+    let nextStream = null;
+    let nextStreamTime = null;
+
+    // Check current day first
+    const currentDayEntries = entries.filter(entry => entry.dayOfWeek === currentDayOfWeek);
+    for (const entry of currentDayEntries) {
+      const streamTime = entry.streamNumber === 1 ? stream1Time : stream2Time;
+      if (streamTime > currentTimeInMinutes) {
+        const timeUntilStream = streamTime - currentTimeInMinutes;
+        if (nextStreamTime === null || timeUntilStream < nextStreamTime) {
+          nextStreamTime = timeUntilStream;
+          nextStream = `${getDayName(entry.dayOfWeek)} - Stream ${entry.streamNumber}: ${entry.eventTitle} (in ${Math.floor(timeUntilStream / 60)}h ${timeUntilStream % 60}m)`;
+        }
+      }
+    }
+
+    // If no stream today, check next 7 days
+    if (nextStream === null) {
+      for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
+        const checkDay = (currentDayOfWeek + dayOffset) % 7;
+        const dayEntries = entries.filter(entry => entry.dayOfWeek === checkDay);
+        
+        for (const entry of dayEntries) {
+          const streamTime = entry.streamNumber === 1 ? stream1Time : stream2Time;
+          const totalMinutesUntilStream = dayOffset * 24 * 60 + streamTime;
+          
+          if (nextStreamTime === null || totalMinutesUntilStream < nextStreamTime) {
+            nextStreamTime = totalMinutesUntilStream;
+            const daysUntil = Math.floor(totalMinutesUntilStream / (24 * 60));
+            const hoursUntil = Math.floor((totalMinutesUntilStream % (24 * 60)) / 60);
+            const minutesUntil = totalMinutesUntilStream % 60;
+            
+            let timeString = "";
+            if (daysUntil > 0) timeString += `${daysUntil}d `;
+            if (hoursUntil > 0) timeString += `${hoursUntil}h `;
+            if (minutesUntil > 0) timeString += `${minutesUntil}m`;
+            
+            nextStream = `${getDayName(entry.dayOfWeek)} - Stream ${entry.streamNumber}: ${entry.eventTitle} (in ${timeString.trim()})`;
+          }
+        }
+      }
+    }
+
+    // Reorder schedules to show current day first, then upcoming days
+    const reorderedEntries = [];
+    
+    // Add current day entries first
+    const currentDaySchedules = entries.filter(entry => entry.dayOfWeek === currentDayOfWeek);
+    reorderedEntries.push(...currentDaySchedules);
+    
+    // Add remaining days in order
+    for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
+      const checkDay = (currentDayOfWeek + dayOffset) % 7;
+      const daySchedules = entries.filter(entry => entry.dayOfWeek === checkDay);
+      reorderedEntries.push(...daySchedules);
+    }
+
+    console.log(`📅 Loaded ${entries.length} schedule entries with current day first`);
+    return {
+      schedules: reorderedEntries,
+      currentDay: getDayName(currentDayOfWeek),
+      nextStream
+    };
+  } catch (error) {
+    console.error("❌ Error loading schedule from database:", error.message);
+    return { schedules: [], currentDay: "", nextStream: null };
+  }
+}
+
+async function cleanupOldEvents() {
+  if (!prisma) {
+    return;
+  }
+
+  try {
+    const now = new Date();
+    const currentDayOfWeek = now.getDay();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+
+    // Stream times in minutes from midnight UTC
+    const stream1Time = 7 * 60; // 7:00 AM UTC
+    const stream2Time = 17 * 60; // 5:00 PM UTC
+
+    // Clean up events from previous days
+    const previousDay = (currentDayOfWeek - 1 + 7) % 7;
+    await prisma.schedule.updateMany({
+      where: {
+        dayOfWeek: previousDay,
+        isActive: true
+      },
+      data: {
+        isActive: false,
+        updatedAt: new Date()
+      }
+    });
+
+    // Clean up events from current day that have passed 3+ hours
+    const threeHoursInMinutes = 3 * 60;
+    
+    // Check stream 1 (7:00 AM UTC)
+    if (currentTimeInMinutes > stream1Time + threeHoursInMinutes) {
+      await prisma.schedule.updateMany({
+        where: {
+          dayOfWeek: currentDayOfWeek,
+          streamNumber: 1,
+          isActive: true
+        },
+        data: {
+          isActive: false,
+          updatedAt: new Date()
+        }
+      });
+    }
+
+    // Check stream 2 (5:00 PM UTC)
+    if (currentTimeInMinutes > stream2Time + threeHoursInMinutes) {
+      await prisma.schedule.updateMany({
+        where: {
+          dayOfWeek: currentDayOfWeek,
+          streamNumber: 2,
+          isActive: true
+        },
+        data: {
+          isActive: false,
+          updatedAt: new Date()
+        }
+      });
+    }
+
+    console.log("🧹 Cleaned up old schedule events");
+  } catch (error) {
+    console.error("❌ Error cleaning up old events:", error.message);
+  }
+}
+
 // Helper function to get day name from day of week number
 function getDayName(dayOfWeek) {
   const days = [
@@ -296,13 +459,13 @@ async function sendScheduleToAllGroups() {
       return { success: 0, failed: 0, groups: [] };
     }
 
-    // Get current schedule
-    const schedules = await getScheduleForWeek();
+    // Get current schedule with current day first
+    const scheduleData = await getScheduleWithCurrentDayFirst();
 
     // Build schedule message (exactly like /schedule command)
     let scheduleMessage;
 
-    if (schedules.length === 0) {
+    if (scheduleData.schedules.length === 0) {
       scheduleMessage =
         `📅 <b>Stream Schedule</b>\n\n` +
         `No scheduled streams found for the next 7 days.\n\n` +
@@ -311,24 +474,44 @@ async function sendScheduleToAllGroups() {
         `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
         `Check back later for updates!`;
     } else {
-      scheduleMessage = `📅 <b>Stream Schedule - Next 7 Days</b>\n\n`;
+      scheduleMessage = `📅 <b>Stream Schedule - ${scheduleData.currentDay} & Next 7 Days</b>\n\n`;
+
+      // Show next upcoming stream at the top
+      if (scheduleData.nextStream) {
+        scheduleMessage += `⏰ <b>Next Stream:</b> ${scheduleData.nextStream}\n\n`;
+      }
 
       // Group schedules by day
       const schedulesByDay = {};
-      for (const schedule of schedules) {
+      for (const schedule of scheduleData.schedules) {
         if (!schedulesByDay[schedule.dayOfWeek]) {
           schedulesByDay[schedule.dayOfWeek] = [];
         }
         schedulesByDay[schedule.dayOfWeek].push(schedule);
       }
 
-      // Display schedule for each day
-      for (let day = 0; day < 7; day++) {
+      // Display schedule for each day (current day first, then upcoming days)
+      const currentDayOfWeek = new Date().getDay();
+      const orderedDays = [];
+      
+      // Add current day first
+      orderedDays.push(currentDayOfWeek);
+      
+      // Add remaining days in order
+      for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
+        const checkDay = (currentDayOfWeek + dayOffset) % 7;
+        orderedDays.push(checkDay);
+      }
+
+      for (const day of orderedDays) {
         const dayName = getDayName(day);
         const daySchedules = schedulesByDay[day] || [];
 
         if (daySchedules.length > 0) {
-          scheduleMessage += `<b>${dayName}</b>\n`;
+          // Highlight current day
+          const isCurrentDay = day === currentDayOfWeek;
+          const dayHeader = isCurrentDay ? `📅 <b>${dayName} (Today)</b>` : `<b>${dayName}</b>`;
+          scheduleMessage += `${dayHeader}\n`;
 
           for (const schedule of daySchedules) {
             const times = getStreamTimes(schedule.streamNumber);
@@ -2303,9 +2486,9 @@ bot.command("schedule", async (ctx) => {
     // If no arguments, show schedule (for everyone)
     if (args.length === 0) {
       try {
-        const schedules = await getScheduleForWeek();
+        const scheduleData = await getScheduleWithCurrentDayFirst();
 
-        if (schedules.length === 0) {
+        if (scheduleData.schedules.length === 0) {
           await ctx.reply(
             `📅 <b>Stream Schedule</b>\n\n` +
               `No scheduled streams found for the next 7 days.\n\n` +
@@ -2318,24 +2501,44 @@ bot.command("schedule", async (ctx) => {
           return;
         }
 
-        let message = `📅 <b>Stream Schedule - Next 7 Days</b>\n\n`;
+        let message = `📅 <b>Stream Schedule - ${scheduleData.currentDay} & Next 7 Days</b>\n\n`;
+
+        // Show next upcoming stream at the top
+        if (scheduleData.nextStream) {
+          message += `⏰ <b>Next Stream:</b> ${scheduleData.nextStream}\n\n`;
+        }
 
         // Group schedules by day
         const schedulesByDay = {};
-        for (const schedule of schedules) {
+        for (const schedule of scheduleData.schedules) {
           if (!schedulesByDay[schedule.dayOfWeek]) {
             schedulesByDay[schedule.dayOfWeek] = [];
           }
           schedulesByDay[schedule.dayOfWeek].push(schedule);
         }
 
-        // Display schedule for each day
-        for (let day = 0; day < 7; day++) {
+        // Display schedule for each day (current day first, then upcoming days)
+        const currentDayOfWeek = new Date().getDay();
+        const orderedDays = [];
+        
+        // Add current day first
+        orderedDays.push(currentDayOfWeek);
+        
+        // Add remaining days in order
+        for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
+          const checkDay = (currentDayOfWeek + dayOffset) % 7;
+          orderedDays.push(checkDay);
+        }
+
+        for (const day of orderedDays) {
           const dayName = getDayName(day);
           const daySchedules = schedulesByDay[day] || [];
 
           if (daySchedules.length > 0) {
-            message += `<b>${dayName}</b>\n`;
+            // Highlight current day
+            const isCurrentDay = day === currentDayOfWeek;
+            const dayHeader = isCurrentDay ? `📅 <b>${dayName} (Today)</b>` : `<b>${dayName}</b>`;
+            message += `${dayHeader}\n`;
 
             for (const schedule of daySchedules) {
               const times = getStreamTimes(schedule.streamNumber);
