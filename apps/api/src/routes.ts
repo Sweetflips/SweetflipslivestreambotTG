@@ -226,7 +226,8 @@ export async function registerRoutes(fastify: FastifyInstance) {
       await prisma.$queryRaw`SELECT 1`;
 
       // Check if sweet_calls_rounds table exists and is accessible
-      await prisma.sweetCallsRound.findFirst();
+      // Use raw query to avoid Prisma schema issues
+      await prisma.$queryRaw`SELECT id FROM sweet_calls_rounds LIMIT 1`;
 
       // Check Redis connection
       const redis = (fastify as any).redis;

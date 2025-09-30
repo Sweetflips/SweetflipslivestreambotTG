@@ -1,4 +1,6 @@
 ## Prohibited Practices
+- Always use PostgreSQL for all Railway deployments.
+- Never use SQLite in any Railway environment.
 
 - Do not use raw SQL queries; always use Prisma for database access.
 - Avoid using SQLite in production; use PostgreSQL for all production environments.

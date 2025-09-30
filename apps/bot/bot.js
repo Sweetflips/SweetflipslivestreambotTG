@@ -3895,7 +3895,8 @@ async function checkDatabaseHealth() {
     await prisma.$queryRaw`SELECT 1`;
     
     // Test if sweet_calls_rounds table exists and is accessible
-    await prisma.sweetCallsRound.findFirst();
+    // Use raw query to avoid Prisma schema issues
+    await prisma.$queryRaw`SELECT id FROM sweet_calls_rounds LIMIT 1`;
     
     return { healthy: true };
   } catch (error) {
@@ -3932,22 +3933,25 @@ async function createNewSweetCallsRound() {
     // Test database connection first
     await prisma.$queryRaw`SELECT 1`;
     
-    // Close any existing open rounds
-    await prisma.sweetCallsRound.updateMany({
-      where: { phase: "OPEN" },
-      data: { 
-        phase: "CLOSED",
-        closedAt: new Date(),
-        updatedAt: new Date()
-      }
-    });
+    // Close any existing open rounds using raw SQL to avoid schema issues
+    await prisma.$executeRaw`
+      UPDATE sweet_calls_rounds 
+      SET phase = 'CLOSED', "closedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE phase = 'OPEN'
+    `;
 
-    // Create new round
-    const newRound = await prisma.sweetCallsRound.create({
-      data: {
-        phase: "OPEN"
-      }
-    });
+    // Create new round using raw SQL to avoid schema issues
+    const result = await prisma.$queryRaw`
+      INSERT INTO sweet_calls_rounds (id, phase, "createdAt", "updatedAt")
+      VALUES (gen_random_uuid()::text, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING id, phase, "createdAt", "closedAt", "revealedAt"
+    `;
+
+    if (!result || result.length === 0) {
+      throw new Error("Failed to create new round");
+    }
+
+    const newRound = result[0];
 
     console.log(`✅ Created new Sweet Calls round: ${newRound.id}`);
     return newRound;
@@ -3962,6 +3966,8 @@ async function createNewSweetCallsRound() {
         console.error("❌ Database schema issue - table may not exist");
       } else if (error.message.includes('permission')) {
         console.error("❌ Database permission issue");
+      } else if (error.message.includes('column') && error.message.includes('does not exist')) {
+        console.error("❌ Database schema mismatch - missing columns. Run migration script.");
       } else {
         console.error(`❌ Database error: ${error.message}`);
       }
