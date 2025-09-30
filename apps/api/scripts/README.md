@@ -12,11 +12,19 @@ The database table `sweet_calls_rounds` is missing the following columns:
 - `updatedAt`
 
 ### Solution
-Run the Prisma migration script to add these missing columns:
+
+#### For Railway Deployment:
+The Railway deployment will automatically run the migration on startup. If you need to run it manually:
 
 ```bash
+# In Railway console or local environment
+node apps/api/fix-database.js
+```
+
+#### For Local Development:
+```bash
 cd apps/api
-node scripts/run-prisma-migration.js
+node scripts/ensure-database-schema.js
 ```
 
 ### What the script does:

@@ -9,6 +9,8 @@
     "build": "tsc && tsc-alias",
     "start": "npx prisma generate && npx prisma db push --force-reset && node ../bot/bot.js",
     "start:with-db": "node start-with-db.js",
+    "start:with-migration": "node scripts/start-with-migration.js",
+    "migrate": "node scripts/ensure-database-schema.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src --ext .ts",
