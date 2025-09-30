@@ -1,0 +1,38 @@
+import { PrismaClient } from '@prisma/client';
+import { BonusService } from '../games/bonus/bonusService.js';
+import { TriviaService } from '../games/trivia/triviaService.js';
+import { LinkService } from '../linking/linkService.js';
+import { PayoutService } from '../payouts/payoutService.js';
+import { TelegramContext } from './middlewares.js';
+export declare class TelegramCommands {
+    private prisma;
+    private bonusService;
+    private triviaService;
+    private payoutService;
+    private linkService;
+    private guessCommands;
+    constructor(prisma: PrismaClient, bonusService: BonusService, triviaService: TriviaService, payoutService: PayoutService, linkService: LinkService);
+    startHunt(ctx: TelegramContext): Promise<void>;
+    addBonus(ctx: TelegramContext): Promise<void>;
+    openBonus(ctx: TelegramContext): Promise<void>;
+    closeHunt(ctx: TelegramContext): Promise<void>;
+    startTrivia(ctx: TelegramContext): Promise<void>;
+    postQuestion(ctx: TelegramContext): Promise<void>;
+    lockRound(ctx: TelegramContext): Promise<void>;
+    stopTrivia(ctx: TelegramContext): Promise<void>;
+    showState(ctx: TelegramContext): Promise<void>;
+    resetGame(ctx: TelegramContext): Promise<void>;
+    payoutPreview(ctx: TelegramContext): Promise<void>;
+    linkStatus(ctx: TelegramContext): Promise<void>;
+    linkAccount(ctx: TelegramContext): Promise<void>;
+    unlinkAccount(ctx: TelegramContext): Promise<void>;
+    guess(ctx: TelegramContext): Promise<void>;
+    gtBalance(ctx: TelegramContext): Promise<void>;
+    gtBonus(ctx: TelegramContext): Promise<void>;
+    balanceAdmin(ctx: TelegramContext): Promise<void>;
+    bonusAdmin(ctx: TelegramContext): Promise<void>;
+    gameAdmin(ctx: TelegramContext): Promise<void>;
+    setRole(ctx: TelegramContext): Promise<void>;
+    listUsers(ctx: TelegramContext): Promise<void>;
+}
+//# sourceMappingURL=commands.d.ts.map

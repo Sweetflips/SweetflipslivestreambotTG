@@ -2967,6 +2967,20 @@ bot.command("broadcastschedule", async (ctx) => {
   }
 });
 
+// Database health check command (for debugging)
+bot.command("dbhealth", async (ctx) => {
+  try {
+    const health = await checkDatabaseHealth();
+    if (health.healthy) {
+      await ctx.reply("✅ Database is healthy and connected");
+    } else {
+      await ctx.reply(`❌ Database health check failed: ${health.error}`);
+    }
+  } catch (error) {
+    await ctx.reply(`❌ Error checking database health: ${error.message}`);
+  }
+});
+
 // Sweet Calls game command
 bot.command("call", async (ctx) => {
   try {
@@ -3802,7 +3816,10 @@ async function makeSweetCall(userId, slotName) {
     if (!activeRound) {
       const newRound = await createNewSweetCallsRound();
       if (!newRound) {
-        return { success: false, message: "Failed to create new round" };
+        return { 
+          success: false, 
+          message: "Failed to create new round. Please check database connection and try again." 
+        };
       }
       activeRound = newRound;
     }
@@ -3867,6 +3884,26 @@ async function makeSweetCall(userId, slotName) {
   }
 }
 
+// Database health check function
+async function checkDatabaseHealth() {
+  if (!prisma) {
+    return { healthy: false, error: "Prisma client is null" };
+  }
+
+  try {
+    // Test basic connection
+    await prisma.$queryRaw`SELECT 1`;
+    
+    // Test if sweet_calls_rounds table exists and is accessible
+    await prisma.sweetCallsRound.findFirst();
+    
+    return { healthy: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return { healthy: false, error: errorMessage };
+  }
+}
+
 async function getActiveSweetCallsRound() {
   if (!prisma) {
     return null;
@@ -3887,10 +3924,14 @@ async function getActiveSweetCallsRound() {
 
 async function createNewSweetCallsRound() {
   if (!prisma) {
+    console.error("❌ Prisma client is null - database not available");
     return null;
   }
 
   try {
+    // Test database connection first
+    await prisma.$queryRaw`SELECT 1`;
+    
     // Close any existing open rounds
     await prisma.sweetCallsRound.updateMany({
       where: { phase: "OPEN" },
@@ -3908,9 +3949,24 @@ async function createNewSweetCallsRound() {
       }
     });
 
+    console.log(`✅ Created new Sweet Calls round: ${newRound.id}`);
     return newRound;
   } catch (error) {
-    console.error("Error creating new Sweet Calls round:", error);
+    console.error("❌ Error creating new Sweet Calls round:", error);
+    
+    // Provide more specific error information
+    if (error instanceof Error) {
+      if (error.message.includes('connect')) {
+        console.error("❌ Database connection failed");
+      } else if (error.message.includes('relation') || error.message.includes('table')) {
+        console.error("❌ Database schema issue - table may not exist");
+      } else if (error.message.includes('permission')) {
+        console.error("❌ Database permission issue");
+      } else {
+        console.error(`❌ Database error: ${error.message}`);
+      }
+    }
+    
     return null;
   }
 }

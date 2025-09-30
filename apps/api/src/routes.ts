@@ -225,6 +225,9 @@ export async function registerRoutes(fastify: FastifyInstance) {
       // Check database connection
       await prisma.$queryRaw`SELECT 1`;
 
+      // Check if sweet_calls_rounds table exists and is accessible
+      await prisma.sweetCallsRound.findFirst();
+
       // Check Redis connection
       const redis = (fastify as any).redis;
       if (redis) {
@@ -247,6 +250,7 @@ export async function registerRoutes(fastify: FastifyInstance) {
       return reply.status(503).send({
         success: false,
         error: 'Service unhealthy',
+        details: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   });

@@ -24,12 +24,36 @@ export interface SweetCallsRound {
 // In-memory storage for active rounds
 const activeRounds = new Map<string, SweetCallsRound>();
 
+// Database health check function
+export const checkDatabaseHealth = async (prisma: PrismaClient | null): Promise<{ healthy: boolean; error?: string }> => {
+  if (!prisma) {
+    return { healthy: false, error: "Prisma client is null" };
+  }
+
+  try {
+    // Test basic connection
+    await prisma.$queryRaw`SELECT 1`;
+    
+    // Test if sweet_calls_rounds table exists and is accessible
+    await prisma.sweetCallsRound.findFirst();
+    
+    return { healthy: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return { healthy: false, error: errorMessage };
+  }
+};
+
 export const createNewRound = async (prisma: PrismaClient | null): Promise<SweetCallsRound | null> => {
   if (!prisma) {
+    console.error("❌ Prisma client is null - database not available");
     return null;
   }
 
   try {
+    // Test database connection first
+    await prisma.$queryRaw`SELECT 1`;
+    
     // Close any existing open rounds
     await prisma.sweetCallsRound.updateMany({
       where: { phase: "OPEN" },
@@ -59,9 +83,24 @@ export const createNewRound = async (prisma: PrismaClient | null): Promise<Sweet
     // Store in memory
     activeRounds.set(newRound.id, round);
 
+    console.log(`✅ Created new Sweet Calls round: ${newRound.id}`);
     return round;
   } catch (error) {
-    console.error("Error creating new Sweet Calls round:", error);
+    console.error("❌ Error creating new Sweet Calls round:", error);
+    
+    // Provide more specific error information
+    if (error instanceof Error) {
+      if (error.message.includes('connect')) {
+        console.error("❌ Database connection failed");
+      } else if (error.message.includes('relation') || error.message.includes('table')) {
+        console.error("❌ Database schema issue - table may not exist");
+      } else if (error.message.includes('permission')) {
+        console.error("❌ Database permission issue");
+      } else {
+        console.error(`❌ Database error: ${error.message}`);
+      }
+    }
+    
     return null;
   }
 };
@@ -144,7 +183,10 @@ export const makeCall = async (
     if (!activeRound) {
       const newRound = await createNewRound(prisma);
       if (!newRound) {
-        return { success: false, message: "Failed to create new round" };
+        return { 
+          success: false, 
+          message: "Failed to create new round. Please check database connection and try again." 
+        };
       }
       activeRound = newRound;
     }
