@@ -7,6 +7,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { CallSessionService } from '../src/services/callSessionService.js';
 import { config } from 'dotenv';
 
 config();
@@ -19,8 +20,10 @@ class CallSessionsTester {
       connection: false,
       models: {},
       operations: {},
+      service: {},
       errors: []
     };
+    this.callSessionService = new CallSessionService(prisma);
   }
 
   async log(message, level = 'INFO') {
@@ -330,6 +333,77 @@ class CallSessionsTester {
     }
   }
 
+  async testCallSessionService() {
+    try {
+      await this.log('Testing CallSessionService...');
+      
+      // Test service initialization
+      await this.callSessionService.initialize();
+      await this.log('✅ CallSessionService initialization successful');
+      
+      // Create test user
+      const testUser = await prisma.user.create({
+        data: {
+          telegramId: `test_service_${Date.now()}`,
+          role: 'VIEWER'
+        }
+      });
+      
+      // Test creating new session
+      const newSession = await this.callSessionService.createNewCallSession();
+      if (!newSession) {
+        throw new Error('Failed to create new session');
+      }
+      await this.log('✅ CallSessionService createNewCallSession working');
+      
+      // Test getting active session
+      const activeSession = await this.callSessionService.getActiveCallSession();
+      if (!activeSession || activeSession.id !== newSession.id) {
+        throw new Error('Failed to get active session');
+      }
+      await this.log('✅ CallSessionService getActiveCallSession working');
+      
+      // Test making call entry
+      const entryResult = await this.callSessionService.makeCallEntry(testUser.id, 'test_slot');
+      if (!entryResult.success) {
+        throw new Error(`Failed to make call entry: ${entryResult.message}`);
+      }
+      await this.log('✅ CallSessionService makeCallEntry working');
+      
+      // Test getting session entries
+      const entries = await this.callSessionService.getSessionCallEntries(newSession.id);
+      if (entries.length === 0) {
+        throw new Error('Failed to get session entries');
+      }
+      await this.log('✅ CallSessionService getSessionCallEntries working');
+      
+      // Test setting multiplier
+      const multiplierResult = await this.callSessionService.setSlotMultiplier(newSession.id, 'test_slot', 2.5);
+      if (!multiplierResult) {
+        throw new Error('Failed to set slot multiplier');
+      }
+      await this.log('✅ CallSessionService setSlotMultiplier working');
+      
+      // Test closing session
+      const closeResult = await this.callSessionService.closeCallSession(newSession.id);
+      if (!closeResult) {
+        throw new Error('Failed to close session');
+      }
+      await this.log('✅ CallSessionService closeCallSession working');
+      
+      // Clean up test data
+      await prisma.user.delete({ where: { id: testUser.id } });
+      
+      this.testResults.service.callSessionService = true;
+      return true;
+    } catch (error) {
+      this.testResults.service.callSessionService = false;
+      this.testResults.errors.push(`CallSessionService failed: ${error.message}`);
+      await this.log(`❌ CallSessionService failed: ${error.message}`, 'ERROR');
+      return false;
+    }
+  }
+
   async run() {
     try {
       await this.log('🧪 Starting Call Sessions Test');
@@ -351,12 +425,16 @@ class CallSessionsTester {
       // Step 4: Test constraints
       await this.testConstraints();
       
-      // Step 5: Summary
+      // Step 5: Test CallSessionService
+      await this.testCallSessionService();
+      
+      // Step 6: Summary
       await this.log('📊 Test Summary');
       await this.log('===============');
       await this.log(`Connection: ${this.testResults.connection ? '✅' : '❌'}`);
       await this.log(`Models: ${Object.values(this.testResults.models).every(m => m) ? '✅' : '❌'}`);
       await this.log(`Operations: ${Object.values(this.testResults.operations).every(o => o) ? '✅' : '❌'}`);
+      await this.log(`Service: ${Object.values(this.testResults.service).every(s => s) ? '✅' : '❌'}`);
       
       if (this.testResults.errors.length > 0) {
         await this.log('❌ Errors found:');

@@ -11,6 +11,7 @@ import { LinkService } from './modules/linking/linkService.js';
 import { OverlayService } from './modules/overlay/overlayService.js';
 import { PayoutService } from './modules/payouts/payoutService.js';
 import { TelegramBot } from './modules/telegram/telegramBot.js';
+import { CallSessionService } from './services/callSessionService.js';
 import { createRequestLogger, logger } from './telemetry/logger.js';
 import { RateLimiter } from './utils/rateLimit.js';
 
@@ -25,6 +26,7 @@ export class Server {
   private telegramBot: TelegramBot;
   private kickChat: KickChatProvider;
   private overlayService: OverlayService;
+  private callSessionService: CallSessionService;
 
   constructor() {
     this.fastify = Fastify({
@@ -41,6 +43,7 @@ export class Server {
     const triviaService = new TriviaService(this.prisma);
     const linkService = new LinkService(this.prisma);
     const payoutService = new PayoutService(this.prisma);
+    this.callSessionService = new CallSessionService(this.prisma);
 
     // Initialize Telegram bot
     this.telegramBot = new TelegramBot(this.prisma, this.redis, this.rateLimiter);
@@ -113,6 +116,125 @@ export class Server {
       const webhookHandler = this.telegramBot.getWebhookHandler();
       return webhookHandler(request, reply);
     });
+
+    // Call Session API routes
+    this.fastify.get('/call-sessions/active', async (request: any, reply: any) => {
+      try {
+        const activeSession = await this.callSessionService.getActiveCallSession();
+        if (!activeSession) {
+          reply.code(404);
+          return { success: false, message: 'No active call session found' };
+        }
+        return { success: true, session: activeSession };
+      } catch (error) {
+        reply.code(500);
+        return { success: false, message: 'Error getting active session', error: error.message };
+      }
+    });
+
+    this.fastify.post('/call-sessions/create', {
+      preHandler: createRBACPreHandler('MOD' as any),
+    }, async (request: any, reply: any) => {
+      try {
+        const newSession = await this.callSessionService.createNewCallSession();
+        if (!newSession) {
+          reply.code(500);
+          return { success: false, message: 'Failed to create new session' };
+        }
+        return { success: true, session: newSession };
+      } catch (error) {
+        reply.code(500);
+        return { success: false, message: 'Error creating session', error: error.message };
+      }
+    });
+
+    this.fastify.post('/call-sessions/:sessionId/close', {
+      preHandler: createRBACPreHandler('MOD' as any),
+    }, async (request: any, reply: any) => {
+      try {
+        const { sessionId } = request.params;
+        const success = await this.callSessionService.closeCallSession(sessionId);
+        if (!success) {
+          reply.code(500);
+          return { success: false, message: 'Failed to close session' };
+        }
+        return { success: true, message: 'Session closed successfully' };
+      } catch (error) {
+        reply.code(500);
+        return { success: false, message: 'Error closing session', error: error.message };
+      }
+    });
+
+    this.fastify.post('/call-sessions/:sessionId/reveal', {
+      preHandler: createRBACPreHandler('MOD' as any),
+    }, async (request: any, reply: any) => {
+      try {
+        const { sessionId } = request.params;
+        const success = await this.callSessionService.revealCallSession(sessionId);
+        if (!success) {
+          reply.code(500);
+          return { success: false, message: 'Failed to reveal session' };
+        }
+        return { success: true, message: 'Session revealed successfully' };
+      } catch (error) {
+        reply.code(500);
+        return { success: false, message: 'Error revealing session', error: error.message };
+      }
+    });
+
+    this.fastify.post('/call-entries', async (request: any, reply: any) => {
+      try {
+        const { userId, slotName } = request.body;
+        if (!userId || !slotName) {
+          reply.code(400);
+          return { success: false, message: 'userId and slotName are required' };
+        }
+        
+        const result = await this.callSessionService.makeCallEntry(userId, slotName);
+        if (!result.success) {
+          reply.code(400);
+        }
+        return result;
+      } catch (error) {
+        reply.code(500);
+        return { success: false, message: 'Error making call entry', error: error.message };
+      }
+    });
+
+    this.fastify.get('/call-entries', async (request: any, reply: any) => {
+      try {
+        const { sessionId } = request.query;
+        const entries = await this.callSessionService.getSessionCallEntries(sessionId);
+        return { success: true, entries };
+      } catch (error) {
+        reply.code(500);
+        return { success: false, message: 'Error getting call entries', error: error.message };
+      }
+    });
+
+    this.fastify.post('/call-entries/:sessionId/:slotName/multiplier', {
+      preHandler: createRBACPreHandler('MOD' as any),
+    }, async (request: any, reply: any) => {
+      try {
+        const { sessionId, slotName } = request.params;
+        const { multiplier } = request.body;
+        
+        if (typeof multiplier !== 'number') {
+          reply.code(400);
+          return { success: false, message: 'multiplier must be a number' };
+        }
+        
+        const success = await this.callSessionService.setSlotMultiplier(sessionId, slotName, multiplier);
+        if (!success) {
+          reply.code(500);
+          return { success: false, message: 'Failed to set multiplier' };
+        }
+        return { success: true, message: 'Multiplier set successfully' };
+      } catch (error) {
+        reply.code(500);
+        return { success: false, message: 'Error setting multiplier', error: error.message };
+      }
+    });
   }
 
   private setupErrorHandling() {
@@ -145,6 +267,10 @@ export class Server {
       // Connect to database
       await this.prisma.$connect();
       logger.info('Connected to database');
+
+      // Initialize CallSessionService
+      await this.callSessionService.initialize();
+      logger.info('CallSessionService initialized');
 
       // Connect to Redis
       await this.redis.ping();

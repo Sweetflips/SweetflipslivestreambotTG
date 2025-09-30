@@ -22,6 +22,8 @@
     "railway:deploy": "node scripts/railway-postgresql-deploy.js",
     "health-check": "node scripts/health-check.js",
     "test:call-sessions": "node scripts/test-call-sessions.js",
+    "test:call-service": "node scripts/test-call-service-simple.js",
+    "verify:call-tables": "node scripts/verify-call-tables.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src --ext .ts",
