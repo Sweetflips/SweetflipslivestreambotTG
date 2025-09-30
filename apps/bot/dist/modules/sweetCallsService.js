@@ -277,3 +277,36 @@ export const formatCallsDisplay = (calls) => {
 export const clearInMemoryCache = () => {
     activeRounds.clear();
 };
+export const raffleCall = async (prisma) => {
+    if (!prisma) {
+        return { success: false, message: "Database not available" };
+    }
+    try {
+        // Get active round
+        const activeRound = await getActiveRound(prisma);
+        if (!activeRound) {
+            return { success: false, message: "No active round found" };
+        }
+        // Get all calls for the current round
+        const calls = await getRoundCalls(prisma, activeRound.id);
+        if (calls.length === 0) {
+            return { success: false, message: "No calls found in current round" };
+        }
+        // Randomly select a winner
+        const randomIndex = Math.floor(Math.random() * calls.length);
+        const winner = calls[randomIndex];
+        return {
+            success: true,
+            message: `🎉 <b>Raffle Winner!</b>\n\n` +
+                `🏆 <b>Winner:</b> ${winner.user.kickName || winner.user.telegramUser || "Unknown"}\n` +
+                `📞 <b>Called Slot:</b> ${winner.slotName}\n` +
+                `⏰ <b>Called At:</b> ${winner.createdAt.toLocaleString()}\n\n` +
+                `🎯 <b>Total Participants:</b> ${calls.length}`,
+            winner
+        };
+    }
+    catch (error) {
+        console.error("Error in raffle call:", error);
+        return { success: false, message: "An error occurred during the raffle" };
+    }
+};

@@ -906,7 +906,8 @@ bot.help(async (ctx) => {
         `/balanceboard - View live balance leaderboard with top 5 guessers\n` +
         `/bonusboard - View active bonus leaderboard with top 5 guessers\n\n` +
         `📞 <b>Sweet Calls Game:</b>\n` +
-        `/call &lt;slot name&gt; - Call a slot in the current round\n\n` +
+        `/call &lt;slot name&gt; - Call a slot in the current round\n` +
+        `/call raffle - Randomly pick a winner (mods only)\n\n` +
         `📅 <b>Schedule Commands:</b>\n` +
         `/schedule - View stream schedule for next 7 days\n\n` +
         `🔗 <b>Account Commands:</b>\n` +
@@ -2988,6 +2989,30 @@ bot.command("call", async (ctx) => {
       return;
     }
 
+    // Handle raffle subcommand for MOD/Owner
+    if (args[0].toLowerCase() === "raffle") {
+      if (!isAdmin(user)) {
+        await ctx.reply(`⛔️ Mods only.`);
+        return;
+      }
+
+      const raffleResult = await runSweetCallsRaffle();
+      
+      if (raffleResult.success) {
+        await ctx.reply(raffleResult.message, { parse_mode: "HTML" });
+      } else {
+        await ctx.reply(
+          `❌ <b>Raffle Failed</b>\n\n` +
+            `📝 <b>Reason:</b> ${raffleResult.message}\n\n` +
+            `💡 <b>Make sure:</b>\n` +
+            `• There is an active round\n` +
+            `• At least one call has been made`,
+          { parse_mode: "HTML" }
+        );
+      }
+      return;
+    }
+
     const slotName = args.join(" ");
 
     // Make the call
@@ -3793,6 +3818,58 @@ async function getCurrentCallsDisplay() {
   } catch (error) {
     console.error("Error getting current calls display:", error);
     return "Error loading calls";
+  }
+}
+
+async function runSweetCallsRaffle() {
+  if (!prisma) {
+    return { success: false, message: "Database not available" };
+  }
+
+  try {
+    // Get active round
+    const activeRound = await getActiveSweetCallsRound();
+    if (!activeRound) {
+      return { success: false, message: "No active round found" };
+    }
+
+    // Get all calls for the current round
+    const calls = await prisma.sweetCall.findMany({
+      where: { 
+        roundId: activeRound.id,
+        isArchived: false
+      },
+      include: {
+        user: {
+          select: {
+            telegramUser: true,
+            kickName: true
+          }
+        }
+      },
+      orderBy: { createdAt: "asc" }
+    });
+
+    if (calls.length === 0) {
+      return { success: false, message: "No calls found in current round" };
+    }
+
+    // Randomly select a winner
+    const randomIndex = Math.floor(Math.random() * calls.length);
+    const winner = calls[randomIndex];
+
+    return {
+      success: true,
+      message: `🎉 <b>Raffle Winner!</b>\n\n` +
+        `🏆 <b>Winner:</b> ${winner.user.kickName || winner.user.telegramUser || "Unknown"}\n` +
+        `📞 <b>Called Slot:</b> ${winner.slotName}\n` +
+        `⏰ <b>Called At:</b> ${winner.createdAt.toLocaleString()}\n\n` +
+        `🎯 <b>Total Participants:</b> ${calls.length}`
+    };
+
+  } catch (error) {
+    console.error("Error in raffle call:", error);
+    return { success: false, message: "An error occurred during the raffle" };
   }
 }
 
