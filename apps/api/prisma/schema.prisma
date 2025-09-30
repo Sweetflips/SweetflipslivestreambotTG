@@ -139,4 +139,3 @@ model StreamNotification {
   @@unique([dayOfWeek, streamNumber, notificationType, eventDate])
   @@map("stream_notifications")
 }
-

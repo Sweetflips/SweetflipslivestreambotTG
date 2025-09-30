@@ -1,11 +1,20 @@
 [phases.setup]
-nixPkgs = ["nodejs", "npm", "curl"]
+nixPkgs = ["nodejs", "npm", "curl", "postgresql"]
 
 [phases.install]
-cmds = ["npm install", "npm install -g pm2 forever"]
+cmds = [
+  "npm install",
+  "cd apps/bot && npm install",
+  "cd ../api && npm install",
+  "cd ../.. && npm run build"
+]
 
 [phases.build]
-cmds = ["npx prisma generate"]
+cmds = [
+  "cd apps/api",
+  "npx prisma generate",
+  "npx prisma migrate deploy"
+]
 
 [start]
-cmd = "node bot.js"
+cmd = "node apps/api/railway-start.js"

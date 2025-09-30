@@ -19,6 +19,8 @@
     "migrate:postgresql": "node scripts/postgresql-migration.js",
     "delete:sweet-calls": "node scripts/delete-sweet-calls-tables.js",
     "railway:delete-tables": "node scripts/railway-delete-tables.js",
+    "railway:deploy": "node scripts/railway-postgresql-deploy.js",
+    "health-check": "node scripts/health-check.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src --ext .ts",
