@@ -70,6 +70,10 @@ export class TelegramBot {
         this.bot.command('setrole', ownerMiddleware, modRateLimit, ctx => this.commands.setRole(ctx));
         // Admin Management Commands (MOD or OWNER)
         this.bot.command('listusers', modMiddleware, modRateLimit, ctx => this.commands.listUsers(ctx));
+        // Schedule Commands (MOD or OWNER)
+        this.bot.command('schedule', modMiddleware, modRateLimit, ctx => this.commands.showSchedule(ctx));
+        this.bot.command('schedule_add', modMiddleware, modRateLimit, ctx => this.commands.addScheduleEntry(ctx));
+        this.bot.command('schedule_remove', modMiddleware, modRateLimit, ctx => this.commands.removeScheduleEntry(ctx));
         // Viewer commands (require VIEWER role)
         const viewerMiddleware = createRBACMiddleware('VIEWER');
         const viewerRateLimit = rateLimitMiddleware(RATE_LIMITS.VIEWER_COMMAND);

@@ -7,15 +7,19 @@ import { TriviaController } from './modules/games/trivia/triviaController.js';
 import { TriviaService } from './modules/games/trivia/triviaService.js';
 import { LinkController } from './modules/linking/linkController.js';
 import { LinkService } from './modules/linking/linkService.js';
+import { ScheduleController } from './modules/schedule/scheduleController.js';
+import { ScheduleService } from './services/scheduleService.js';
 export async function registerRoutes(fastify) {
     const prisma = fastify.prisma;
     // Initialize services and controllers
     const bonusService = new BonusService(prisma);
     const triviaService = new TriviaService(prisma);
     const linkService = new LinkService(prisma);
+    const scheduleService = new ScheduleService(prisma);
     const bonusController = new BonusController(bonusService);
     const triviaController = new TriviaController(triviaService);
     const linkController = new LinkController(linkService);
+    const scheduleController = new ScheduleController(scheduleService);
     // Game API routes
     fastify.register(async function (fastify) {
         // Bonus game routes
@@ -198,6 +202,15 @@ export async function registerRoutes(fastify) {
             }
         });
     }, { prefix: '/api/overlay' });
+    // Schedule API routes
+    fastify.register(async function (fastify) {
+        const modPreHandler = createRBACPreHandler([Role.MOD, Role.OWNER]);
+        fastify.get('/', scheduleController.getSchedule.bind(scheduleController));
+        fastify.get('/next', scheduleController.getNextStreams.bind(scheduleController));
+        fastify.get('/times', scheduleController.getStreamTimes.bind(scheduleController));
+        fastify.post('/add', { preHandler: modPreHandler }, scheduleController.addScheduleEntry.bind(scheduleController));
+        fastify.post('/remove', { preHandler: modPreHandler }, scheduleController.removeScheduleEntry.bind(scheduleController));
+    }, { prefix: '/api/schedule' });
     // Health and status routes
     fastify.get('/api/health', async (request, reply) => {
         try {

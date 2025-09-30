@@ -1,0 +1,144 @@
+import { PrismaClient } from '@prisma/client';
+import { logger } from '../telemetry/logger.js';
+export class ScheduleService {
+    prisma;
+    streamTimes = [
+        { hour: 8, minute: 0, timezone: 'UTC' }, // 8am UTC
+        { hour: 18, minute: 0, timezone: 'UTC' } // 6pm UTC
+    ];
+    constructor(prisma) {
+        this.prisma = prisma;
+    }
+    async getScheduleForWeek() {
+        try {
+            const schedules = await this.prisma.schedule.findMany({
+                where: { isActive: true },
+                orderBy: [
+                    { dayOfWeek: 'asc' },
+                    { streamNumber: 'asc' }
+                ]
+            });
+            return schedules;
+        }
+        catch (error) {
+            logger.error('Failed to get schedule for week:', error);
+            throw error;
+        }
+    }
+    async addScheduleEntry(dayOfWeek, streamNumber, eventTitle, createdBy) {
+        try {
+            if (dayOfWeek < 0 || dayOfWeek > 6) {
+                throw new Error('Day of week must be between 0 (Sunday) and 6 (Saturday)');
+            }
+            if (streamNumber < 1 || streamNumber > 2) {
+                throw new Error('Stream number must be 1 or 2');
+            }
+            if (eventTitle.length > 100) {
+                throw new Error('Event title too long (max 100 characters)');
+            }
+            const schedule = await this.prisma.schedule.upsert({
+                where: {
+                    dayOfWeek_streamNumber: {
+                        dayOfWeek,
+                        streamNumber
+                    }
+                },
+                update: {
+                    eventTitle,
+                    isActive: true,
+                    createdBy
+                },
+                create: {
+                    dayOfWeek,
+                    streamNumber,
+                    eventTitle,
+                    isActive: true,
+                    createdBy
+                }
+            });
+            logger.info(`Schedule entry added: ${dayOfWeek}-${streamNumber} - ${eventTitle}`);
+            return schedule;
+        }
+        catch (error) {
+            logger.error('Failed to add schedule entry:', error);
+            throw error;
+        }
+    }
+    async removeScheduleEntry(dayOfWeek, streamNumber) {
+        try {
+            await this.prisma.schedule.updateMany({
+                where: {
+                    dayOfWeek,
+                    streamNumber
+                },
+                data: {
+                    isActive: false
+                }
+            });
+            logger.info(`Schedule entry removed: ${dayOfWeek}-${streamNumber}`);
+        }
+        catch (error) {
+            logger.error('Failed to remove schedule entry:', error);
+            throw error;
+        }
+    }
+    async getStreamTime(streamNumber) {
+        if (streamNumber < 1 || streamNumber > 2) {
+            throw new Error('Stream number must be 1 or 2');
+        }
+        return this.streamTimes[streamNumber - 1];
+    }
+    async getAllStreamTimes() {
+        return [...this.streamTimes];
+    }
+    formatScheduleForDisplay(schedules) {
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        let message = '📅 **Stream Schedule**\n\n';
+        for (let day = 0; day < 7; day++) {
+            const daySchedules = schedules.filter(s => s.dayOfWeek === day);
+            if (daySchedules.length === 0) {
+                message += `**${days[day]}:** No streams scheduled\n\n`;
+                continue;
+            }
+            message += `**${days[day]}:**\n`;
+            for (const schedule of daySchedules) {
+                const streamTime = this.streamTimes[schedule.streamNumber - 1];
+                const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute.toString().padStart(2, '0')} ${streamTime.timezone}`;
+                message += `  ${schedule.streamNumber}. ${timeStr} - ${schedule.eventTitle}\n`;
+            }
+            message += '\n';
+        }
+        return message;
+    }
+    async getNextStreams(days = 7) {
+        try {
+            const schedules = await this.getScheduleForWeek();
+            const nextStreams = [];
+            const today = new Date();
+            for (let i = 0; i < days; i++) {
+                const checkDate = new Date(today);
+                checkDate.setDate(today.getDate() + i);
+                const dayOfWeek = checkDate.getDay();
+                const daySchedules = schedules.filter(s => s.dayOfWeek === dayOfWeek);
+                for (const schedule of daySchedules) {
+                    const streamTime = this.streamTimes[schedule.streamNumber - 1];
+                    const streamDate = new Date(checkDate);
+                    streamDate.setUTCHours(streamTime.hour, streamTime.minute, 0, 0);
+                    nextStreams.push({
+                        date: streamDate,
+                        dayOfWeek,
+                        streamNumber: schedule.streamNumber,
+                        eventTitle: schedule.eventTitle,
+                        streamTime
+                    });
+                }
+            }
+            return nextStreams.sort((a, b) => a.date.getTime() - b.date.getTime());
+        }
+        catch (error) {
+            logger.error('Failed to get next streams:', error);
+            throw error;
+        }
+    }
+}
+//# sourceMappingURL=scheduleService.js.map

@@ -7,6 +7,7 @@ export declare class Server {
     private telegramBot;
     private kickChat;
     private overlayService;
+    private callSessionService;
     constructor();
     private setupRoutes;
     private setupErrorHandling;

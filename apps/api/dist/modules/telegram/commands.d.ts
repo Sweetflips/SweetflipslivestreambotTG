@@ -11,6 +11,7 @@ export declare class TelegramCommands {
     private payoutService;
     private linkService;
     private guessCommands;
+    private scheduleService;
     constructor(prisma: PrismaClient, bonusService: BonusService, triviaService: TriviaService, payoutService: PayoutService, linkService: LinkService);
     startHunt(ctx: TelegramContext): Promise<void>;
     addBonus(ctx: TelegramContext): Promise<void>;
@@ -34,5 +35,8 @@ export declare class TelegramCommands {
     gameAdmin(ctx: TelegramContext): Promise<void>;
     setRole(ctx: TelegramContext): Promise<void>;
     listUsers(ctx: TelegramContext): Promise<void>;
+    showSchedule(ctx: TelegramContext): Promise<void>;
+    addScheduleEntry(ctx: TelegramContext): Promise<void>;
+    removeScheduleEntry(ctx: TelegramContext): Promise<void>;
 }
 //# sourceMappingURL=commands.d.ts.map

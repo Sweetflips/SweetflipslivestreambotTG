@@ -6,12 +6,14 @@ import { GuessCommands } from '../games/guess/guessCommands.js';
 import { TriviaService } from '../games/trivia/triviaService.js';
 import { LinkService } from '../linking/linkService.js';
 import { PayoutService } from '../payouts/payoutService.js';
+import { ScheduleService } from '../../services/scheduleService.js';
 import { TelegramContext } from './middlewares.js';
 
 const env = getEnv();
 
 export class TelegramCommands {
   private guessCommands: GuessCommands;
+  private scheduleService: ScheduleService;
 
   constructor(
     private prisma: PrismaClient,
@@ -28,6 +30,7 @@ export class TelegramCommands {
     const guessBonusService = new GuessBonusService(prisma);
 
     this.guessCommands = new GuessCommands(prisma, guessService, guessBonusService);
+    this.scheduleService = new ScheduleService(prisma);
   }
 
   // Bonus Hunt Commands
@@ -660,6 +663,127 @@ export class TelegramCommands {
     } catch (error) {
       logger.error('Failed to list users:', error);
       await ctx.reply('❌ Failed to list users');
+    }
+  }
+
+  // Schedule Commands
+  async showSchedule(ctx: TelegramContext) {
+    try {
+      const schedules = await this.scheduleService.getScheduleForWeek();
+      const message = this.scheduleService.formatScheduleForDisplay(schedules);
+      
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      logger.error('Failed to show schedule:', error);
+      await ctx.reply('❌ Failed to get schedule');
+    }
+  }
+
+  async addScheduleEntry(ctx: TelegramContext) {
+    const args = ctx.message && 'text' in ctx.message ? ctx.message.text.split(' ').slice(1) : [];
+
+    if (args.length < 3) {
+      await ctx.reply(
+        '❌ Usage: /schedule add <day> <stream> <title>\n\n' +
+        'Days: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday\n' +
+        'Streams: 1=8am UTC, 2=6pm UTC\n\n' +
+        'Example: /schedule add 1 1 "Monday Morning Stream"'
+      );
+      return;
+    }
+
+    const dayOfWeek = parseInt(args[0]);
+    const streamNumber = parseInt(args[1]);
+    const eventTitle = args.slice(2).join(' ');
+
+    if (isNaN(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+      await ctx.reply('❌ Day must be a number between 0 (Sunday) and 6 (Saturday)');
+      return;
+    }
+
+    if (isNaN(streamNumber) || streamNumber < 1 || streamNumber > 2) {
+      await ctx.reply('❌ Stream must be 1 (8am UTC) or 2 (6pm UTC)');
+      return;
+    }
+
+    try {
+      const schedule = await this.scheduleService.addScheduleEntry(
+        dayOfWeek,
+        streamNumber,
+        eventTitle,
+        ctx.user!.id
+      );
+
+      const streamTime = await this.scheduleService.getStreamTime(streamNumber);
+      const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute.toString().padStart(2, '0')} ${streamTime.timezone}`;
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+      await ctx.reply(
+        `✅ **Schedule Entry Added**\n\n` +
+        `Day: ${days[dayOfWeek]}\n` +
+        `Time: ${timeStr}\n` +
+        `Title: ${eventTitle}`,
+        { parse_mode: 'Markdown' }
+      );
+
+      logUserAction('schedule_entry_added', ctx.user!.id, {
+        dayOfWeek,
+        streamNumber,
+        eventTitle
+      });
+    } catch (error) {
+      logger.error('Failed to add schedule entry:', error);
+      await ctx.reply('❌ Failed to add schedule entry');
+    }
+  }
+
+  async removeScheduleEntry(ctx: TelegramContext) {
+    const args = ctx.message && 'text' in ctx.message ? ctx.message.text.split(' ').slice(1) : [];
+
+    if (args.length < 2) {
+      await ctx.reply(
+        '❌ Usage: /schedule remove <day> <stream>\n\n' +
+        'Days: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday\n' +
+        'Streams: 1=8am UTC, 2=6pm UTC\n\n' +
+        'Example: /schedule remove 1 1'
+      );
+      return;
+    }
+
+    const dayOfWeek = parseInt(args[0]);
+    const streamNumber = parseInt(args[1]);
+
+    if (isNaN(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+      await ctx.reply('❌ Day must be a number between 0 (Sunday) and 6 (Saturday)');
+      return;
+    }
+
+    if (isNaN(streamNumber) || streamNumber < 1 || streamNumber > 2) {
+      await ctx.reply('❌ Stream must be 1 (8am UTC) or 2 (6pm UTC)');
+      return;
+    }
+
+    try {
+      await this.scheduleService.removeScheduleEntry(dayOfWeek, streamNumber);
+
+      const streamTime = await this.scheduleService.getStreamTime(streamNumber);
+      const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute.toString().padStart(2, '0')} ${streamTime.timezone}`;
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+      await ctx.reply(
+        `✅ **Schedule Entry Removed**\n\n` +
+        `Day: ${days[dayOfWeek]}\n` +
+        `Time: ${timeStr}`,
+        { parse_mode: 'Markdown' }
+      );
+
+      logUserAction('schedule_entry_removed', ctx.user!.id, {
+        dayOfWeek,
+        streamNumber
+      });
+    } catch (error) {
+      logger.error('Failed to remove schedule entry:', error);
+      await ctx.reply('❌ Failed to remove schedule entry');
     }
   }
 }
