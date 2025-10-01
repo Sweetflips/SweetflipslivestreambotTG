@@ -86,7 +86,7 @@ export const getActiveSchedule = async (
 
   return entries.map((entry) => {
     const times = formatStreamTimes(
-      entry.streamNumber === 1 ? "07:00" : "17:00",
+      entry.streamNumber === 1 ? "08:00" : "18:00",
       entry.streamNumber as 1 | 2
     )
       .map((item) => `${item.label}: ${item.time}`)
@@ -132,8 +132,8 @@ export const getScheduleWithCurrentDayFirst = async (
   const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
   // Stream times in minutes from midnight UTC
-  const stream1Time = 7 * 60; // 7:00 AM UTC
-  const stream2Time = 17 * 60; // 5:00 PM UTC
+  const stream1Time = 8 * 60; // 8:00 AM UTC
+  const stream2Time = 18 * 60; // 6:00 PM UTC
 
   // Find the next upcoming stream
   let nextStream: string | null = null;
@@ -212,8 +212,8 @@ export const cleanupOldEvents = async (prisma: PrismaClient | null): Promise<voi
   const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
   // Stream times in minutes from midnight UTC
-  const stream1Time = 7 * 60; // 7:00 AM UTC
-  const stream2Time = 17 * 60; // 5:00 PM UTC
+  const stream1Time = 8 * 60; // 8:00 AM UTC
+  const stream2Time = 18 * 60; // 6:00 PM UTC
 
   // Clean up events from previous days
   const previousDay = (currentDayOfWeek - 1 + 7) % 7;

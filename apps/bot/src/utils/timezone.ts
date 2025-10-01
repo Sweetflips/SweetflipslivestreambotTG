@@ -8,8 +8,8 @@ export const formatStreamTimes = (
   streamNumber: 1 | 2
 ): StreamTime[] => {
   const times = {
-    1: { ist: "12:30", pst: "23:00" },
-    2: { ist: "22:30", pst: "09:00" },
+    1: { ist: "13:30", pst: "00:00" },
+    2: { ist: "23:30", pst: "10:00" },
   } as const;
 
   const { ist, pst } = times[streamNumber];

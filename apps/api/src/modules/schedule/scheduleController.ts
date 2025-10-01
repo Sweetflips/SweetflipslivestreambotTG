@@ -1,4 +1,4 @@
-import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ScheduleService } from '../../services/scheduleService.js';
 import { logger } from '../../telemetry/logger.js';
 
@@ -8,16 +8,16 @@ export class ScheduleController {
   async getSchedule(request: FastifyRequest, reply: FastifyReply) {
     try {
       const schedules = await this.scheduleService.getScheduleForWeek();
-      
+
       return reply.send({
         success: true,
-        data: schedules
+        data: schedules,
       });
     } catch (error) {
       logger.error('Failed to get schedule:', error);
       return reply.status(500).send({
         success: false,
-        error: 'Failed to get schedule'
+        error: 'Failed to get schedule',
       });
     }
   }
@@ -26,16 +26,16 @@ export class ScheduleController {
     try {
       const { days = 7 } = request.query as { days?: number };
       const nextStreams = await this.scheduleService.getNextStreams(days);
-      
+
       return reply.send({
         success: true,
-        data: nextStreams
+        data: nextStreams,
       });
     } catch (error) {
       logger.error('Failed to get next streams:', error);
       return reply.status(500).send({
         success: false,
-        error: 'Failed to get next streams'
+        error: 'Failed to get next streams',
       });
     }
   }
@@ -52,21 +52,21 @@ export class ScheduleController {
       if (typeof dayOfWeek !== 'number' || dayOfWeek < 0 || dayOfWeek > 6) {
         return reply.status(400).send({
           success: false,
-          error: 'Day of week must be between 0 (Sunday) and 6 (Saturday)'
+          error: 'Day of week must be between 0 (Sunday) and 6 (Saturday)',
         });
       }
 
       if (typeof streamNumber !== 'number' || streamNumber < 1 || streamNumber > 2) {
         return reply.status(400).send({
           success: false,
-          error: 'Stream number must be 1 or 2'
+          error: 'Stream number must be 1 or 2',
         });
       }
 
       if (!eventTitle || typeof eventTitle !== 'string') {
         return reply.status(400).send({
           success: false,
-          error: 'Event title is required'
+          error: 'Event title is required',
         });
       }
 
@@ -79,13 +79,13 @@ export class ScheduleController {
 
       return reply.send({
         success: true,
-        data: schedule
+        data: schedule,
       });
     } catch (error) {
       logger.error('Failed to add schedule entry:', error);
       return reply.status(500).send({
         success: false,
-        error: 'Failed to add schedule entry'
+        error: 'Failed to add schedule entry',
       });
     }
   }
@@ -100,14 +100,14 @@ export class ScheduleController {
       if (typeof dayOfWeek !== 'number' || dayOfWeek < 0 || dayOfWeek > 6) {
         return reply.status(400).send({
           success: false,
-          error: 'Day of week must be between 0 (Sunday) and 6 (Saturday)'
+          error: 'Day of week must be between 0 (Sunday) and 6 (Saturday)',
         });
       }
 
       if (typeof streamNumber !== 'number' || streamNumber < 1 || streamNumber > 2) {
         return reply.status(400).send({
           success: false,
-          error: 'Stream number must be 1 or 2'
+          error: 'Stream number must be 1 or 2',
         });
       }
 
@@ -115,13 +115,13 @@ export class ScheduleController {
 
       return reply.send({
         success: true,
-        message: 'Schedule entry removed successfully'
+        message: 'Schedule entry removed successfully',
       });
     } catch (error) {
       logger.error('Failed to remove schedule entry:', error);
       return reply.status(500).send({
         success: false,
-        error: 'Failed to remove schedule entry'
+        error: 'Failed to remove schedule entry',
       });
     }
   }
@@ -129,16 +129,16 @@ export class ScheduleController {
   async getStreamTimes(request: FastifyRequest, reply: FastifyReply) {
     try {
       const streamTimes = await this.scheduleService.getAllStreamTimes();
-      
+
       return reply.send({
         success: true,
-        data: streamTimes
+        data: streamTimes,
       });
     } catch (error) {
       logger.error('Failed to get stream times:', error);
       return reply.status(500).send({
         success: false,
-        error: 'Failed to get stream times'
+        error: 'Failed to get stream times',
       });
     }
   }

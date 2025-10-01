@@ -1,12 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import { getEnv } from '../../config/env.js';
+import { ScheduleService } from '../../services/scheduleService.js';
 import { logGameEvent, logUserAction, logger } from '../../telemetry/logger.js';
 import { BonusService } from '../games/bonus/bonusService.js';
 import { GuessCommands } from '../games/guess/guessCommands.js';
 import { TriviaService } from '../games/trivia/triviaService.js';
 import { LinkService } from '../linking/linkService.js';
 import { PayoutService } from '../payouts/payoutService.js';
-import { ScheduleService } from '../../services/scheduleService.js';
 import { TelegramContext } from './middlewares.js';
 
 const env = getEnv();
@@ -671,7 +671,7 @@ export class TelegramCommands {
     try {
       const schedules = await this.scheduleService.getScheduleForWeek();
       const message = this.scheduleService.formatScheduleForDisplay(schedules);
-      
+
       await ctx.reply(message, { parse_mode: 'Markdown' });
     } catch (error) {
       logger.error('Failed to show schedule:', error);
@@ -685,9 +685,9 @@ export class TelegramCommands {
     if (args.length < 3) {
       await ctx.reply(
         '❌ Usage: /schedule add <day> <stream> <title>\n\n' +
-        'Days: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday\n' +
-        'Streams: 1=8am UTC, 2=6pm UTC\n\n' +
-        'Example: /schedule add 1 1 "Monday Morning Stream"'
+          'Days: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday\n' +
+          'Streams: 1=8am UTC, 2=6pm UTC\n\n' +
+          'Example: /schedule add 1 1 "Monday Morning Stream"'
       );
       return;
     }
@@ -715,21 +715,23 @@ export class TelegramCommands {
       );
 
       const streamTime = await this.scheduleService.getStreamTime(streamNumber);
-      const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute.toString().padStart(2, '0')} ${streamTime.timezone}`;
+      const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute
+        .toString()
+        .padStart(2, '0')} ${streamTime.timezone}`;
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
       await ctx.reply(
         `✅ **Schedule Entry Added**\n\n` +
-        `Day: ${days[dayOfWeek]}\n` +
-        `Time: ${timeStr}\n` +
-        `Title: ${eventTitle}`,
+          `Day: ${days[dayOfWeek]}\n` +
+          `Time: ${timeStr}\n` +
+          `Title: ${eventTitle}`,
         { parse_mode: 'Markdown' }
       );
 
       logUserAction('schedule_entry_added', ctx.user!.id, {
         dayOfWeek,
         streamNumber,
-        eventTitle
+        eventTitle,
       });
     } catch (error) {
       logger.error('Failed to add schedule entry:', error);
@@ -743,9 +745,9 @@ export class TelegramCommands {
     if (args.length < 2) {
       await ctx.reply(
         '❌ Usage: /schedule remove <day> <stream>\n\n' +
-        'Days: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday\n' +
-        'Streams: 1=8am UTC, 2=6pm UTC\n\n' +
-        'Example: /schedule remove 1 1'
+          'Days: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday\n' +
+          'Streams: 1=8am UTC, 2=6pm UTC\n\n' +
+          'Example: /schedule remove 1 1'
       );
       return;
     }
@@ -767,19 +769,19 @@ export class TelegramCommands {
       await this.scheduleService.removeScheduleEntry(dayOfWeek, streamNumber);
 
       const streamTime = await this.scheduleService.getStreamTime(streamNumber);
-      const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute.toString().padStart(2, '0')} ${streamTime.timezone}`;
+      const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute
+        .toString()
+        .padStart(2, '0')} ${streamTime.timezone}`;
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
       await ctx.reply(
-        `✅ **Schedule Entry Removed**\n\n` +
-        `Day: ${days[dayOfWeek]}\n` +
-        `Time: ${timeStr}`,
+        `✅ **Schedule Entry Removed**\n\n` + `Day: ${days[dayOfWeek]}\n` + `Time: ${timeStr}`,
         { parse_mode: 'Markdown' }
       );
 
       logUserAction('schedule_entry_removed', ctx.user!.id, {
         dayOfWeek,
-        streamNumber
+        streamNumber,
       });
     } catch (error) {
       logger.error('Failed to remove schedule entry:', error);

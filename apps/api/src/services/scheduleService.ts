@@ -20,8 +20,8 @@ export interface StreamTime {
 export class ScheduleService {
   private prisma: PrismaClient;
   private streamTimes: StreamTime[] = [
-    { hour: 8, minute: 0, timezone: 'UTC' },   // 8am UTC
-    { hour: 18, minute: 0, timezone: 'UTC' }   // 6pm UTC
+    { hour: 8, minute: 0, timezone: 'UTC' }, // 8am UTC
+    { hour: 18, minute: 0, timezone: 'UTC' }, // 6pm UTC
   ];
 
   constructor(prisma: PrismaClient) {
@@ -32,10 +32,7 @@ export class ScheduleService {
     try {
       const schedules = await this.prisma.schedule.findMany({
         where: { isActive: true },
-        orderBy: [
-          { dayOfWeek: 'asc' },
-          { streamNumber: 'asc' }
-        ]
+        orderBy: [{ dayOfWeek: 'asc' }, { streamNumber: 'asc' }],
       });
 
       return schedules;
@@ -68,21 +65,21 @@ export class ScheduleService {
         where: {
           dayOfWeek_streamNumber: {
             dayOfWeek,
-            streamNumber
-          }
+            streamNumber,
+          },
         },
         update: {
           eventTitle,
           isActive: true,
-          createdBy: createdBy || null
+          createdBy: createdBy || null,
         },
         create: {
           dayOfWeek,
           streamNumber,
           eventTitle,
           isActive: true,
-          createdBy: createdBy || null
-        }
+          createdBy: createdBy || null,
+        },
       });
 
       logger.info(`Schedule entry added: ${dayOfWeek}-${streamNumber} - ${eventTitle}`);
@@ -98,11 +95,11 @@ export class ScheduleService {
       await this.prisma.schedule.updateMany({
         where: {
           dayOfWeek,
-          streamNumber
+          streamNumber,
         },
         data: {
-          isActive: false
-        }
+          isActive: false,
+        },
       });
 
       logger.info(`Schedule entry removed: ${dayOfWeek}-${streamNumber}`);
@@ -130,40 +127,44 @@ export class ScheduleService {
 
   formatScheduleForDisplay(schedules: ScheduleEntry[]): string {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    
+
     let message = '📅 **Stream Schedule**\n\n';
-    
+
     for (let day = 0; day < 7; day++) {
       const daySchedules = schedules.filter(s => s.dayOfWeek === day);
-      
+
       if (daySchedules.length === 0) {
         message += `**${days[day]}:** No streams scheduled\n\n`;
         continue;
       }
 
       message += `**${days[day]}:**\n`;
-      
+
       for (const schedule of daySchedules) {
         const streamTime = this.streamTimes[schedule.streamNumber - 1];
         if (streamTime) {
-          const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute.toString().padStart(2, '0')} ${streamTime.timezone}`;
+          const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute
+            .toString()
+            .padStart(2, '0')} ${streamTime.timezone}`;
           message += `  ${schedule.streamNumber}. ${timeStr} - ${schedule.eventTitle}\n`;
         }
       }
-      
+
       message += '\n';
     }
 
     return message;
   }
 
-  async getNextStreams(days: number = 7): Promise<Array<{
-    date: Date;
-    dayOfWeek: number;
-    streamNumber: number;
-    eventTitle: string;
-    streamTime: StreamTime;
-  }>> {
+  async getNextStreams(days: number = 7): Promise<
+    Array<{
+      date: Date;
+      dayOfWeek: number;
+      streamNumber: number;
+      eventTitle: string;
+      streamTime: StreamTime;
+    }>
+  > {
     try {
       const schedules = await this.getScheduleForWeek();
       const nextStreams: Array<{
@@ -175,14 +176,14 @@ export class ScheduleService {
       }> = [];
 
       const today = new Date();
-      
+
       for (let i = 0; i < days; i++) {
         const checkDate = new Date(today);
         checkDate.setDate(today.getDate() + i);
         const dayOfWeek = checkDate.getDay();
 
         const daySchedules = schedules.filter(s => s.dayOfWeek === dayOfWeek);
-        
+
         for (const schedule of daySchedules) {
           const streamTime = this.streamTimes[schedule.streamNumber - 1];
           if (streamTime) {
@@ -194,7 +195,7 @@ export class ScheduleService {
               dayOfWeek,
               streamNumber: schedule.streamNumber,
               eventTitle: schedule.eventTitle,
-              streamTime
+              streamTime,
             });
           }
         }
