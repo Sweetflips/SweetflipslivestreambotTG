@@ -1,8 +1,8 @@
-import { createPrismaClient } from "./src/services/prismaClient.js";
 import cron from "node-cron";
 import path from "path";
 import { Telegraf } from "telegraf";
 import { fileURLToPath } from "url";
+import { createPrismaClient } from "./dist/src/services/prismaClient.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -280,14 +280,20 @@ async function getScheduleWithCurrentDayFirst() {
     let nextStreamTime = null;
 
     // Check current day first
-    const currentDayEntries = entries.filter(entry => entry.dayOfWeek === currentDayOfWeek);
+    const currentDayEntries = entries.filter(
+      (entry) => entry.dayOfWeek === currentDayOfWeek
+    );
     for (const entry of currentDayEntries) {
       const streamTime = entry.streamNumber === 1 ? stream1Time : stream2Time;
       if (streamTime > currentTimeInMinutes) {
         const timeUntilStream = streamTime - currentTimeInMinutes;
         if (nextStreamTime === null || timeUntilStream < nextStreamTime) {
           nextStreamTime = timeUntilStream;
-          nextStream = `${getDayName(entry.dayOfWeek)} - Stream ${entry.streamNumber}: ${entry.eventTitle} (in ${Math.floor(timeUntilStream / 60)}h ${timeUntilStream % 60}m)`;
+          nextStream = `${getDayName(entry.dayOfWeek)} - Stream ${
+            entry.streamNumber
+          }: ${entry.eventTitle} (in ${Math.floor(timeUntilStream / 60)}h ${
+            timeUntilStream % 60
+          }m)`;
         }
       }
     }
@@ -296,24 +302,34 @@ async function getScheduleWithCurrentDayFirst() {
     if (nextStream === null) {
       for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
         const checkDay = (currentDayOfWeek + dayOffset) % 7;
-        const dayEntries = entries.filter(entry => entry.dayOfWeek === checkDay);
-        
+        const dayEntries = entries.filter(
+          (entry) => entry.dayOfWeek === checkDay
+        );
+
         for (const entry of dayEntries) {
-          const streamTime = entry.streamNumber === 1 ? stream1Time : stream2Time;
+          const streamTime =
+            entry.streamNumber === 1 ? stream1Time : stream2Time;
           const totalMinutesUntilStream = dayOffset * 24 * 60 + streamTime;
-          
-          if (nextStreamTime === null || totalMinutesUntilStream < nextStreamTime) {
+
+          if (
+            nextStreamTime === null ||
+            totalMinutesUntilStream < nextStreamTime
+          ) {
             nextStreamTime = totalMinutesUntilStream;
             const daysUntil = Math.floor(totalMinutesUntilStream / (24 * 60));
-            const hoursUntil = Math.floor((totalMinutesUntilStream % (24 * 60)) / 60);
+            const hoursUntil = Math.floor(
+              (totalMinutesUntilStream % (24 * 60)) / 60
+            );
             const minutesUntil = totalMinutesUntilStream % 60;
-            
+
             let timeString = "";
             if (daysUntil > 0) timeString += `${daysUntil}d `;
             if (hoursUntil > 0) timeString += `${hoursUntil}h `;
             if (minutesUntil > 0) timeString += `${minutesUntil}m`;
-            
-            nextStream = `${getDayName(entry.dayOfWeek)} - Stream ${entry.streamNumber}: ${entry.eventTitle} (in ${timeString.trim()})`;
+
+            nextStream = `${getDayName(entry.dayOfWeek)} - Stream ${
+              entry.streamNumber
+            }: ${entry.eventTitle} (in ${timeString.trim()})`;
           }
         }
       }
@@ -321,23 +337,29 @@ async function getScheduleWithCurrentDayFirst() {
 
     // Reorder schedules to show current day first, then upcoming days
     const reorderedEntries = [];
-    
+
     // Add current day entries first
-    const currentDaySchedules = entries.filter(entry => entry.dayOfWeek === currentDayOfWeek);
+    const currentDaySchedules = entries.filter(
+      (entry) => entry.dayOfWeek === currentDayOfWeek
+    );
     reorderedEntries.push(...currentDaySchedules);
-    
+
     // Add remaining days in order
     for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
       const checkDay = (currentDayOfWeek + dayOffset) % 7;
-      const daySchedules = entries.filter(entry => entry.dayOfWeek === checkDay);
+      const daySchedules = entries.filter(
+        (entry) => entry.dayOfWeek === checkDay
+      );
       reorderedEntries.push(...daySchedules);
     }
 
-    console.log(`📅 Loaded ${entries.length} schedule entries with current day first`);
+    console.log(
+      `📅 Loaded ${entries.length} schedule entries with current day first`
+    );
     return {
       schedules: reorderedEntries,
       currentDay: getDayName(currentDayOfWeek),
-      nextStream
+      nextStream,
     };
   } catch (error) {
     console.error("❌ Error loading schedule from database:", error.message);
@@ -366,29 +388,29 @@ async function cleanupOldEvents() {
     await prisma.schedule.updateMany({
       where: {
         dayOfWeek: previousDay,
-        isActive: true
+        isActive: true,
       },
       data: {
         isActive: false,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     // Clean up events from current day that have passed 3+ hours
     const threeHoursInMinutes = 3 * 60;
-    
+
     // Check stream 1 (7:00 AM UTC)
     if (currentTimeInMinutes > stream1Time + threeHoursInMinutes) {
       await prisma.schedule.updateMany({
         where: {
           dayOfWeek: currentDayOfWeek,
           streamNumber: 1,
-          isActive: true
+          isActive: true,
         },
         data: {
           isActive: false,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
     }
 
@@ -398,12 +420,12 @@ async function cleanupOldEvents() {
         where: {
           dayOfWeek: currentDayOfWeek,
           streamNumber: 2,
-          isActive: true
+          isActive: true,
         },
         data: {
           isActive: false,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
     }
 
@@ -493,10 +515,10 @@ async function sendScheduleToAllGroups() {
       // Display schedule for each day (current day first, then upcoming days)
       const currentDayOfWeek = new Date().getDay();
       const orderedDays = [];
-      
+
       // Add current day first
       orderedDays.push(currentDayOfWeek);
-      
+
       // Add remaining days in order
       for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
         const checkDay = (currentDayOfWeek + dayOffset) % 7;
@@ -510,7 +532,9 @@ async function sendScheduleToAllGroups() {
         if (daySchedules.length > 0) {
           // Highlight current day
           const isCurrentDay = day === currentDayOfWeek;
-          const dayHeader = isCurrentDay ? `📅 <b>${dayName} (Today)</b>` : `<b>${dayName}</b>`;
+          const dayHeader = isCurrentDay
+            ? `📅 <b>${dayName} (Today)</b>`
+            : `<b>${dayName}</b>`;
           scheduleMessage += `${dayHeader}\n`;
 
           for (const schedule of daySchedules) {
@@ -1366,11 +1390,11 @@ bot.command("balance", async (ctx) => {
 
         // Open new balance round in database
         const result = await guessService.openRound("GUESS_BALANCE", user.id);
-        
+
         // Update in-memory game state
         gameState.balance.isOpen = true;
         gameState.balance.isFinalized = false;
-        
+
         await ctx.reply(
           `✅ Balance guessing is now OPEN! Users can submit their guesses.`
         );
@@ -1389,12 +1413,14 @@ bot.command("balance", async (ctx) => {
 
         // Close balance round in database
         const result = await guessService.closeRound("GUESS_BALANCE", user.id);
-        
+
         // Update in-memory game state
         gameState.balance.isOpen = false;
-        
+
         // Get guess count from database for accurate reporting
-        const currentRound = await guessService.getCurrentRound("GUESS_BALANCE");
+        const currentRound = await guessService.getCurrentRound(
+          "GUESS_BALANCE"
+        );
         let guessCount = 0;
         if (currentRound) {
           const guesses = await prisma.guess.findMany({
@@ -1402,7 +1428,7 @@ bot.command("balance", async (ctx) => {
           });
           guessCount = guesses.length;
         }
-        
+
         await ctx.reply(
           `⛔️ Balance guessing is now CLOSED. ${guessCount} guesses collected.`
         );
@@ -1443,7 +1469,9 @@ bot.command("balance", async (ctx) => {
           guesses: new Map(),
         };
 
-        await ctx.reply(`🔄 Balance game reset. All guesses cleared from database and memory.`);
+        await ctx.reply(
+          `🔄 Balance game reset. All guesses cleared from database and memory.`
+        );
       } catch (error) {
         console.error("Error resetting balance game:", error);
         await ctx.reply(`❌ Error resetting balance game. Please try again.`);
@@ -1458,7 +1486,9 @@ bot.command("balance", async (ctx) => {
         }
 
         // Get current balance round from database
-        const currentRound = await guessService.getCurrentRound("GUESS_BALANCE");
+        const currentRound = await guessService.getCurrentRound(
+          "GUESS_BALANCE"
+        );
         if (!currentRound) {
           await ctx.reply(`📊 No active balance guessing round found.`);
           return;
@@ -1473,7 +1503,7 @@ bot.command("balance", async (ctx) => {
             user: true,
           },
           orderBy: {
-            value: 'asc',
+            value: "asc",
           },
         });
 
@@ -1482,8 +1512,11 @@ bot.command("balance", async (ctx) => {
         } else {
           let showText = `📊 <b>Balance Guesses (${guesses.length}):</b>\n\n`;
           guesses.forEach((guess, index) => {
-            const kickName = guess.user.kickName || guess.user.telegramUser || 'Unknown';
-            showText += `${index + 1}. @${kickName} - ${guess.value.toLocaleString()}\n`;
+            const kickName =
+              guess.user.kickName || guess.user.telegramUser || "Unknown";
+            showText += `${
+              index + 1
+            }. @${kickName} - ${guess.value.toLocaleString()}\n`;
           });
           await ctx.reply(showText, { parse_mode: "HTML" });
         }
@@ -1521,11 +1554,11 @@ bot.command("bonus", async (ctx) => {
 
         // Open new bonus round in database
         const result = await guessService.openRound("GUESS_BONUS", user.id);
-        
+
         // Update in-memory game state
         gameState.bonus.isOpen = true;
         gameState.bonus.isFinalized = false;
-        
+
         await ctx.reply(
           `✅ Bonus guessing is now OPEN! Users can submit their guesses.`
         );
@@ -1544,10 +1577,10 @@ bot.command("bonus", async (ctx) => {
 
         // Close bonus round in database
         const result = await guessService.closeRound("GUESS_BONUS", user.id);
-        
+
         // Update in-memory game state
         gameState.bonus.isOpen = false;
-        
+
         // Get guess count from database for accurate reporting
         const currentRound = await guessService.getCurrentRound("GUESS_BONUS");
         let guessCount = 0;
@@ -1557,7 +1590,7 @@ bot.command("bonus", async (ctx) => {
           });
           guessCount = guesses.length;
         }
-        
+
         await ctx.reply(
           `⛔️ Bonus guessing is now CLOSED. ${guessCount} guesses collected.`
         );
@@ -1595,7 +1628,9 @@ bot.command("bonus", async (ctx) => {
           bonusList: [],
         };
 
-        await ctx.reply(`🔄 Bonus game reset. All guesses and bonuses cleared from database and memory.`);
+        await ctx.reply(
+          `🔄 Bonus game reset. All guesses and bonuses cleared from database and memory.`
+        );
       } catch (error) {
         console.error("Error resetting bonus game:", error);
         await ctx.reply(`❌ Error resetting bonus game. Please try again.`);
@@ -1625,7 +1660,7 @@ bot.command("bonus", async (ctx) => {
             user: true,
           },
           orderBy: {
-            value: 'asc',
+            value: "asc",
           },
         });
 
@@ -1634,8 +1669,11 @@ bot.command("bonus", async (ctx) => {
         } else {
           let showText = `📊 <b>Bonus Guesses (${guesses.length}):</b>\n\n`;
           guesses.forEach((guess, index) => {
-            const kickName = guess.user.kickName || guess.user.telegramUser || 'Unknown';
-            showText += `${index + 1}. @${kickName} - ${guess.value.toLocaleString()}\n`;
+            const kickName =
+              guess.user.kickName || guess.user.telegramUser || "Unknown";
+            showText += `${
+              index + 1
+            }. @${kickName} - ${guess.value.toLocaleString()}\n`;
           });
           await ctx.reply(showText, { parse_mode: "HTML" });
         }
@@ -2530,10 +2568,10 @@ bot.command("schedule", async (ctx) => {
         // Display schedule for each day (current day first, then upcoming days)
         const currentDayOfWeek = new Date().getDay();
         const orderedDays = [];
-        
+
         // Add current day first
         orderedDays.push(currentDayOfWeek);
-        
+
         // Add remaining days in order
         for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
           const checkDay = (currentDayOfWeek + dayOffset) % 7;
@@ -2547,7 +2585,9 @@ bot.command("schedule", async (ctx) => {
           if (daySchedules.length > 0) {
             // Highlight current day
             const isCurrentDay = day === currentDayOfWeek;
-            const dayHeader = isCurrentDay ? `📅 <b>${dayName} (Today)</b>` : `<b>${dayName}</b>`;
+            const dayHeader = isCurrentDay
+              ? `📅 <b>${dayName} (Today)</b>`
+              : `<b>${dayName}</b>`;
             message += `${dayHeader}\n`;
 
             for (const schedule of daySchedules) {
@@ -3000,7 +3040,7 @@ bot.command("call", async (ctx) => {
           `<code>/call Blue</code>\n` +
           `<code>/call Lucky 7</code>\n\n` +
           `🎯 <b>Current Round:</b>\n` +
-          await getCurrentCallsDisplay(),
+          (await getCurrentCallsDisplay()),
         { parse_mode: "HTML" }
       );
       return;
@@ -3014,7 +3054,7 @@ bot.command("call", async (ctx) => {
       }
 
       const raffleResult = await runSweetCallsRaffle();
-      
+
       if (raffleResult.success) {
         await ctx.reply(raffleResult.message, { parse_mode: "HTML" });
       } else {
@@ -3041,7 +3081,7 @@ bot.command("call", async (ctx) => {
           `📞 You called: <b>${slotName}</b>\n` +
           `👤 User: ${user.telegramUser || user.kickName || "Unknown"}\n\n` +
           `🎯 <b>Current Round:</b>\n` +
-          await getCurrentCallsDisplay(),
+          (await getCurrentCallsDisplay()),
         { parse_mode: "HTML" }
       );
     } else {
@@ -3055,7 +3095,6 @@ bot.command("call", async (ctx) => {
         { parse_mode: "HTML" }
       );
     }
-
   } catch (error) {
     console.error("❌ Error in call command:", error);
     await ctx.reply("❌ Error processing your call. Please try again.");
@@ -3084,7 +3123,7 @@ bot.command("sc", async (ctx) => {
           `<code>/sc Red 2.5</code>\n` +
           `<code>/sc change Blue 3.0</code>\n\n` +
           `🎯 <b>Current Round:</b>\n` +
-          await getCurrentCallsDisplay(),
+          (await getCurrentCallsDisplay()),
         { parse_mode: "HTML" }
       );
       return;
@@ -3170,10 +3209,11 @@ bot.command("sc", async (ctx) => {
         { parse_mode: "HTML" }
       );
     }
-
   } catch (error) {
     console.error("❌ Error in sc command:", error);
-    await ctx.reply("❌ Error processing multiplier command. Please try again.");
+    await ctx.reply(
+      "❌ Error processing multiplier command. Please try again."
+    );
   }
 });
 
@@ -3192,7 +3232,6 @@ bot.command("callboard", async (ctx) => {
         { parse_mode: "HTML" }
       );
     }
-
   } catch (error) {
     console.error("❌ Error in callboard command:", error);
     await ctx.reply("❌ Error loading leaderboard. Please try again.");
@@ -3607,26 +3646,30 @@ async function sendStreamReminders(streamNumber) {
     // Get current day and time
     const now = new Date();
     const currentDayOfWeek = now.getDay();
-    
+
     // Find active schedule for this stream on current day
     const schedule = await prisma.schedule.findUnique({
       where: {
         dayOfWeek_streamNumber: {
           dayOfWeek: currentDayOfWeek,
-          streamNumber: streamNumber
-        }
-      }
+          streamNumber: streamNumber,
+        },
+      },
     });
 
     if (!schedule || !schedule.isActive) {
-      console.log(`📅 No active schedule found for Stream ${streamNumber} on ${getDayName(currentDayOfWeek)}`);
+      console.log(
+        `📅 No active schedule found for Stream ${streamNumber} on ${getDayName(
+          currentDayOfWeek
+        )}`
+      );
       return;
     }
 
     // Check if we've already sent this reminder today
     const eventDate = new Date();
     eventDate.setHours(streamNumber === 1 ? 7 : 17, 0, 0, 0);
-    
+
     const alreadySent = await hasNotificationBeenSent(
       prisma,
       currentDayOfWeek,
@@ -3646,7 +3689,7 @@ async function sendStreamReminders(streamNumber) {
       streamNumber: streamNumber,
       eventTitle: schedule.eventTitle,
       eventDate: eventDate,
-      timeUntilStream: "2h 0m"
+      timeUntilStream: "2h 0m",
     });
 
     // Get all active groups
@@ -3662,24 +3705,31 @@ async function sendStreamReminders(streamNumber) {
     let successCount = 0;
     let failedCount = 0;
 
-    console.log(`📢 Sending Stream ${streamNumber} reminder to ${allGroups.length} groups...`);
+    console.log(
+      `📢 Sending Stream ${streamNumber} reminder to ${allGroups.length} groups...`
+    );
 
     for (const groupId of allGroups) {
       try {
         await bot.telegram.sendMessage(groupId, reminderMessage, {
           parse_mode: "HTML",
-          disable_web_page_preview: true
+          disable_web_page_preview: true,
         });
         successCount++;
         console.log(`✅ Reminder sent to group ${groupId}`);
       } catch (error) {
         failedCount++;
-        console.error(`❌ Failed to send reminder to group ${groupId}:`, error.message);
-        
+        console.error(
+          `❌ Failed to send reminder to group ${groupId}:`,
+          error.message
+        );
+
         // If bot was removed from group, mark as inactive
-        if (error.message.includes("bot was blocked") || 
-            error.message.includes("chat not found") ||
-            error.message.includes("bot is not a member")) {
+        if (
+          error.message.includes("bot was blocked") ||
+          error.message.includes("chat not found") ||
+          error.message.includes("bot is not a member")
+        ) {
           await markGroupAsInactive(groupId);
         }
       }
@@ -3696,15 +3746,22 @@ async function sendStreamReminders(streamNumber) {
       failedCount
     );
 
-    console.log(`🚀 Stream ${streamNumber} reminder completed: ${successCount} success, ${failedCount} failed`);
-
+    console.log(
+      `🚀 Stream ${streamNumber} reminder completed: ${successCount} success, ${failedCount} failed`
+    );
   } catch (error) {
     console.error(`❌ Error sending Stream ${streamNumber} reminders:`, error);
   }
 }
 
 // Check if notification has been sent
-async function hasNotificationBeenSent(prisma, dayOfWeek, streamNumber, notificationType, eventDate) {
+async function hasNotificationBeenSent(
+  prisma,
+  dayOfWeek,
+  streamNumber,
+  notificationType,
+  eventDate
+) {
   if (!prisma) {
     return false;
   }
@@ -3716,9 +3773,9 @@ async function hasNotificationBeenSent(prisma, dayOfWeek, streamNumber, notifica
           dayOfWeek: dayOfWeek,
           streamNumber: streamNumber,
           notificationType: notificationType,
-          eventDate: eventDate
-        }
-      }
+          eventDate: eventDate,
+        },
+      },
     });
 
     return existing !== null;
@@ -3729,7 +3786,15 @@ async function hasNotificationBeenSent(prisma, dayOfWeek, streamNumber, notifica
 }
 
 // Record notification as sent
-async function recordNotificationSent(prisma, dayOfWeek, streamNumber, notificationType, eventDate, successCount, failedCount) {
+async function recordNotificationSent(
+  prisma,
+  dayOfWeek,
+  streamNumber,
+  notificationType,
+  eventDate,
+  successCount,
+  failedCount
+) {
   if (!prisma) {
     return;
   }
@@ -3741,13 +3806,13 @@ async function recordNotificationSent(prisma, dayOfWeek, streamNumber, notificat
           dayOfWeek: dayOfWeek,
           streamNumber: streamNumber,
           notificationType: notificationType,
-          eventDate: eventDate
-        }
+          eventDate: eventDate,
+        },
       },
       update: {
         sentAt: new Date(),
         successCount: successCount,
-        failedCount: failedCount
+        failedCount: failedCount,
       },
       create: {
         dayOfWeek: dayOfWeek,
@@ -3755,8 +3820,8 @@ async function recordNotificationSent(prisma, dayOfWeek, streamNumber, notificat
         notificationType: notificationType,
         eventDate: eventDate,
         successCount: successCount,
-        failedCount: failedCount
-      }
+        failedCount: failedCount,
+      },
     });
   } catch (error) {
     console.error("Error recording notification:", error);
@@ -3767,16 +3832,20 @@ async function recordNotificationSent(prisma, dayOfWeek, streamNumber, notificat
 function createStreamReminderMessage(reminder) {
   const times = getStreamTimes(reminder.streamNumber);
 
-  return `🚀 <b>Stream Reminder!</b>\n\n` +
+  return (
+    `🚀 <b>Stream Reminder!</b>\n\n` +
     `⏰ <b>Stream starting in ${reminder.timeUntilStream}!</b>\n\n` +
-    `📅 <b>${getDayName(reminder.dayOfWeek)} - Stream ${reminder.streamNumber}</b>\n` +
+    `📅 <b>${getDayName(reminder.dayOfWeek)} - Stream ${
+      reminder.streamNumber
+    }</b>\n` +
     `🎮 <b>Event:</b> ${reminder.eventTitle}\n\n` +
     `🕐 <b>Stream Times:</b>\n` +
     `🌍 UTC: ${times.utc}\n` +
     `🇮🇳 IST: ${times.ist}\n` +
     `🇺🇸 PST: ${times.pst}\n\n` +
     `🎯 <b>Join us at:</b> https://kick.com/sweetflips\n\n` +
-    `⚡ Get ready for an amazing stream!`;
+    `⚡ Get ready for an amazing stream!`
+  );
 }
 
 // Cleanup old notifications
@@ -3793,9 +3862,9 @@ async function cleanupOldNotifications() {
     await prisma.streamNotification.deleteMany({
       where: {
         sentAt: {
-          lt: sevenDaysAgo
-        }
-      }
+          lt: sevenDaysAgo,
+        },
+      },
     });
 
     console.log("🧹 Cleaned up old stream notifications");
@@ -3812,15 +3881,17 @@ async function makeSweetCall(userId, slotName) {
 
   try {
     // Import the updated service functions
-    const { makeCall } = await import("./src/modules/sweetCallsService.js");
-    
+    const { makeCall } = await import("./dist/src/modules/sweetCallsService.js");
+
     // Use the new service function
     const result = await makeCall(prisma, userId, slotName);
     return result;
-
   } catch (error) {
     console.error("Error making Sweet Call:", error);
-    return { success: false, message: "An error occurred while making your call" };
+    return {
+      success: false,
+      message: "An error occurred while making your call",
+    };
   }
 }
 
@@ -3833,13 +3904,14 @@ async function checkDatabaseHealth() {
   try {
     // Test basic connection
     await prisma.$queryRaw`SELECT 1`;
-    
+
     // Test if sweet_calls_rounds table exists and is accessible using Prisma ORM
     await prisma.sweetCallsRound.findFirst();
-    
+
     return { healthy: true };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return { healthy: false, error: errorMessage };
   }
 }
@@ -3851,8 +3923,10 @@ async function getActiveSweetCallsSession() {
 
   try {
     // Import the updated service functions
-    const { getActiveSession } = await import("./src/modules/sweetCallsService.js");
-    
+    const { getActiveSession } = await import(
+      "./src/modules/sweetCallsService.js"
+    );
+
     // Use the new service function
     const activeSession = await getActiveSession(prisma);
     return activeSession;
@@ -3870,8 +3944,10 @@ async function createNewSweetCallsSession() {
 
   try {
     // Import the updated service functions
-    const { createNewSession } = await import("./src/modules/sweetCallsService.js");
-    
+    const { createNewSession } = await import(
+      "./src/modules/sweetCallsService.js"
+    );
+
     // Use the new service function
     const newSession = await createNewSession(prisma);
     return newSession;
@@ -3888,8 +3964,9 @@ async function getCurrentCallsDisplay() {
 
   try {
     // Import the updated service functions
-    const { getActiveSession, getSessionCalls, formatCallsDisplay } = await import("./src/modules/sweetCallsService.js");
-    
+    const { getActiveSession, getSessionCalls, formatCallsDisplay } =
+      await import("./dist/src/modules/sweetCallsService.js");
+
     // Get active session
     const activeSession = await getActiveSession(prisma);
     if (!activeSession) {
@@ -3898,7 +3975,7 @@ async function getCurrentCallsDisplay() {
 
     // Get calls for the session
     const calls = await getSessionCalls(prisma, activeSession.id);
-    
+
     // Format the display
     return formatCallsDisplay(calls);
   } catch (error) {
@@ -3914,12 +3991,11 @@ async function runSweetCallsRaffle() {
 
   try {
     // Import the updated service functions
-    const { raffleCall } = await import("./src/modules/sweetCallsService.js");
-    
+    const { raffleCall } = await import("./dist/src/modules/sweetCallsService.js");
+
     // Use the new service function
     const result = await raffleCall(prisma);
     return result;
-
   } catch (error) {
     console.error("Error in raffle call:", error);
     return { success: false, message: "An error occurred during the raffle" };
@@ -3933,15 +4009,19 @@ async function setSlotMultiplier(slotName, multiplier) {
 
   try {
     // Import the updated service functions
-    const { setSlotMultiplier: setMultiplier } = await import("./src/modules/sweetCallsService.js");
-    
+    const { setSlotMultiplier: setMultiplier } = await import(
+      "./dist/src/modules/sweetCallsService.js"
+    );
+
     // Use the new service function
     const result = await setMultiplier(prisma, slotName, multiplier);
     return result;
-
   } catch (error) {
     console.error("Error setting slot multiplier:", error);
-    return { success: false, message: "An error occurred while setting the multiplier" };
+    return {
+      success: false,
+      message: "An error occurred while setting the multiplier",
+    };
   }
 }
 
@@ -3952,15 +4032,19 @@ async function getCallboardData() {
 
   try {
     // Import the updated service functions
-    const { getCallboardData: getCallboard } = await import("./src/modules/sweetCallsService.js");
-    
+    const { getCallboardData: getCallboard } = await import(
+      "./dist/src/modules/sweetCallsService.js"
+    );
+
     // Use the new service function
     const result = await getCallboard(prisma);
     return result;
-
   } catch (error) {
     console.error("Error getting callboard data:", error);
-    return { success: false, message: "An error occurred while loading the leaderboard" };
+    return {
+      success: false,
+      message: "An error occurred while loading the leaderboard",
+    };
   }
 }
 
@@ -4094,7 +4178,7 @@ async function startBot() {
     } else {
       // Initialize GuessService for database storage
       try {
-        const { GuessService } = await import("./guessService.js");
+        const { GuessService } = await import("./dist/guessService.js");
         guessService = new GuessService(prisma);
         console.log("✅ GuessService initialized for database storage");
       } catch (error) {
