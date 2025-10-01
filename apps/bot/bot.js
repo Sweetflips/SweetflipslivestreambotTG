@@ -2,7 +2,7 @@ import cron from "node-cron";
 import path from "path";
 import { Telegraf } from "telegraf";
 import { fileURLToPath } from "url";
-import { createPrismaClient } from "./dist/src/services/prismaClient.js";
+import { createPrismaClient } from "./dist/services/prismaClient.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -3881,7 +3881,9 @@ async function makeSweetCall(userId, slotName) {
 
   try {
     // Import the updated service functions
-    const { makeCall } = await import("./dist/src/modules/sweetCallsService.js");
+    const { makeCall } = await import(
+      "./dist/src/modules/sweetCallsService.js"
+    );
 
     // Use the new service function
     const result = await makeCall(prisma, userId, slotName);
@@ -3991,7 +3993,9 @@ async function runSweetCallsRaffle() {
 
   try {
     // Import the updated service functions
-    const { raffleCall } = await import("./dist/src/modules/sweetCallsService.js");
+    const { raffleCall } = await import(
+      "./dist/src/modules/sweetCallsService.js"
+    );
 
     // Use the new service function
     const result = await raffleCall(prisma);
