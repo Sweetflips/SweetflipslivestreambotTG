@@ -271,7 +271,7 @@ export const cleanupOldEvents = async (
     });
   }
 
-  // Check stream 2 (5:00 PM UTC)
+  // Check stream 2 (6:00 PM UTC)
   if (currentTimeInMinutes > stream2Time + threeHoursInMinutes) {
     await prisma.schedule.updateMany({
       where: {

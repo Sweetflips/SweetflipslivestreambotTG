@@ -399,7 +399,7 @@ async function cleanupOldEvents() {
     // Clean up events from current day that have passed 3+ hours
     const threeHoursInMinutes = 3 * 60;
 
-    // Check stream 1 (7:00 AM UTC)
+    // Check stream 1 (8:00 AM UTC)
     if (currentTimeInMinutes > stream1Time + threeHoursInMinutes) {
       await prisma.schedule.updateMany({
         where: {
@@ -414,7 +414,7 @@ async function cleanupOldEvents() {
       });
     }
 
-    // Check stream 2 (5:00 PM UTC)
+    // Check stream 2 (6:00 PM UTC)
     if (currentTimeInMinutes > stream2Time + threeHoursInMinutes) {
       await prisma.schedule.updateMany({
         where: {
@@ -451,8 +451,8 @@ function getDayName(dayOfWeek) {
 
 // Helper function to get stream time in different timezones
 function getStreamTimes(streamNumber) {
-  const stream1UTC = "07:00"; // 7 AM UTC
-  const stream2UTC = "17:00"; // 5 PM UTC
+  const stream1UTC = "08:00"; // 8 AM UTC
+  const stream2UTC = "18:00"; // 6 PM UTC
 
   const utcTime = streamNumber === 1 ? stream1UTC : stream2UTC;
 
@@ -492,8 +492,8 @@ async function sendScheduleToAllGroups() {
         `📅 <b>Stream Schedule</b>\n\n` +
         `No scheduled streams found for the next 7 days.\n\n` +
         `<b>Stream Times:</b>\n` +
-        `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n` +
-        `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
+        `• Stream 1: 8:00 AM UTC (1:30 PM IST, 12:00 AM PST)\n` +
+        `• Stream 2: 6:00 PM UTC (11:30 PM IST, 10:00 AM PST)\n\n` +
         `Check back later for updates!`;
     } else {
       scheduleMessage = `📅 <b>Stream Schedule - ${scheduleData.currentDay} & Next 7 Days</b>\n\n`;
@@ -2541,8 +2541,8 @@ bot.command("schedule", async (ctx) => {
             `📅 <b>Stream Schedule</b>\n\n` +
               `No scheduled streams found for the next 7 days.\n\n` +
               `<b>Stream Times:</b>\n` +
-              `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n` +
-              `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n` +
+              `• Stream 1: 8:00 AM UTC (1:30 PM IST, 12:00 AM PST)\n` +
+              `• Stream 2: 6:00 PM UTC (11:30 PM IST, 10:00 AM PST)\n\n` +
               `Check back later for updates!`,
             { parse_mode: "HTML" }
           );
@@ -4056,11 +4056,11 @@ async function getCallboardData() {
 function setupAutomatedScheduleMessaging() {
   console.log("⏰ Setting up automated schedule messaging...");
 
-  // Schedule for 7:00 AM UTC (0 7 * * *)
+  // Schedule for 8:00 AM UTC (0 8 * * *)
   const morningSchedule = cron.schedule(
-    "0 7 * * *",
+    "0 8 * * *",
     async () => {
-      console.log("🌅 Morning schedule broadcast triggered (7:00 AM UTC)");
+      console.log("🌅 Morning schedule broadcast triggered (8:00 AM UTC)");
       try {
         const result = await sendScheduleToAllGroups();
         console.log(
@@ -4096,11 +4096,11 @@ function setupAutomatedScheduleMessaging() {
     }
   );
 
-  // 2-hour reminder for Stream 1 (5:00 AM UTC - 2 hours before 7:00 AM)
+  // 2-hour reminder for Stream 1 (6:00 AM UTC - 2 hours before 8:00 AM)
   const stream1Reminder = cron.schedule(
-    "0 5 * * *",
+    "0 6 * * *",
     async () => {
-      console.log("🚀 Stream 1 reminder triggered (5:00 AM UTC)");
+      console.log("🚀 Stream 1 reminder triggered (6:00 AM UTC)");
       try {
         await sendStreamReminders(1);
       } catch (error) {
@@ -4113,11 +4113,11 @@ function setupAutomatedScheduleMessaging() {
     }
   );
 
-  // 2-hour reminder for Stream 2 (3:00 PM UTC - 2 hours before 5:00 PM)
+  // 2-hour reminder for Stream 2 (4:00 PM UTC - 2 hours before 6:00 PM)
   const stream2Reminder = cron.schedule(
-    "0 15 * * *",
+    "0 16 * * *",
     async () => {
-      console.log("🚀 Stream 2 reminder triggered (3:00 PM UTC)");
+      console.log("🚀 Stream 2 reminder triggered (4:00 PM UTC)");
       try {
         await sendStreamReminders(2);
       } catch (error) {
@@ -4148,10 +4148,10 @@ function setupAutomatedScheduleMessaging() {
   );
 
   console.log("✅ Automated schedule messaging configured:");
-  console.log("   🌅 Morning broadcast: 7:00 AM UTC");
+  console.log("   🌅 Morning broadcast: 8:00 AM UTC");
   console.log("   🌆 Afternoon broadcast: 3:00 PM UTC");
-  console.log("   🚀 Stream 1 reminder: 5:00 AM UTC (2h before)");
-  console.log("   🚀 Stream 2 reminder: 3:00 PM UTC (2h before)");
+  console.log("   🚀 Stream 1 reminder: 6:00 AM UTC (2h before)");
+  console.log("   🚀 Stream 2 reminder: 4:00 PM UTC (2h before)");
   console.log("   🧹 Daily cleanup: 12:00 AM UTC");
 
   // Store references for cleanup
