@@ -25,8 +25,8 @@ export const checkForUpcomingStreams = async (
   const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
   // Stream times in minutes from midnight UTC
-  const stream1Time = 7 * 60; // 7:00 AM UTC
-  const stream2Time = 17 * 60; // 5:00 PM UTC
+  const stream1Time = 8 * 60; // 8:00 AM UTC
+  const stream2Time = 18 * 60; // 6:00 PM UTC
 
   const reminders: StreamReminder[] = [];
 
@@ -175,7 +175,7 @@ export const recordNotificationSent = async (
 
 export const createStreamReminderMessage = (reminder: StreamReminder): string => {
   const times = formatStreamTimes(
-    reminder.streamNumber === 1 ? "07:00" : "17:00",
+    reminder.streamNumber === 1 ? "08:00" : "18:00",
     reminder.streamNumber
   );
 
