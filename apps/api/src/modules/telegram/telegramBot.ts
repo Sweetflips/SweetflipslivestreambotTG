@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma.js';
 import { Telegraf } from 'telegraf';
 import { AuthService, createRBACMiddleware } from '../../auth/rbac.js';
 import { getEnv } from '../../config/env.js';
@@ -25,7 +25,7 @@ export class TelegramBot {
   private bot: Telegraf<TelegramContext>;
   private commands: TelegramCommands;
 
-  constructor(private prisma: PrismaClient, private redis: any, private rateLimiter: RateLimiter) {
+  constructor(private redis: any, private rateLimiter: RateLimiter) {
     this.bot = new Telegraf<TelegramContext>(env.TELEGRAM_BOT_TOKEN);
 
     // Initialize services

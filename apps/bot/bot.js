@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { createPrismaClient } from "./src/services/prismaClient.js";
 import cron from "node-cron";
 import path from "path";
 import { Telegraf } from "telegraf";
@@ -13,7 +13,7 @@ let guessService = null;
 
 // Initialize Prisma client
 try {
-  prisma = new PrismaClient();
+  prisma = createPrismaClient();
   console.log("✅ Database connection initialized");
 } catch (error) {
   console.error("❌ Database initialization failed:", error.message);

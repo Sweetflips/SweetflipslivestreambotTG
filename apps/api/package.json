@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/dev.ts",
     "build": "tsc && tsc-alias",
-    "start": "npx prisma generate && npx prisma db push --force-reset && node ../bot/bot.js",
+    "start": "npx prisma generate && npx prisma migrate deploy && node ../bot/bot.js",
     "start:with-db": "node start-with-db.js",
     "start:with-migration": "node scripts/start-with-migration.js",
     "migrate": "node scripts/ensure-database-schema.js",
@@ -30,7 +30,8 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "node deploy-db.js",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:deploy-legacy": "node deploy-db.js",
     "db:init": "node init-db.js",
     "prisma:seed": "tsx src/prisma/seed.ts",
     "prisma:studio": "prisma studio",

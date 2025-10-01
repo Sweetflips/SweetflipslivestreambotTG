@@ -1,4 +1,5 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
+import { prisma } from './lib/prisma.js';
 import { FastifyInstance } from 'fastify';
 import { createRBACPreHandler } from './auth/rbac.js';
 import { BonusController } from './modules/games/bonus/bonusController.js';
@@ -11,7 +12,6 @@ import { ScheduleController } from './modules/schedule/scheduleController.js';
 import { ScheduleService } from './services/scheduleService.js';
 
 export async function registerRoutes(fastify: FastifyInstance) {
-  const prisma = fastify.prisma as PrismaClient;
 
   // Initialize services and controllers
   const bonusService = new BonusService(prisma);

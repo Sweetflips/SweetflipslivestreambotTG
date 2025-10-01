@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { connectDatabase, disconnectDatabase, checkDatabaseHealth } from './config/database.js';
 import Fastify from 'fastify';
 import Redis from 'ioredis';
 import { Server as SocketIOServer } from 'socket.io';
@@ -20,7 +20,7 @@ const env = getEnv();
 export class Server {
   private fastify: any;
   private io: SocketIOServer;
-  private prisma: PrismaClient;
+  private prisma: typeof import('./lib/prisma.js').prisma;
   private redis: Redis;
   private rateLimiter: RateLimiter;
   private telegramBot: TelegramBot;
@@ -33,7 +33,7 @@ export class Server {
       logger: false, // We'll use our own logger
     });
 
-    this.prisma = new PrismaClient();
+    this.prisma = (await import('./lib/prisma.js')).prisma;
     this.redis = new Redis(env.REDIS_URL);
     this.rateLimiter = new RateLimiter(this.redis);
 
@@ -46,7 +46,7 @@ export class Server {
     this.callSessionService = new CallSessionService(this.prisma);
 
     // Initialize Telegram bot
-    this.telegramBot = new TelegramBot(this.prisma, this.redis, this.rateLimiter);
+    this.telegramBot = new TelegramBot(this.redis, this.rateLimiter);
 
     // Initialize Kick chat
     this.kickChat = new KickChatProvider(
@@ -265,8 +265,7 @@ export class Server {
   async start() {
     try {
       // Connect to database
-      await this.prisma.$connect();
-      logger.info('Connected to database');
+      await connectDatabase();
 
       // Initialize CallSessionService
       await this.callSessionService.initialize();
@@ -313,7 +312,7 @@ export class Server {
       await this.redis.quit();
 
       // Disconnect from database
-      await this.prisma.$disconnect();
+      await disconnectDatabase();
 
       logger.info('Server stopped successfully');
     } catch (error) {

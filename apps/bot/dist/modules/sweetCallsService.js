@@ -1,15 +1,15 @@
-// In-memory storage for active rounds
-const activeRounds = new Map();
+// In-memory storage for active sessions
+const activeSessions = new Map();
 // Database health check function
-export const checkDatabaseHealth = async (prisma) => {
-    if (!prisma) {
+export const checkDatabaseHealth = async (prismaClient) => {
+    if (!prismaClient) {
         return { healthy: false, error: "Prisma client is null" };
     }
     try {
         // Test basic connection
-        await prisma.$queryRaw `SELECT 1`;
-        // Test if sweet_calls_rounds table exists and is accessible using Prisma ORM
-        await prisma.sweetCallsRound.findFirst();
+        await prismaClient.$queryRaw `SELECT 1`;
+        // Test if call_sessions table exists and is accessible using Prisma ORM
+        await prismaClient.callSession.findFirst();
         return { healthy: true };
     }
     catch (error) {
@@ -17,44 +17,46 @@ export const checkDatabaseHealth = async (prisma) => {
         return { healthy: false, error: errorMessage };
     }
 };
-export const createNewRound = async (prisma) => {
-    if (!prisma) {
+export const createNewSession = async (prismaClient) => {
+    if (!prismaClient) {
         console.error("❌ Prisma client is null - database not available");
         return null;
     }
     try {
         // Test database connection first
-        await prisma.$queryRaw `SELECT 1`;
-        // Close any existing open rounds using Prisma ORM
-        await prisma.sweetCallsRound.updateMany({
-            where: { phase: "OPEN" },
+        await prismaClient.$queryRaw `SELECT 1`;
+        // Close any existing open sessions using Prisma ORM
+        await prismaClient.callSession.updateMany({
+            where: { status: "OPEN" },
             data: {
-                phase: "CLOSED",
+                status: "CLOSED",
                 closedAt: new Date(),
                 updatedAt: new Date()
             }
         });
-        // Create new round using Prisma ORM
-        const newRound = await prisma.sweetCallsRound.create({
+        // Create new session using Prisma ORM
+        const newSession = await prismaClient.callSession.create({
             data: {
-                phase: "OPEN"
+                sessionName: `Session_${Date.now()}`,
+                status: "OPEN"
             }
         });
-        const round = {
-            id: newRound.id,
-            phase: newRound.phase,
-            createdAt: newRound.createdAt,
-            closedAt: newRound.closedAt,
-            revealedAt: newRound.revealedAt,
-            calls: []
+        const session = {
+            id: newSession.id,
+            sessionName: newSession.sessionName,
+            status: newSession.status,
+            createdAt: newSession.createdAt,
+            closedAt: newSession.closedAt,
+            revealedAt: newSession.revealedAt,
+            callEntries: []
         };
         // Store in memory
-        activeRounds.set(newRound.id, round);
-        console.log(`✅ Created new Sweet Calls round: ${newRound.id}`);
-        return round;
+        activeSessions.set(newSession.id, session);
+        console.log(`✅ Created new Call Session: ${newSession.id}`);
+        return session;
     }
     catch (error) {
-        console.error("❌ Error creating new Sweet Calls round:", error);
+        console.error("❌ Error creating new Call Session:", error);
         // Provide more specific error information
         if (error instanceof Error) {
             if (error.message.includes('connect')) {
@@ -76,22 +78,22 @@ export const createNewRound = async (prisma) => {
         return null;
     }
 };
-export const getActiveRound = async (prisma) => {
-    if (!prisma) {
+export const getActiveSession = async (prismaClient) => {
+    if (!prismaClient) {
         return null;
     }
     try {
         // First check in-memory cache
-        for (const [_, round] of activeRounds) {
-            if (round.phase === "OPEN") {
-                return round;
+        for (const [_, session] of activeSessions) {
+            if (session.status === "OPEN") {
+                return session;
             }
         }
         // If not in memory, check database using Prisma ORM
-        const dbRound = await prisma.sweetCallsRound.findFirst({
-            where: { phase: "OPEN" },
+        const dbSession = await prismaClient.callSession.findFirst({
+            where: { status: "OPEN" },
             include: {
-                calls: {
+                callEntries: {
                     include: {
                         user: {
                             select: {
@@ -105,51 +107,53 @@ export const getActiveRound = async (prisma) => {
             },
             orderBy: { createdAt: "desc" }
         });
-        if (dbRound) {
-            const round = {
-                id: dbRound.id,
-                phase: dbRound.phase,
-                createdAt: dbRound.createdAt,
-                closedAt: dbRound.closedAt,
-                revealedAt: dbRound.revealedAt,
-                calls: dbRound.calls.map(call => ({
-                    id: call.id,
-                    userId: call.userId,
-                    slotName: call.slotName,
-                    createdAt: call.createdAt,
+        if (dbSession) {
+            const session = {
+                id: dbSession.id,
+                sessionName: dbSession.sessionName,
+                status: dbSession.status,
+                createdAt: dbSession.createdAt,
+                closedAt: dbSession.closedAt,
+                revealedAt: dbSession.revealedAt,
+                callEntries: dbSession.callEntries.map(entry => ({
+                    id: entry.id,
+                    userId: entry.userId,
+                    slotName: entry.slotName,
+                    multiplier: entry.multiplier,
+                    createdAt: entry.createdAt,
                     user: {
-                        telegramUser: call.user.telegramUser,
-                        kickName: call.user.kickName
+                        telegramUser: entry.user.telegramUser,
+                        kickName: entry.user.kickName
                     }
                 }))
             };
             // Store in memory
-            activeRounds.set(dbRound.id, round);
-            return round;
+            activeSessions.set(dbSession.id, session);
+            return session;
         }
         return null;
     }
     catch (error) {
-        console.error("Error getting active Sweet Calls round:", error);
+        console.error("Error getting active Call Session:", error);
         return null;
     }
 };
-export const makeCall = async (prisma, userId, slotName) => {
-    if (!prisma) {
+export const makeCall = async (prismaClient, userId, slotName) => {
+    if (!prismaClient) {
         return { success: false, message: "Database not available" };
     }
     try {
-        // Get or create active round
-        let activeRound = await getActiveRound(prisma);
-        if (!activeRound) {
-            const newRound = await createNewRound(prisma);
-            if (!newRound) {
+        // Get or create active session
+        let activeSession = await getActiveSession(prismaClient);
+        if (!activeSession) {
+            const newSession = await createNewSession(prismaClient);
+            if (!newSession) {
                 return {
                     success: false,
-                    message: "Failed to create new round. Please check database connection and try again."
+                    message: "Failed to create new session. Please check database connection and try again."
                 };
             }
-            activeRound = newRound;
+            activeSession = newSession;
         }
         // Validate slot name
         if (!slotName || slotName.trim().length === 0) {
@@ -159,34 +163,30 @@ export const makeCall = async (prisma, userId, slotName) => {
             return { success: false, message: "Slot name must be 50 characters or less" };
         }
         const trimmedSlotName = slotName.trim();
-        // Check if user already called in this round
-        const existingUserCall = await prisma.sweetCall.findUnique({
+        // Check if user already called in this session
+        const existingUserCall = await prismaClient.callEntry.findFirst({
             where: {
-                roundId_userId: {
-                    roundId: activeRound.id,
-                    userId: userId
-                }
+                sessionId: activeSession.id,
+                userId: userId
             }
         });
         if (existingUserCall) {
-            return { success: false, message: "You have already called a slot in this round" };
+            return { success: false, message: "You have already called a slot in this session" };
         }
         // Check if slot name is already taken
-        const existingSlotCall = await prisma.sweetCall.findUnique({
+        const existingSlotCall = await prismaClient.callEntry.findFirst({
             where: {
-                roundId_slotName: {
-                    roundId: activeRound.id,
-                    slotName: trimmedSlotName
-                }
+                sessionId: activeSession.id,
+                slotName: trimmedSlotName
             }
         });
         if (existingSlotCall) {
             return { success: false, message: `Slot "${trimmedSlotName}" is already taken` };
         }
-        // Create the call
-        const newCall = await prisma.sweetCall.create({
+        // Create the call entry
+        const newCall = await prismaClient.callEntry.create({
             data: {
-                roundId: activeRound.id,
+                sessionId: activeSession.id,
                 userId: userId,
                 slotName: trimmedSlotName
             },
@@ -200,12 +200,13 @@ export const makeCall = async (prisma, userId, slotName) => {
             }
         });
         // Update in-memory cache
-        const updatedRound = activeRounds.get(activeRound.id);
-        if (updatedRound) {
-            updatedRound.calls.push({
+        const updatedSession = activeSessions.get(activeSession.id);
+        if (updatedSession) {
+            updatedSession.callEntries.push({
                 id: newCall.id,
                 userId: newCall.userId,
                 slotName: newCall.slotName,
+                multiplier: newCall.multiplier,
                 createdAt: newCall.createdAt,
                 user: {
                     telegramUser: newCall.user.telegramUser,
@@ -216,31 +217,31 @@ export const makeCall = async (prisma, userId, slotName) => {
         return {
             success: true,
             message: `Successfully called slot "${trimmedSlotName}"!`,
-            roundId: activeRound.id
+            sessionId: activeSession.id
         };
     }
     catch (error) {
-        console.error("Error making Sweet Call:", error);
+        console.error("Error making Call Entry:", error);
         return { success: false, message: "An error occurred while making your call" };
     }
 };
-export const getRoundCalls = async (prisma, roundId) => {
-    if (!prisma) {
+export const getSessionCalls = async (prismaClient, sessionId) => {
+    if (!prismaClient) {
         return [];
     }
     try {
-        let targetRoundId = roundId;
-        // If no roundId provided, get active round
-        if (!targetRoundId) {
-            const activeRound = await getActiveRound(prisma);
-            if (!activeRound) {
+        let targetSessionId = sessionId;
+        // If no sessionId provided, get active session
+        if (!targetSessionId) {
+            const activeSession = await getActiveSession(prismaClient);
+            if (!activeSession) {
                 return [];
             }
-            targetRoundId = activeRound.id;
+            targetSessionId = activeSession.id;
         }
-        const calls = await prisma.sweetCall.findMany({
+        const calls = await prismaClient.callEntry.findMany({
             where: {
-                roundId: targetRoundId,
+                sessionId: targetSessionId,
                 isArchived: false
             },
             include: {
@@ -266,42 +267,42 @@ export const getRoundCalls = async (prisma, roundId) => {
         }));
     }
     catch (error) {
-        console.error("Error getting round calls:", error);
+        console.error("Error getting session calls:", error);
         return [];
     }
 };
-export const closeRound = async (prisma, roundId) => {
-    if (!prisma) {
+export const closeSession = async (prismaClient, sessionId) => {
+    if (!prismaClient) {
         return false;
     }
     try {
-        let targetRoundId = roundId;
-        // If no roundId provided, get active round
-        if (!targetRoundId) {
-            const activeRound = await getActiveRound(prisma);
-            if (!activeRound) {
+        let targetSessionId = sessionId;
+        // If no sessionId provided, get active session
+        if (!targetSessionId) {
+            const activeSession = await getActiveSession(prismaClient);
+            if (!activeSession) {
                 return false;
             }
-            targetRoundId = activeRound.id;
+            targetSessionId = activeSession.id;
         }
-        await prisma.sweetCallsRound.update({
-            where: { id: targetRoundId },
+        await prismaClient.callSession.update({
+            where: { id: targetSessionId },
             data: {
-                phase: "CLOSED",
+                status: "CLOSED",
                 closedAt: new Date(),
                 updatedAt: new Date()
             }
         });
         // Update in-memory cache
-        const cachedRound = activeRounds.get(targetRoundId);
-        if (cachedRound) {
-            cachedRound.phase = "CLOSED";
-            cachedRound.closedAt = new Date();
+        const cachedSession = activeSessions.get(targetSessionId);
+        if (cachedSession) {
+            cachedSession.status = "CLOSED";
+            cachedSession.closedAt = new Date();
         }
         return true;
     }
     catch (error) {
-        console.error("Error closing round:", error);
+        console.error("Error closing session:", error);
         return false;
     }
 };
@@ -309,7 +310,7 @@ export const formatCallsDisplay = (calls) => {
     if (calls.length === 0) {
         return "No calls yet!";
     }
-    let message = `📞 <b>Sweet Calls - Current Round</b>\n\n`;
+    let message = `📞 <b>Sweet Calls - Current Session</b>\n\n`;
     calls.forEach((call, index) => {
         const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
         const multiplierText = call.multiplier ? ` (${call.multiplier}x)` : "";
@@ -319,22 +320,22 @@ export const formatCallsDisplay = (calls) => {
     return message;
 };
 export const clearInMemoryCache = () => {
-    activeRounds.clear();
+    activeSessions.clear();
 };
-export const raffleCall = async (prisma) => {
-    if (!prisma) {
+export const raffleCall = async (prismaClient) => {
+    if (!prismaClient) {
         return { success: false, message: "Database not available" };
     }
     try {
-        // Get active round
-        const activeRound = await getActiveRound(prisma);
-        if (!activeRound) {
-            return { success: false, message: "No active round found" };
+        // Get active session
+        const activeSession = await getActiveSession(prismaClient);
+        if (!activeSession) {
+            return { success: false, message: "No active session found" };
         }
-        // Get all calls for the current round
-        const calls = await getRoundCalls(prisma, activeRound.id);
+        // Get all calls for the current session
+        const calls = await getSessionCalls(prismaClient, activeSession.id);
         if (calls.length === 0) {
-            return { success: false, message: "No calls found in current round" };
+            return { success: false, message: "No calls found in current session" };
         }
         // Randomly select a winner
         const randomIndex = Math.floor(Math.random() * calls.length);
@@ -354,8 +355,8 @@ export const raffleCall = async (prisma) => {
         return { success: false, message: "An error occurred during the raffle" };
     }
 };
-export const setSlotMultiplier = async (prisma, slotName, multiplier) => {
-    if (!prisma) {
+export const setSlotMultiplier = async (prismaClient, slotName, multiplier) => {
+    if (!prismaClient) {
         return { success: false, message: "Database not available" };
     }
     try {
@@ -363,18 +364,16 @@ export const setSlotMultiplier = async (prisma, slotName, multiplier) => {
         if (multiplier < 0 || multiplier > 1000) {
             return { success: false, message: "Multiplier must be between 0 and 1000" };
         }
-        // Get active round
-        const activeRound = await getActiveRound(prisma);
-        if (!activeRound) {
-            return { success: false, message: "No active round found" };
+        // Get active session
+        const activeSession = await getActiveSession(prismaClient);
+        if (!activeSession) {
+            return { success: false, message: "No active session found" };
         }
         // Find the call with this slot name
-        const call = await prisma.sweetCall.findUnique({
+        const call = await prismaClient.callEntry.findFirst({
             where: {
-                roundId_slotName: {
-                    roundId: activeRound.id,
-                    slotName: slotName
-                }
+                sessionId: activeSession.id,
+                slotName: slotName
             },
             include: {
                 user: {
@@ -386,10 +385,10 @@ export const setSlotMultiplier = async (prisma, slotName, multiplier) => {
             }
         });
         if (!call) {
-            return { success: false, message: `Slot "${slotName}" not found in current round` };
+            return { success: false, message: `Slot "${slotName}" not found in current session` };
         }
         // Update the multiplier
-        await prisma.sweetCall.update({
+        await prismaClient.callEntry.update({
             where: { id: call.id },
             data: { multiplier: multiplier }
         });
@@ -409,13 +408,13 @@ export const setSlotMultiplier = async (prisma, slotName, multiplier) => {
         return { success: false, message: "An error occurred while setting the multiplier" };
     }
 };
-export const getCallboardData = async (prisma) => {
-    if (!prisma) {
+export const getCallboardData = async (prismaClient) => {
+    if (!prismaClient) {
         return { success: false, message: "Database not available" };
     }
     try {
-        // Get all calls with multipliers from all rounds
-        const calls = await prisma.sweetCall.findMany({
+        // Get all calls with multipliers from all sessions
+        const calls = await prismaClient.callEntry.findMany({
             where: {
                 multiplier: {
                     not: null
@@ -429,7 +428,7 @@ export const getCallboardData = async (prisma) => {
                         kickName: true
                     }
                 },
-                round: {
+                session: {
                     select: {
                         id: true,
                         createdAt: true
@@ -459,7 +458,7 @@ export const getCallboardData = async (prisma) => {
             const rankEmoji = isTop5 ? "🥇🥈🥉🏅🏅".split("")[index] : "🔸";
             message += `${rankEmoji} <b>#${rank}</b> ${displayName}${prizeText}\n`;
             message += `   📞 <b>${call.slotName}</b> - <b>${call.multiplier}x</b>\n`;
-            message += `   📅 ${call.round.createdAt.toLocaleDateString()}\n\n`;
+            message += `   📅 ${call.session.createdAt.toLocaleDateString()}\n\n`;
         });
         // Add prize information
         message += `💰 <b>Top 5 Winners</b> - $10 Prize Each!\n`;

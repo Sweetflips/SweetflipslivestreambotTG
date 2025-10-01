@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma.js";
 
 export interface CallEntry {
   id: string;
@@ -26,17 +26,17 @@ export interface CallSession {
 const activeSessions = new Map<string, CallSession>();
 
 // Database health check function
-export const checkDatabaseHealth = async (prisma: PrismaClient | null): Promise<{ healthy: boolean; error?: string }> => {
-  if (!prisma) {
+export const checkDatabaseHealth = async (prismaClient: typeof prisma): Promise<{ healthy: boolean; error?: string }> => {
+  if (!prismaClient) {
     return { healthy: false, error: "Prisma client is null" };
   }
 
   try {
     // Test basic connection
-    await prisma.$queryRaw`SELECT 1`;
+    await prismaClient.$queryRaw`SELECT 1`;
     
     // Test if call_sessions table exists and is accessible using Prisma ORM
-    await prisma.callSession.findFirst();
+    await prismaClient.callSession.findFirst();
     
     return { healthy: true };
   } catch (error) {
@@ -45,18 +45,18 @@ export const checkDatabaseHealth = async (prisma: PrismaClient | null): Promise<
   }
 };
 
-export const createNewSession = async (prisma: PrismaClient | null): Promise<CallSession | null> => {
-  if (!prisma) {
+export const createNewSession = async (prismaClient: typeof prisma): Promise<CallSession | null> => {
+  if (!prismaClient) {
     console.error("❌ Prisma client is null - database not available");
     return null;
   }
 
   try {
     // Test database connection first
-    await prisma.$queryRaw`SELECT 1`;
+    await prismaClient.$queryRaw`SELECT 1`;
     
     // Close any existing open sessions using Prisma ORM
-    await prisma.callSession.updateMany({
+    await prismaClient.callSession.updateMany({
       where: { status: "OPEN" },
       data: { 
         status: "CLOSED",
@@ -66,7 +66,7 @@ export const createNewSession = async (prisma: PrismaClient | null): Promise<Cal
     });
 
     // Create new session using Prisma ORM
-    const newSession = await prisma.callSession.create({
+    const newSession = await prismaClient.callSession.create({
       data: {
         sessionName: `Session_${Date.now()}`,
         status: "OPEN"
@@ -110,8 +110,8 @@ export const createNewSession = async (prisma: PrismaClient | null): Promise<Cal
   }
 };
 
-export const getActiveSession = async (prisma: PrismaClient | null): Promise<CallSession | null> => {
-  if (!prisma) {
+export const getActiveSession = async (prismaClient: typeof prisma): Promise<CallSession | null> => {
+  if (!prismaClient) {
     return null;
   }
 
@@ -124,7 +124,7 @@ export const getActiveSession = async (prisma: PrismaClient | null): Promise<Cal
     }
 
     // If not in memory, check database using Prisma ORM
-    const dbSession = await prisma.callSession.findFirst({
+    const dbSession = await prismaClient.callSession.findFirst({
       where: { status: "OPEN" },
       include: {
         callEntries: {
@@ -176,19 +176,19 @@ export const getActiveSession = async (prisma: PrismaClient | null): Promise<Cal
 };
 
 export const makeCall = async (
-  prisma: PrismaClient | null,
+  prismaClient: typeof prisma,
   userId: string,
   slotName: string
 ): Promise<{ success: boolean; message: string; sessionId?: string }> => {
-  if (!prisma) {
+  if (!prismaClient) {
     return { success: false, message: "Database not available" };
   }
 
   try {
     // Get or create active session
-    let activeSession = await getActiveSession(prisma);
+    let activeSession = await getActiveSession(prismaClient);
     if (!activeSession) {
-      const newSession = await createNewSession(prisma);
+      const newSession = await createNewSession(prismaClient);
       if (!newSession) {
         return { 
           success: false, 
@@ -210,7 +210,7 @@ export const makeCall = async (
     const trimmedSlotName = slotName.trim();
 
     // Check if user already called in this session
-    const existingUserCall = await prisma.callEntry.findFirst({
+    const existingUserCall = await prismaClient.callEntry.findFirst({
       where: {
         sessionId: activeSession.id,
         userId: userId
@@ -222,7 +222,7 @@ export const makeCall = async (
     }
 
     // Check if slot name is already taken
-    const existingSlotCall = await prisma.callEntry.findFirst({
+    const existingSlotCall = await prismaClient.callEntry.findFirst({
       where: {
         sessionId: activeSession.id,
         slotName: trimmedSlotName
@@ -234,7 +234,7 @@ export const makeCall = async (
     }
 
     // Create the call entry
-    const newCall = await prisma.callEntry.create({
+    const newCall = await prismaClient.callEntry.create({
       data: {
         sessionId: activeSession.id,
         userId: userId,
@@ -279,10 +279,10 @@ export const makeCall = async (
 };
 
 export const getSessionCalls = async (
-  prisma: PrismaClient | null,
+  prismaClient: typeof prisma,
   sessionId?: string
 ): Promise<CallEntry[]> => {
-  if (!prisma) {
+  if (!prismaClient) {
     return [];
   }
 
@@ -291,14 +291,14 @@ export const getSessionCalls = async (
 
     // If no sessionId provided, get active session
     if (!targetSessionId) {
-      const activeSession = await getActiveSession(prisma);
+      const activeSession = await getActiveSession(prismaClient);
       if (!activeSession) {
         return [];
       }
       targetSessionId = activeSession.id;
     }
 
-    const calls = await prisma.callEntry.findMany({
+    const calls = await prismaClient.callEntry.findMany({
       where: { 
         sessionId: targetSessionId,
         isArchived: false
@@ -332,8 +332,8 @@ export const getSessionCalls = async (
   }
 };
 
-export const closeSession = async (prisma: PrismaClient | null, sessionId?: string): Promise<boolean> => {
-  if (!prisma) {
+export const closeSession = async (prismaClient: typeof prisma, sessionId?: string): Promise<boolean> => {
+  if (!prismaClient) {
     return false;
   }
 
@@ -342,14 +342,14 @@ export const closeSession = async (prisma: PrismaClient | null, sessionId?: stri
 
     // If no sessionId provided, get active session
     if (!targetSessionId) {
-      const activeSession = await getActiveSession(prisma);
+      const activeSession = await getActiveSession(prismaClient);
       if (!activeSession) {
         return false;
       }
       targetSessionId = activeSession.id;
     }
 
-    await prisma.callSession.update({
+    await prismaClient.callSession.update({
       where: { id: targetSessionId },
       data: {
         status: "CLOSED",
@@ -395,21 +395,21 @@ export const clearInMemoryCache = (): void => {
 };
 
 export const raffleCall = async (
-  prisma: PrismaClient | null
+  prismaClient: typeof prisma
 ): Promise<{ success: boolean; message: string; winner?: CallEntry }> => {
-  if (!prisma) {
+  if (!prismaClient) {
     return { success: false, message: "Database not available" };
   }
 
   try {
     // Get active session
-    const activeSession = await getActiveSession(prisma);
+    const activeSession = await getActiveSession(prismaClient);
     if (!activeSession) {
       return { success: false, message: "No active session found" };
     }
 
     // Get all calls for the current session
-    const calls = await getSessionCalls(prisma, activeSession.id);
+    const calls = await getSessionCalls(prismaClient, activeSession.id);
     if (calls.length === 0) {
       return { success: false, message: "No calls found in current session" };
     }
@@ -421,9 +421,9 @@ export const raffleCall = async (
     return {
       success: true,
       message: `🎉 <b>Raffle Winner!</b>\n\n` +
-        `🏆 <b>Winner:</b> ${winner.user.kickName || winner.user.telegramUser || "Unknown"}\n` +
-        `📞 <b>Called Slot:</b> ${winner.slotName}\n` +
-        `⏰ <b>Called At:</b> ${winner.createdAt.toLocaleString()}\n\n` +
+        `🏆 <b>Winner:</b> ${winner?.user.kickName || winner?.user.telegramUser || "Unknown"}\n` +
+        `📞 <b>Called Slot:</b> ${winner?.slotName}\n` +
+        `⏰ <b>Called At:</b> ${winner?.createdAt.toLocaleString()}\n\n` +
         `🎯 <b>Total Participants:</b> ${calls.length}`,
       winner
     };
@@ -435,11 +435,11 @@ export const raffleCall = async (
 };
 
 export const setSlotMultiplier = async (
-  prisma: PrismaClient | null,
+  prismaClient: typeof prisma,
   slotName: string,
   multiplier: number
 ): Promise<{ success: boolean; message: string }> => {
-  if (!prisma) {
+  if (!prismaClient) {
     return { success: false, message: "Database not available" };
   }
 
@@ -450,13 +450,13 @@ export const setSlotMultiplier = async (
     }
 
     // Get active session
-    const activeSession = await getActiveSession(prisma);
+    const activeSession = await getActiveSession(prismaClient);
     if (!activeSession) {
       return { success: false, message: "No active session found" };
     }
 
     // Find the call with this slot name
-    const call = await prisma.callEntry.findFirst({
+    const call = await prismaClient.callEntry.findFirst({
       where: {
         sessionId: activeSession.id,
         slotName: slotName
@@ -476,7 +476,7 @@ export const setSlotMultiplier = async (
     }
 
     // Update the multiplier
-    await prisma.callEntry.update({
+    await prismaClient.callEntry.update({
       where: { id: call.id },
       data: { multiplier: multiplier }
     });
@@ -500,15 +500,15 @@ export const setSlotMultiplier = async (
 };
 
 export const getCallboardData = async (
-  prisma: PrismaClient | null
+  prismaClient: typeof prisma
 ): Promise<{ success: boolean; message: string; data?: CallEntry[] }> => {
-  if (!prisma) {
+  if (!prismaClient) {
     return { success: false, message: "Database not available" };
   }
 
   try {
     // Get all calls with multipliers from all sessions
-    const calls = await prisma.callEntry.findMany({
+    const calls = await prismaClient.callEntry.findMany({
       where: {
         multiplier: {
           not: null

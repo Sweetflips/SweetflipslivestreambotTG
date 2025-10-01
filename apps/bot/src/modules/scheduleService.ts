@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma.js";
 import { getDayName } from "../utils/dayName";
 import { formatStreamTimes } from "../utils/timezone";
 
@@ -16,15 +16,15 @@ export interface ScheduleSummary {
 }
 
 export const addScheduleEntry = async (
-  prisma: PrismaClient | null,
+  prismaClient: typeof prisma,
   entry: ScheduleEntry,
   createdBy: string
 ) => {
-  if (!prisma) {
+  if (!prismaClient) {
     return false;
   }
 
-  await prisma.schedule.upsert({
+  await prismaClient.schedule.upsert({
     where: {
       dayOfWeek_streamNumber: {
         dayOfWeek: entry.dayOfWeek,
@@ -48,15 +48,15 @@ export const addScheduleEntry = async (
 };
 
 export const removeScheduleEntry = async (
-  prisma: PrismaClient | null,
+  prismaClient: typeof prisma,
   dayOfWeek: number,
   streamNumber: 1 | 2
 ) => {
-  if (!prisma) {
+  if (!prismaClient) {
     return false;
   }
 
-  await prisma.schedule.update({
+  await prismaClient.schedule.update({
     where: {
       dayOfWeek_streamNumber: {
         dayOfWeek,
@@ -73,13 +73,13 @@ export const removeScheduleEntry = async (
 };
 
 export const getActiveSchedule = async (
-  prisma: PrismaClient | null
+  prismaClient: typeof prisma
 ): Promise<ScheduleSummary[]> => {
-  if (!prisma) {
+  if (!prismaClient) {
     return [];
   }
 
-  const entries = await prisma.schedule.findMany({
+  const entries = await prismaClient.schedule.findMany({
     where: { isActive: true },
     orderBy: [{ dayOfWeek: "asc" }, { streamNumber: "asc" }],
   });
@@ -111,20 +111,20 @@ export interface ScheduleWithDateTime extends ScheduleSummary {
 }
 
 export const getScheduleWithCurrentDayFirst = async (
-  prisma: PrismaClient | null
+  prismaClient: typeof prisma
 ): Promise<{
   schedules: ScheduleWithDateTime[];
   currentDay: string;
   nextStream: string | null;
 }> => {
-  if (!prisma) {
+  if (!prismaClient) {
     return { schedules: [], currentDay: "", nextStream: null };
   }
 
   // Clean up old events first
-  await cleanupOldEvents(prisma);
+  await cleanupOldEvents(prismaClient);
 
-  const entries = await prisma.schedule.findMany({
+  const entries = await prismaClient.schedule.findMany({
     where: { isActive: true },
     orderBy: [{ dayOfWeek: "asc" }, { streamNumber: "asc" }],
   });
@@ -224,9 +224,9 @@ export const getScheduleWithCurrentDayFirst = async (
 };
 
 export const cleanupOldEvents = async (
-  prisma: PrismaClient | null
+  prismaClient: typeof prisma
 ): Promise<void> => {
-  if (!prisma) {
+  if (!prismaClient) {
     return;
   }
 
