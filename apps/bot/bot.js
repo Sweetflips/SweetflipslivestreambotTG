@@ -272,8 +272,8 @@ async function getScheduleWithCurrentDayFirst() {
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
     // Stream times in minutes from midnight UTC
-    const stream1Time = 7 * 60; // 7:00 AM UTC
-    const stream2Time = 17 * 60; // 5:00 PM UTC
+    const stream1Time = 8 * 60; // 8:00 AM UTC
+    const stream2Time = 18 * 60; // 6:00 PM UTC
 
     // Find the next upcoming stream
     let nextStream = null;
@@ -380,8 +380,8 @@ async function cleanupOldEvents() {
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
     // Stream times in minutes from midnight UTC
-    const stream1Time = 7 * 60; // 7:00 AM UTC
-    const stream2Time = 17 * 60; // 5:00 PM UTC
+    const stream1Time = 8 * 60; // 8:00 AM UTC
+    const stream2Time = 18 * 60; // 6:00 PM UTC
 
     // Clean up events from previous days
     const previousDay = (currentDayOfWeek - 1 + 7) % 7;
@@ -547,8 +547,8 @@ async function sendScheduleToAllGroups() {
       }
 
       scheduleMessage += `<b>Stream Times:</b>\n`;
-      scheduleMessage += `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n`;
-      scheduleMessage += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
+      scheduleMessage += `• Stream 1: 8:00 AM UTC (1:30 PM IST, 12:00 AM PST)\n`;
+      scheduleMessage += `• Stream 2: 6:00 PM UTC (11:30 PM IST, 10:00 AM PST)\n\n`;
       scheduleMessage += `🎮 Join us at https://kick.com/sweetflips`;
     }
 
@@ -2600,8 +2600,8 @@ bot.command("schedule", async (ctx) => {
         }
 
         message += `<b>Stream Times:</b>\n`;
-        message += `• Stream 1: 7:00 AM UTC (12:30 PM IST, 11:00 PM PST)\n`;
-        message += `• Stream 2: 5:00 PM UTC (10:30 PM IST, 9:00 AM PST)\n\n`;
+        message += `• Stream 1: 8:00 AM UTC (1:30 PM IST, 12:00 AM PST)\n`;
+        message += `• Stream 2: 6:00 PM UTC (11:30 PM IST, 10:00 AM PST)\n\n`;
         message += `🎮 Join us at https://kick.com/sweetflips`;
 
         await ctx.reply(message, { parse_mode: "HTML" });
