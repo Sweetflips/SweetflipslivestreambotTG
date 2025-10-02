@@ -23,20 +23,27 @@ try {
 
 // Function to wait for database to be ready
 async function waitForDatabase() {
-  if (!prisma) return false;
+  if (!prisma) {
+    console.log("❌ Prisma client not initialized");
+    return false;
+  }
 
   let retries = 0;
   const maxRetries = 10;
 
   while (retries < maxRetries) {
     try {
+      // Try to connect first
+      await prisma.$connect();
+      console.log("✅ Database connected");
+      
       // Try to query a simple table to check if database is ready
       await prisma.$queryRaw`SELECT 1`;
       console.log("✅ Database is ready");
       return true;
     } catch (error) {
       retries++;
-      console.log(`⏳ Waiting for database... (${retries}/${maxRetries})`);
+      console.log(`⏳ Waiting for database... (${retries}/${maxRetries}) - Error: ${error.message}`);
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
