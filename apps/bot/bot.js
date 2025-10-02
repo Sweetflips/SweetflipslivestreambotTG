@@ -13,6 +13,8 @@ let guessService = null;
 
 // Initialize Prisma client
 try {
+  console.log("🔧 Initializing Prisma client...");
+  console.log("📊 DATABASE_URL:", process.env.DATABASE_URL ? "Set" : "Not set");
   prisma = createPrismaClient();
   console.log("✅ Database connection initialized");
 } catch (error) {
@@ -36,14 +38,16 @@ async function waitForDatabase() {
       // Try to connect first
       await prisma.$connect();
       console.log("✅ Database connected");
-      
+
       // Try to query a simple table to check if database is ready
       await prisma.$queryRaw`SELECT 1`;
       console.log("✅ Database is ready");
       return true;
     } catch (error) {
       retries++;
-      console.log(`⏳ Waiting for database... (${retries}/${maxRetries}) - Error: ${error.message}`);
+      console.log(
+        `⏳ Waiting for database... (${retries}/${maxRetries}) - Error: ${error.message}`
+      );
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
@@ -800,6 +804,7 @@ console.log("✅ Bot configured to use database storage only");
 // Helper functions
 async function getUserOrCreate(telegramId, telegramUser) {
   console.log(`🔍 getUserOrCreate called for: ${telegramUser} (${telegramId})`);
+  console.log(`🔍 Prisma client status: ${prisma ? 'Available' : 'Not available'}`);
 
   // If database is not available, return a mock user and sync to Google Sheets
   if (!prisma) {
@@ -867,13 +872,7 @@ async function getUserOrCreate(telegramId, telegramUser) {
       kickName: null,
     };
 
-    // Try to sync mock user to Google Sheets
-    try {
-      await syncToGoogleSheets(mockUser);
-    } catch (error) {
-      console.error("❌ Error syncing mock user to Google Sheets:", error);
-      // Continue with mock user even if Google Sheets fails
-    }
+    // Google Sheets sync removed - using database storage instead
 
     return mockUser;
   }
