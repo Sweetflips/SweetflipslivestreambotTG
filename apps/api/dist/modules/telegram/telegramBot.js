@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma.js';
 import { Telegraf } from 'telegraf';
 import { AuthService, createRBACMiddleware } from '../../auth/rbac.js';
 import { getEnv } from '../../config/env.js';
@@ -12,13 +12,11 @@ import { TelegramCommands } from './commands.js';
 import { TelegramContext, authMiddleware, commandValidationMiddleware, errorMiddleware, idempotencyMiddleware, loggingMiddleware, rateLimitMiddleware, } from './middlewares.js';
 const env = getEnv();
 export class TelegramBot {
-    prisma;
     redis;
     rateLimiter;
     bot;
     commands;
-    constructor(prisma, redis, rateLimiter) {
-        this.prisma = prisma;
+    constructor(redis, rateLimiter) {
         this.redis = redis;
         this.rateLimiter = rateLimiter;
         this.bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);

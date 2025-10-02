@@ -26,7 +26,9 @@ export interface CallSession {
 const activeSessions = new Map<string, CallSession>();
 
 // Database health check function
-export const checkDatabaseHealth = async (prismaClient: typeof prisma): Promise<{ healthy: boolean; error?: string }> => {
+export const checkDatabaseHealth = async (
+  prismaClient: typeof prisma
+): Promise<{ healthy: boolean; error?: string }> => {
   if (!prismaClient) {
     return { healthy: false, error: "Prisma client is null" };
   }
@@ -34,18 +36,21 @@ export const checkDatabaseHealth = async (prismaClient: typeof prisma): Promise<
   try {
     // Test basic connection
     await prismaClient.$queryRaw`SELECT 1`;
-    
+
     // Test if call_sessions table exists and is accessible using Prisma ORM
     await prismaClient.callSession.findFirst();
-    
+
     return { healthy: true };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return { healthy: false, error: errorMessage };
   }
 };
 
-export const createNewSession = async (prismaClient: typeof prisma): Promise<CallSession | null> => {
+export const createNewSession = async (
+  prismaClient: typeof prisma
+): Promise<CallSession | null> => {
   if (!prismaClient) {
     console.error("❌ Prisma client is null - database not available");
     return null;
@@ -54,23 +59,23 @@ export const createNewSession = async (prismaClient: typeof prisma): Promise<Cal
   try {
     // Test database connection first
     await prismaClient.$queryRaw`SELECT 1`;
-    
+
     // Close any existing open sessions using Prisma ORM
     await prismaClient.callSession.updateMany({
       where: { status: "OPEN" },
-      data: { 
+      data: {
         status: "CLOSED",
         closedAt: new Date(),
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     // Create new session using Prisma ORM
     const newSession = await prismaClient.callSession.create({
       data: {
         sessionName: `Session_${Date.now()}`,
-        status: "OPEN"
-      }
+        status: "OPEN",
+      },
     });
 
     const session: CallSession = {
@@ -80,7 +85,7 @@ export const createNewSession = async (prismaClient: typeof prisma): Promise<Cal
       createdAt: newSession.createdAt,
       closedAt: newSession.closedAt,
       revealedAt: newSession.revealedAt,
-      callEntries: []
+      callEntries: [],
     };
 
     // Store in memory
@@ -90,27 +95,37 @@ export const createNewSession = async (prismaClient: typeof prisma): Promise<Cal
     return session;
   } catch (error) {
     console.error("❌ Error creating new Call Session:", error);
-    
+
     // Provide more specific error information
     if (error instanceof Error) {
-      if (error.message.includes('connect')) {
+      if (error.message.includes("connect")) {
         console.error("❌ Database connection failed");
-      } else if (error.message.includes('relation') || error.message.includes('table')) {
+      } else if (
+        error.message.includes("relation") ||
+        error.message.includes("table")
+      ) {
         console.error("❌ Database schema issue - table may not exist");
-      } else if (error.message.includes('permission')) {
+      } else if (error.message.includes("permission")) {
         console.error("❌ Database permission issue");
-      } else if (error.message.includes('column') && error.message.includes('does not exist')) {
-        console.error("❌ Database schema mismatch - missing columns. Run Prisma migration.");
+      } else if (
+        error.message.includes("column") &&
+        error.message.includes("does not exist")
+      ) {
+        console.error(
+          "❌ Database schema mismatch - missing columns. Run Prisma migration."
+        );
       } else {
         console.error(`❌ Database error: ${error.message}`);
       }
     }
-    
+
     return null;
   }
 };
 
-export const getActiveSession = async (prismaClient: typeof prisma): Promise<CallSession | null> => {
+export const getActiveSession = async (
+  prismaClient: typeof prisma
+): Promise<CallSession | null> => {
   if (!prismaClient) {
     return null;
   }
@@ -132,14 +147,14 @@ export const getActiveSession = async (prismaClient: typeof prisma): Promise<Cal
             user: {
               select: {
                 telegramUser: true,
-                kickName: true
-              }
-            }
+                kickName: true,
+              },
+            },
           },
-          orderBy: { createdAt: "asc" }
-        }
+          orderBy: { createdAt: "asc" },
+        },
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     if (dbSession) {
@@ -150,7 +165,7 @@ export const getActiveSession = async (prismaClient: typeof prisma): Promise<Cal
         createdAt: dbSession.createdAt,
         closedAt: dbSession.closedAt,
         revealedAt: dbSession.revealedAt,
-        callEntries: dbSession.callEntries.map(entry => ({
+        callEntries: dbSession.callEntries.map((entry) => ({
           id: entry.id,
           userId: entry.userId,
           slotName: entry.slotName,
@@ -158,9 +173,9 @@ export const getActiveSession = async (prismaClient: typeof prisma): Promise<Cal
           createdAt: entry.createdAt,
           user: {
             telegramUser: entry.user.telegramUser,
-            kickName: entry.user.kickName
-          }
-        }))
+            kickName: entry.user.kickName,
+          },
+        })),
       };
 
       // Store in memory
@@ -190,9 +205,10 @@ export const makeCall = async (
     if (!activeSession) {
       const newSession = await createNewSession(prismaClient);
       if (!newSession) {
-        return { 
-          success: false, 
-          message: "Failed to create new session. Please check database connection and try again." 
+        return {
+          success: false,
+          message:
+            "Failed to create new session. Please check database connection and try again.",
         };
       }
       activeSession = newSession;
@@ -204,7 +220,10 @@ export const makeCall = async (
     }
 
     if (slotName.length > 50) {
-      return { success: false, message: "Slot name must be 50 characters or less" };
+      return {
+        success: false,
+        message: "Slot name must be 50 characters or less",
+      };
     }
 
     const trimmedSlotName = slotName.trim();
@@ -213,24 +232,30 @@ export const makeCall = async (
     const existingUserCall = await prismaClient.callEntry.findFirst({
       where: {
         sessionId: activeSession.id,
-        userId: userId
-      }
+        userId: userId,
+      },
     });
 
     if (existingUserCall) {
-      return { success: false, message: "You have already called a slot in this session" };
+      return {
+        success: false,
+        message: "You have already called a slot in this session",
+      };
     }
 
     // Check if slot name is already taken
     const existingSlotCall = await prismaClient.callEntry.findFirst({
       where: {
         sessionId: activeSession.id,
-        slotName: trimmedSlotName
-      }
+        slotName: trimmedSlotName,
+      },
     });
 
     if (existingSlotCall) {
-      return { success: false, message: `Slot "${trimmedSlotName}" is already taken` };
+      return {
+        success: false,
+        message: `Slot "${trimmedSlotName}" is already taken`,
+      };
     }
 
     // Create the call entry
@@ -238,16 +263,16 @@ export const makeCall = async (
       data: {
         sessionId: activeSession.id,
         userId: userId,
-        slotName: trimmedSlotName
+        slotName: trimmedSlotName,
       },
       include: {
         user: {
           select: {
             telegramUser: true,
-            kickName: true
-          }
-        }
-      }
+            kickName: true,
+          },
+        },
+      },
     });
 
     // Update in-memory cache
@@ -261,20 +286,22 @@ export const makeCall = async (
         createdAt: newCall.createdAt,
         user: {
           telegramUser: newCall.user.telegramUser,
-          kickName: newCall.user.kickName
-        }
+          kickName: newCall.user.kickName,
+        },
       });
     }
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       message: `Successfully called slot "${trimmedSlotName}"!`,
-      sessionId: activeSession.id
+      sessionId: activeSession.id,
     };
-
   } catch (error) {
     console.error("Error making Call Entry:", error);
-    return { success: false, message: "An error occurred while making your call" };
+    return {
+      success: false,
+      message: "An error occurred while making your call",
+    };
   }
 };
 
@@ -299,22 +326,22 @@ export const getSessionCalls = async (
     }
 
     const calls = await prismaClient.callEntry.findMany({
-      where: { 
+      where: {
         sessionId: targetSessionId,
-        isArchived: false
+        isArchived: false,
       },
       include: {
         user: {
           select: {
             telegramUser: true,
-            kickName: true
-          }
-        }
+            kickName: true,
+          },
+        },
       },
-      orderBy: { createdAt: "asc" }
+      orderBy: { createdAt: "asc" },
     });
 
-    return calls.map(call => ({
+    return calls.map((call) => ({
       id: call.id,
       userId: call.userId,
       slotName: call.slotName,
@@ -322,17 +349,19 @@ export const getSessionCalls = async (
       createdAt: call.createdAt,
       user: {
         telegramUser: call.user.telegramUser,
-        kickName: call.user.kickName
-      }
+        kickName: call.user.kickName,
+      },
     }));
-
   } catch (error) {
     console.error("Error getting session calls:", error);
     return [];
   }
 };
 
-export const closeSession = async (prismaClient: typeof prisma, sessionId?: string): Promise<boolean> => {
+export const closeSession = async (
+  prismaClient: typeof prisma,
+  sessionId?: string
+): Promise<boolean> => {
   if (!prismaClient) {
     return false;
   }
@@ -354,8 +383,8 @@ export const closeSession = async (prismaClient: typeof prisma, sessionId?: stri
       data: {
         status: "CLOSED",
         closedAt: new Date(),
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     // Update in-memory cache
@@ -378,15 +407,18 @@ export const formatCallsDisplay = (calls: CallEntry[]): string => {
   }
 
   let message = `📞 <b>Sweet Calls - Current Session</b>\n\n`;
-  
+
   calls.forEach((call, index) => {
-    const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
+    const displayName =
+      call.user.kickName || call.user.telegramUser || "Unknown";
     const multiplierText = call.multiplier ? ` (${call.multiplier}x)` : "";
-    message += `${index + 1}. <b>${call.slotName}</b> - ${displayName}${multiplierText}\n`;
+    message += `${index + 1}. <b>${
+      call.slotName
+    }</b> - ${displayName}${multiplierText}\n`;
   });
 
   message += `\n📊 Total calls: ${calls.length}`;
-  
+
   return message;
 };
 
@@ -420,14 +452,16 @@ export const raffleCall = async (
 
     return {
       success: true,
-      message: `🎉 <b>Raffle Winner!</b>\n\n` +
-        `🏆 <b>Winner:</b> ${winner?.user.kickName || winner?.user.telegramUser || "Unknown"}\n` +
+      message:
+        `🎉 <b>Raffle Winner!</b>\n\n` +
+        `🏆 <b>Winner:</b> ${
+          winner?.user.kickName || winner?.user.telegramUser || "Unknown"
+        }\n` +
         `📞 <b>Called Slot:</b> ${winner?.slotName}\n` +
         `⏰ <b>Called At:</b> ${winner?.createdAt.toLocaleString()}\n\n` +
         `🎯 <b>Total Participants:</b> ${calls.length}`,
-      winner
+      winner,
     };
-
   } catch (error) {
     console.error("Error in raffle call:", error);
     return { success: false, message: "An error occurred during the raffle" };
@@ -446,7 +480,10 @@ export const setSlotMultiplier = async (
   try {
     // Validate multiplier
     if (multiplier < 0 || multiplier > 1000) {
-      return { success: false, message: "Multiplier must be between 0 and 1000" };
+      return {
+        success: false,
+        message: "Multiplier must be between 0 and 1000",
+      };
     }
 
     // Get active session
@@ -459,43 +496,50 @@ export const setSlotMultiplier = async (
     const call = await prismaClient.callEntry.findFirst({
       where: {
         sessionId: activeSession.id,
-        slotName: slotName
+        slotName: slotName,
       },
       include: {
         user: {
           select: {
             telegramUser: true,
-            kickName: true
-          }
-        }
-      }
+            kickName: true,
+          },
+        },
+      },
     });
 
     if (!call) {
-      return { success: false, message: `Slot "${slotName}" not found in current session` };
+      return {
+        success: false,
+        message: `Slot "${slotName}" not found in current session`,
+      };
     }
 
     // Update the multiplier
     await prismaClient.callEntry.update({
       where: { id: call.id },
-      data: { multiplier: multiplier }
+      data: { multiplier: multiplier },
     });
 
-    const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
+    const displayName =
+      call.user.kickName || call.user.telegramUser || "Unknown";
     const action = call.multiplier === null ? "set" : "updated";
 
     return {
       success: true,
-      message: `✅ <b>Multiplier ${action}!</b>\n\n` +
+      message:
+        `✅ <b>Multiplier ${action}!</b>\n\n` +
         `📞 <b>Slot:</b> ${slotName}\n` +
         `👤 <b>User:</b> ${displayName}\n` +
         `🎯 <b>Multiplier:</b> ${multiplier}x\n\n` +
-        `🎮 <b>Action:</b> ${action}`
+        `🎮 <b>Action:</b> ${action}`,
     };
-
   } catch (error) {
     console.error("Error setting slot multiplier:", error);
-    return { success: false, message: "An error occurred while setting the multiplier" };
+    return {
+      success: false,
+      message: "An error occurred while setting the multiplier",
+    };
   }
 };
 
@@ -511,49 +555,51 @@ export const getCallboardData = async (
     const calls = await prismaClient.callEntry.findMany({
       where: {
         multiplier: {
-          not: null
+          not: null,
         },
-        isArchived: false
+        isArchived: false,
       },
       include: {
         user: {
           select: {
             telegramUser: true,
-            kickName: true
-          }
+            kickName: true,
+          },
         },
         session: {
           select: {
             id: true,
-            createdAt: true
-          }
-        }
+            createdAt: true,
+          },
+        },
       },
       orderBy: {
-        multiplier: "desc"
+        multiplier: "desc",
       },
-      take: 10 // Top 10 results
+      take: 10, // Top 10 results
     });
 
     if (calls.length === 0) {
       return {
         success: true,
-        message: `🏆 <b>Sweet Calls Leaderboard</b>\n\n` +
+        message:
+          `🏆 <b>Sweet Calls Leaderboard</b>\n\n` +
           `📊 <b>No calls with multipliers found</b>\n\n` +
-          `💡 <b>Tip:</b> Use <code>/sc &lt;slot name&gt; &lt;multiplier&gt;</code> to set multipliers!`
+          `💡 <b>Tip:</b> Use <code>/sc &lt;slot name&gt; &lt;multiplier&gt;</code> to set multipliers!`,
       };
     }
 
     // Format the leaderboard
     let message = `🏆 <b>Sweet Calls Leaderboard</b>\n\n`;
-    
+
     calls.forEach((call, index) => {
-      const displayName = call.user.kickName || call.user.telegramUser || "Unknown";
+      const displayName =
+        call.user.kickName || call.user.telegramUser || "Unknown";
       const rank = index + 1;
       const isTop5 = rank <= 5;
       const prizeText = isTop5 ? " 💰" : "";
       const rankEmoji = isTop5 ? "🥇🥈🥉🏅🏅".split("")[index] : "🔸";
-      
+
       message += `${rankEmoji} <b>#${rank}</b> ${displayName}${prizeText}\n`;
       message += `   📞 <b>${call.slotName}</b> - <b>${call.multiplier}x</b>\n`;
       message += `   📅 ${call.session.createdAt.toLocaleDateString()}\n\n`;
@@ -566,7 +612,7 @@ export const getCallboardData = async (
     return {
       success: true,
       message: message,
-      data: calls.map(call => ({
+      data: calls.map((call) => ({
         id: call.id,
         userId: call.userId,
         slotName: call.slotName,
@@ -574,13 +620,15 @@ export const getCallboardData = async (
         createdAt: call.createdAt,
         user: {
           telegramUser: call.user.telegramUser,
-          kickName: call.user.kickName
-        }
-      }))
+          kickName: call.user.kickName,
+        },
+      })),
     };
-
   } catch (error) {
     console.error("Error getting callboard data:", error);
-    return { success: false, message: "An error occurred while loading the leaderboard" };
+    return {
+      success: false,
+      message: "An error occurred while loading the leaderboard",
+    };
   }
 };

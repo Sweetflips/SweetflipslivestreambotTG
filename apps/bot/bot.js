@@ -4182,7 +4182,7 @@ async function startBot() {
     } else {
       // Initialize GuessService for database storage
       try {
-        const { GuessService } = await import("./dist/guessService.js");
+        const { GuessService } = await import("./guessService.js");
         guessService = new GuessService(prisma);
         console.log("✅ GuessService initialized for database storage");
       } catch (error) {

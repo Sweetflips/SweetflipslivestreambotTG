@@ -1,12 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import { getEnv } from '../../config/env.js';
+import { ScheduleService } from '../../services/scheduleService.js';
 import { logGameEvent, logUserAction, logger } from '../../telemetry/logger.js';
 import { BonusService } from '../games/bonus/bonusService.js';
 import { GuessCommands } from '../games/guess/guessCommands.js';
 import { TriviaService } from '../games/trivia/triviaService.js';
 import { LinkService } from '../linking/linkService.js';
 import { PayoutService } from '../payouts/payoutService.js';
-import { ScheduleService } from '../../services/scheduleService.js';
 import { TelegramContext } from './middlewares.js';
 const env = getEnv();
 export class TelegramCommands {
@@ -571,7 +571,9 @@ export class TelegramCommands {
         try {
             const schedule = await this.scheduleService.addScheduleEntry(dayOfWeek, streamNumber, eventTitle, ctx.user.id);
             const streamTime = await this.scheduleService.getStreamTime(streamNumber);
-            const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute.toString().padStart(2, '0')} ${streamTime.timezone}`;
+            const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute
+                .toString()
+                .padStart(2, '0')} ${streamTime.timezone}`;
             const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             await ctx.reply(`✅ **Schedule Entry Added**\n\n` +
                 `Day: ${days[dayOfWeek]}\n` +
@@ -580,7 +582,7 @@ export class TelegramCommands {
             logUserAction('schedule_entry_added', ctx.user.id, {
                 dayOfWeek,
                 streamNumber,
-                eventTitle
+                eventTitle,
             });
         }
         catch (error) {
@@ -610,14 +612,14 @@ export class TelegramCommands {
         try {
             await this.scheduleService.removeScheduleEntry(dayOfWeek, streamNumber);
             const streamTime = await this.scheduleService.getStreamTime(streamNumber);
-            const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute.toString().padStart(2, '0')} ${streamTime.timezone}`;
+            const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute
+                .toString()
+                .padStart(2, '0')} ${streamTime.timezone}`;
             const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            await ctx.reply(`✅ **Schedule Entry Removed**\n\n` +
-                `Day: ${days[dayOfWeek]}\n` +
-                `Time: ${timeStr}`, { parse_mode: 'Markdown' });
+            await ctx.reply(`✅ **Schedule Entry Removed**\n\n` + `Day: ${days[dayOfWeek]}\n` + `Time: ${timeStr}`, { parse_mode: 'Markdown' });
             logUserAction('schedule_entry_removed', ctx.user.id, {
                 dayOfWeek,
-                streamNumber
+                streamNumber,
             });
         }
         catch (error) {

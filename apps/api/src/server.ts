@@ -1,8 +1,8 @@
-import { connectDatabase, disconnectDatabase, checkDatabaseHealth } from './config/database.js';
 import Fastify from 'fastify';
 import Redis from 'ioredis';
 import { Server as SocketIOServer } from 'socket.io';
 import { AuthService, createRBACPreHandler } from './auth/rbac.js';
+import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { getEnv } from './config/env.js';
 import { BonusService } from './modules/games/bonus/bonusService.js';
 import { TriviaService } from './modules/games/trivia/triviaService.js';
@@ -91,12 +91,16 @@ export class Server {
     });
 
     // Admin endpoints
-    this.fastify.post('/admin/recompute', {
-      preHandler: createRBACPreHandler('OWNER' as any),
-    }, async (request: any, reply: any) => {
-      // Recompute game results logic would go here
-      return { message: 'Recomputation completed' };
-    });
+    this.fastify.post(
+      '/admin/recompute',
+      {
+        preHandler: createRBACPreHandler('OWNER' as any),
+      },
+      async (request: any, reply: any) => {
+        // Recompute game results logic would go here
+        return { message: 'Recomputation completed' };
+      }
+    );
 
     // Link verification endpoint
     this.fastify.post('/link/verify', async (request: any, reply: any) => {
@@ -132,55 +136,67 @@ export class Server {
       }
     });
 
-    this.fastify.post('/call-sessions/create', {
-      preHandler: createRBACPreHandler('MOD' as any),
-    }, async (request: any, reply: any) => {
-      try {
-        const newSession = await this.callSessionService.createNewCallSession();
-        if (!newSession) {
+    this.fastify.post(
+      '/call-sessions/create',
+      {
+        preHandler: createRBACPreHandler('MOD' as any),
+      },
+      async (request: any, reply: any) => {
+        try {
+          const newSession = await this.callSessionService.createNewCallSession();
+          if (!newSession) {
+            reply.code(500);
+            return { success: false, message: 'Failed to create new session' };
+          }
+          return { success: true, session: newSession };
+        } catch (error) {
           reply.code(500);
-          return { success: false, message: 'Failed to create new session' };
+          return { success: false, message: 'Error creating session', error: error.message };
         }
-        return { success: true, session: newSession };
-      } catch (error) {
-        reply.code(500);
-        return { success: false, message: 'Error creating session', error: error.message };
       }
-    });
+    );
 
-    this.fastify.post('/call-sessions/:sessionId/close', {
-      preHandler: createRBACPreHandler('MOD' as any),
-    }, async (request: any, reply: any) => {
-      try {
-        const { sessionId } = request.params;
-        const success = await this.callSessionService.closeCallSession(sessionId);
-        if (!success) {
+    this.fastify.post(
+      '/call-sessions/:sessionId/close',
+      {
+        preHandler: createRBACPreHandler('MOD' as any),
+      },
+      async (request: any, reply: any) => {
+        try {
+          const { sessionId } = request.params;
+          const success = await this.callSessionService.closeCallSession(sessionId);
+          if (!success) {
+            reply.code(500);
+            return { success: false, message: 'Failed to close session' };
+          }
+          return { success: true, message: 'Session closed successfully' };
+        } catch (error) {
           reply.code(500);
-          return { success: false, message: 'Failed to close session' };
+          return { success: false, message: 'Error closing session', error: error.message };
         }
-        return { success: true, message: 'Session closed successfully' };
-      } catch (error) {
-        reply.code(500);
-        return { success: false, message: 'Error closing session', error: error.message };
       }
-    });
+    );
 
-    this.fastify.post('/call-sessions/:sessionId/reveal', {
-      preHandler: createRBACPreHandler('MOD' as any),
-    }, async (request: any, reply: any) => {
-      try {
-        const { sessionId } = request.params;
-        const success = await this.callSessionService.revealCallSession(sessionId);
-        if (!success) {
+    this.fastify.post(
+      '/call-sessions/:sessionId/reveal',
+      {
+        preHandler: createRBACPreHandler('MOD' as any),
+      },
+      async (request: any, reply: any) => {
+        try {
+          const { sessionId } = request.params;
+          const success = await this.callSessionService.revealCallSession(sessionId);
+          if (!success) {
+            reply.code(500);
+            return { success: false, message: 'Failed to reveal session' };
+          }
+          return { success: true, message: 'Session revealed successfully' };
+        } catch (error) {
           reply.code(500);
-          return { success: false, message: 'Failed to reveal session' };
+          return { success: false, message: 'Error revealing session', error: error.message };
         }
-        return { success: true, message: 'Session revealed successfully' };
-      } catch (error) {
-        reply.code(500);
-        return { success: false, message: 'Error revealing session', error: error.message };
       }
-    });
+    );
 
     this.fastify.post('/call-entries', async (request: any, reply: any) => {
       try {
@@ -189,7 +205,7 @@ export class Server {
           reply.code(400);
           return { success: false, message: 'userId and slotName are required' };
         }
-        
+
         const result = await this.callSessionService.makeCallEntry(userId, slotName);
         if (!result.success) {
           reply.code(400);
@@ -212,29 +228,37 @@ export class Server {
       }
     });
 
-    this.fastify.post('/call-entries/:sessionId/:slotName/multiplier', {
-      preHandler: createRBACPreHandler('MOD' as any),
-    }, async (request: any, reply: any) => {
-      try {
-        const { sessionId, slotName } = request.params;
-        const { multiplier } = request.body;
-        
-        if (typeof multiplier !== 'number') {
-          reply.code(400);
-          return { success: false, message: 'multiplier must be a number' };
-        }
-        
-        const success = await this.callSessionService.setSlotMultiplier(sessionId, slotName, multiplier);
-        if (!success) {
+    this.fastify.post(
+      '/call-entries/:sessionId/:slotName/multiplier',
+      {
+        preHandler: createRBACPreHandler('MOD' as any),
+      },
+      async (request: any, reply: any) => {
+        try {
+          const { sessionId, slotName } = request.params;
+          const { multiplier } = request.body;
+
+          if (typeof multiplier !== 'number') {
+            reply.code(400);
+            return { success: false, message: 'multiplier must be a number' };
+          }
+
+          const success = await this.callSessionService.setSlotMultiplier(
+            sessionId,
+            slotName,
+            multiplier
+          );
+          if (!success) {
+            reply.code(500);
+            return { success: false, message: 'Failed to set multiplier' };
+          }
+          return { success: true, message: 'Multiplier set successfully' };
+        } catch (error) {
           reply.code(500);
-          return { success: false, message: 'Failed to set multiplier' };
+          return { success: false, message: 'Error setting multiplier', error: error.message };
         }
-        return { success: true, message: 'Multiplier set successfully' };
-      } catch (error) {
-        reply.code(500);
-        return { success: false, message: 'Error setting multiplier', error: error.message };
       }
-    });
+    );
   }
 
   private setupErrorHandling() {

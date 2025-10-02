@@ -1,4 +1,5 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
+import { prisma } from './lib/prisma.js';
 import { FastifyInstance } from 'fastify';
 import { createRBACPreHandler } from './auth/rbac.js';
 import { BonusController } from './modules/games/bonus/bonusController.js';
@@ -10,7 +11,6 @@ import { LinkService } from './modules/linking/linkService.js';
 import { ScheduleController } from './modules/schedule/scheduleController.js';
 import { ScheduleService } from './services/scheduleService.js';
 export async function registerRoutes(fastify) {
-    const prisma = fastify.prisma;
     // Initialize services and controllers
     const bonusService = new BonusService(prisma);
     const triviaService = new TriviaService(prisma);
@@ -68,7 +68,7 @@ export async function registerRoutes(fastify) {
         fastify.get('/stats', async (request, reply) => {
             try {
                 const stats = await prisma.$transaction(async (tx) => {
-                    const [totalUsers, totalGames, totalAwards, activeGames,] = await Promise.all([
+                    const [totalUsers, totalGames, totalAwards, activeGames] = await Promise.all([
                         tx.user.count(),
                         tx.game.count(),
                         tx.award.count(),

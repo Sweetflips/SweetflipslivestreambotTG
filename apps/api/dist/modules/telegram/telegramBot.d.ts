@@ -1,12 +1,10 @@
-import { PrismaClient } from '@prisma/client';
 import { RateLimiter } from '../../utils/rateLimit.js';
 export declare class TelegramBot {
-    private prisma;
     private redis;
     private rateLimiter;
     private bot;
     private commands;
-    constructor(prisma: PrismaClient, redis: any, rateLimiter: RateLimiter);
+    constructor(redis: any, rateLimiter: RateLimiter);
     private setupMiddlewares;
     private setupCommands;
     setupWebhook(): Promise<void>;

@@ -1,4 +1,4 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ScheduleService } from '../../services/scheduleService.js';
 export declare class ScheduleController {
     private scheduleService;

@@ -4,7 +4,7 @@ export class ScheduleService {
     prisma;
     streamTimes = [
         { hour: 8, minute: 0, timezone: 'UTC' }, // 8am UTC
-        { hour: 18, minute: 0, timezone: 'UTC' } // 6pm UTC
+        { hour: 18, minute: 0, timezone: 'UTC' }, // 6pm UTC
     ];
     constructor(prisma) {
         this.prisma = prisma;
@@ -13,10 +13,7 @@ export class ScheduleService {
         try {
             const schedules = await this.prisma.schedule.findMany({
                 where: { isActive: true },
-                orderBy: [
-                    { dayOfWeek: 'asc' },
-                    { streamNumber: 'asc' }
-                ]
+                orderBy: [{ dayOfWeek: 'asc' }, { streamNumber: 'asc' }],
             });
             return schedules;
         }
@@ -40,21 +37,21 @@ export class ScheduleService {
                 where: {
                     dayOfWeek_streamNumber: {
                         dayOfWeek,
-                        streamNumber
-                    }
+                        streamNumber,
+                    },
                 },
                 update: {
                     eventTitle,
                     isActive: true,
-                    createdBy
+                    createdBy: createdBy || null,
                 },
                 create: {
                     dayOfWeek,
                     streamNumber,
                     eventTitle,
                     isActive: true,
-                    createdBy
-                }
+                    createdBy: createdBy || null,
+                },
             });
             logger.info(`Schedule entry added: ${dayOfWeek}-${streamNumber} - ${eventTitle}`);
             return schedule;
@@ -69,11 +66,11 @@ export class ScheduleService {
             await this.prisma.schedule.updateMany({
                 where: {
                     dayOfWeek,
-                    streamNumber
+                    streamNumber,
                 },
                 data: {
-                    isActive: false
-                }
+                    isActive: false,
+                },
             });
             logger.info(`Schedule entry removed: ${dayOfWeek}-${streamNumber}`);
         }
@@ -86,7 +83,11 @@ export class ScheduleService {
         if (streamNumber < 1 || streamNumber > 2) {
             throw new Error('Stream number must be 1 or 2');
         }
-        return this.streamTimes[streamNumber - 1];
+        const streamTime = this.streamTimes[streamNumber - 1];
+        if (!streamTime) {
+            throw new Error('Invalid stream number');
+        }
+        return streamTime;
     }
     async getAllStreamTimes() {
         return [...this.streamTimes];
@@ -103,8 +104,12 @@ export class ScheduleService {
             message += `**${days[day]}:**\n`;
             for (const schedule of daySchedules) {
                 const streamTime = this.streamTimes[schedule.streamNumber - 1];
-                const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute.toString().padStart(2, '0')} ${streamTime.timezone}`;
-                message += `  ${schedule.streamNumber}. ${timeStr} - ${schedule.eventTitle}\n`;
+                if (streamTime) {
+                    const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute
+                        .toString()
+                        .padStart(2, '0')} ${streamTime.timezone}`;
+                    message += `  ${schedule.streamNumber}. ${timeStr} - ${schedule.eventTitle}\n`;
+                }
             }
             message += '\n';
         }
@@ -122,15 +127,17 @@ export class ScheduleService {
                 const daySchedules = schedules.filter(s => s.dayOfWeek === dayOfWeek);
                 for (const schedule of daySchedules) {
                     const streamTime = this.streamTimes[schedule.streamNumber - 1];
-                    const streamDate = new Date(checkDate);
-                    streamDate.setUTCHours(streamTime.hour, streamTime.minute, 0, 0);
-                    nextStreams.push({
-                        date: streamDate,
-                        dayOfWeek,
-                        streamNumber: schedule.streamNumber,
-                        eventTitle: schedule.eventTitle,
-                        streamTime
-                    });
+                    if (streamTime) {
+                        const streamDate = new Date(checkDate);
+                        streamDate.setUTCHours(streamTime.hour, streamTime.minute, 0, 0);
+                        nextStreams.push({
+                            date: streamDate,
+                            dayOfWeek,
+                            streamNumber: schedule.streamNumber,
+                            eventTitle: schedule.eventTitle,
+                            streamTime,
+                        });
+                    }
                 }
             }
             return nextStreams.sort((a, b) => a.date.getTime() - b.date.getTime());
