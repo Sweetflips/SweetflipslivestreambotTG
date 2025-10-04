@@ -4,7 +4,7 @@ declare global {
   var __prisma: PrismaClient | undefined;
 }
 
-const createPrismaClient = () => {
+export const createPrismaClient = () => {
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     errorFormat: 'pretty',

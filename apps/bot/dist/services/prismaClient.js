@@ -1,4 +1,4 @@
-import { prisma } from '../lib/prisma.js';
+import { createPrismaClient as createPrisma } from '../lib/prisma.js';
 export const createPrismaClient = () => {
-    return prisma;
+    return createPrisma();
 };

@@ -3889,9 +3889,7 @@ async function makeSweetCall(userId, slotName) {
 
   try {
     // Import the updated service functions
-    const { makeCall } = await import(
-      "./dist/modules/sweetCallsService.js"
-    );
+    const { makeCall } = await import("./dist/modules/sweetCallsService.js");
 
     // Use the new service function
     const result = await makeCall(prisma, userId, slotName);
@@ -4001,9 +3999,7 @@ async function runSweetCallsRaffle() {
 
   try {
     // Import the updated service functions
-    const { raffleCall } = await import(
-      "./dist/modules/sweetCallsService.js"
-    );
+    const { raffleCall } = await import("./dist/modules/sweetCallsService.js");
 
     // Use the new service function
     const result = await raffleCall(prisma);

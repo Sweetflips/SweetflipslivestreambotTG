@@ -125,23 +125,23 @@ export const getScheduleWithCurrentDayFirst = async (prismaClient) => {
     const reorderedEntries = [];
     // Add current day entries first
     const currentDaySchedules = entries.filter((entry) => entry.dayOfWeek === currentDayOfWeek);
-    reorderedEntries.push(...currentDaySchedules.map(entry => ({
+    reorderedEntries.push(...currentDaySchedules.map((entry) => ({
         ...entry,
         day: getDayName(entry.dayOfWeek),
         stream: entry.streamNumber,
         event: entry.eventTitle,
-        times: formatStreamTimes(entry.dayOfWeek.toString(), entry.streamNumber)
+        times: formatStreamTimes(entry.dayOfWeek.toString(), entry.streamNumber),
     })));
     // Add remaining days in order
     for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
         const checkDay = (currentDayOfWeek + dayOffset) % 7;
         const daySchedules = entries.filter((entry) => entry.dayOfWeek === checkDay);
-        reorderedEntries.push(...daySchedules.map(entry => ({
+        reorderedEntries.push(...daySchedules.map((entry) => ({
             ...entry,
             day: getDayName(entry.dayOfWeek),
             stream: entry.streamNumber,
             event: entry.eventTitle,
-            times: formatStreamTimes(entry.dayOfWeek.toString(), entry.streamNumber)
+            times: formatStreamTimes(entry.dayOfWeek.toString(), entry.streamNumber),
         })));
     }
     return {

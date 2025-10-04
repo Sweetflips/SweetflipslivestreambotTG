@@ -203,13 +203,18 @@ export const getScheduleWithCurrentDayFirst = async (
   const currentDaySchedules = entries.filter(
     (entry) => entry.dayOfWeek === currentDayOfWeek
   );
-  reorderedEntries.push(...currentDaySchedules.map(entry => ({
-    ...entry,
-    day: getDayName(entry.dayOfWeek),
-    stream: entry.streamNumber,
-    event: entry.eventTitle,
-    times: formatStreamTimes(entry.dayOfWeek.toString(), entry.streamNumber as 1 | 2)
-  })));
+  reorderedEntries.push(
+    ...currentDaySchedules.map((entry) => ({
+      ...entry,
+      day: getDayName(entry.dayOfWeek),
+      stream: entry.streamNumber,
+      event: entry.eventTitle,
+      times: formatStreamTimes(
+        entry.dayOfWeek.toString(),
+        entry.streamNumber as 1 | 2
+      ),
+    }))
+  );
 
   // Add remaining days in order
   for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
@@ -217,13 +222,18 @@ export const getScheduleWithCurrentDayFirst = async (
     const daySchedules = entries.filter(
       (entry) => entry.dayOfWeek === checkDay
     );
-    reorderedEntries.push(...daySchedules.map(entry => ({
-      ...entry,
-      day: getDayName(entry.dayOfWeek),
-      stream: entry.streamNumber,
-      event: entry.eventTitle,
-      times: formatStreamTimes(entry.dayOfWeek.toString(), entry.streamNumber as 1 | 2)
-    })));
+    reorderedEntries.push(
+      ...daySchedules.map((entry) => ({
+        ...entry,
+        day: getDayName(entry.dayOfWeek),
+        stream: entry.streamNumber,
+        event: entry.eventTitle,
+        times: formatStreamTimes(
+          entry.dayOfWeek.toString(),
+          entry.streamNumber as 1 | 2
+        ),
+      }))
+    );
   }
 
   return {
