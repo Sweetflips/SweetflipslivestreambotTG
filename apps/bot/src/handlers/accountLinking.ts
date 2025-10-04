@@ -19,7 +19,7 @@ export const handleKickLinking: MiddlewareFn<BotContext> = async (
     return;
   }
 
-  const kickName = ctx.message?.text?.trim() ?? "";
+  const kickName = (ctx.message as any)?.text?.trim() ?? "";
 
   if (!isValidKickName(kickName)) {
     await ctx.reply(

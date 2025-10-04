@@ -53,9 +53,7 @@ export const getActiveSchedule = async (prismaClient) => {
         orderBy: [{ dayOfWeek: "asc" }, { streamNumber: "asc" }],
     });
     return entries.map((entry) => {
-        const times = formatStreamTimes(entry.streamNumber === 1 ? "08:00" : "18:00", entry.streamNumber)
-            .map((item) => `${item.label}: ${item.time}`)
-            .join(" | ");
+        const times = formatStreamTimes(entry.streamNumber === 1 ? "08:00" : "18:00", entry.streamNumber);
         return {
             day: getDayName(entry.dayOfWeek),
             stream: entry.streamNumber,
@@ -127,12 +125,24 @@ export const getScheduleWithCurrentDayFirst = async (prismaClient) => {
     const reorderedEntries = [];
     // Add current day entries first
     const currentDaySchedules = entries.filter((entry) => entry.dayOfWeek === currentDayOfWeek);
-    reorderedEntries.push(...currentDaySchedules);
+    reorderedEntries.push(...currentDaySchedules.map(entry => ({
+        ...entry,
+        day: getDayName(entry.dayOfWeek),
+        stream: entry.streamNumber,
+        event: entry.eventTitle,
+        times: formatStreamTimes(entry.dayOfWeek.toString(), entry.streamNumber)
+    })));
     // Add remaining days in order
     for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
         const checkDay = (currentDayOfWeek + dayOffset) % 7;
         const daySchedules = entries.filter((entry) => entry.dayOfWeek === checkDay);
-        reorderedEntries.push(...daySchedules);
+        reorderedEntries.push(...daySchedules.map(entry => ({
+            ...entry,
+            day: getDayName(entry.dayOfWeek),
+            stream: entry.streamNumber,
+            event: entry.eventTitle,
+            times: formatStreamTimes(entry.dayOfWeek.toString(), entry.streamNumber)
+        })));
     }
     return {
         schedules: reorderedEntries,
@@ -180,7 +190,7 @@ export const cleanupOldEvents = async (prismaClient) => {
             },
         });
     }
-    // Check stream 2 (5:00 PM UTC)
+    // Check stream 2 (6:00 PM UTC)
     if (currentTimeInMinutes > stream2Time + threeHoursInMinutes) {
         await prisma.schedule.updateMany({
             where: {

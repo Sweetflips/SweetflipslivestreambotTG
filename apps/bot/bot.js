@@ -804,7 +804,9 @@ console.log("✅ Bot configured to use database storage only");
 // Helper functions
 async function getUserOrCreate(telegramId, telegramUser) {
   console.log(`🔍 getUserOrCreate called for: ${telegramUser} (${telegramId})`);
-  console.log(`🔍 Prisma client status: ${prisma ? 'Available' : 'Not available'}`);
+  console.log(
+    `🔍 Prisma client status: ${prisma ? "Available" : "Not available"}`
+  );
 
   // If database is not available, return a mock user and sync to Google Sheets
   if (!prisma) {
@@ -3932,7 +3934,7 @@ async function getActiveSweetCallsSession() {
   try {
     // Import the updated service functions
     const { getActiveSession } = await import(
-      "./src/modules/sweetCallsService.js"
+      "./dist/modules/sweetCallsService.js"
     );
 
     // Use the new service function
@@ -3953,7 +3955,7 @@ async function createNewSweetCallsSession() {
   try {
     // Import the updated service functions
     const { createNewSession } = await import(
-      "./src/modules/sweetCallsService.js"
+      "./dist/modules/sweetCallsService.js"
     );
 
     // Use the new service function

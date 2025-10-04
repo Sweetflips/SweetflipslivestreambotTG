@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { getDayName } from "../utils/dayName";
-import { formatStreamTimes } from "../utils/timezone";
+import { formatStreamTimes, type StreamTime } from "../utils/timezone";
 
 export interface ScheduleEntry {
   dayOfWeek: number;
@@ -12,7 +12,7 @@ export interface ScheduleSummary {
   day: string;
   stream: number;
   event: string;
-  times: string;
+  times: StreamTime[];
 }
 
 export const addScheduleEntry = async (
@@ -88,9 +88,7 @@ export const getActiveSchedule = async (
     const times = formatStreamTimes(
       entry.streamNumber === 1 ? "08:00" : "18:00",
       entry.streamNumber as 1 | 2
-    )
-      .map((item) => `${item.label}: ${item.time}`)
-      .join(" | ");
+    );
 
     return {
       day: getDayName(entry.dayOfWeek),
@@ -103,7 +101,7 @@ export const getActiveSchedule = async (
 
 export interface ScheduleWithDateTime extends ScheduleSummary {
   dayOfWeek: number;
-  streamNumber: 1 | 2;
+  streamNumber: number;
   eventTitle: string;
   isActive: boolean;
   createdAt: Date;
@@ -205,7 +203,13 @@ export const getScheduleWithCurrentDayFirst = async (
   const currentDaySchedules = entries.filter(
     (entry) => entry.dayOfWeek === currentDayOfWeek
   );
-  reorderedEntries.push(...currentDaySchedules);
+  reorderedEntries.push(...currentDaySchedules.map(entry => ({
+    ...entry,
+    day: getDayName(entry.dayOfWeek),
+    stream: entry.streamNumber,
+    event: entry.eventTitle,
+    times: formatStreamTimes(entry.dayOfWeek.toString(), entry.streamNumber as 1 | 2)
+  })));
 
   // Add remaining days in order
   for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
@@ -213,7 +217,13 @@ export const getScheduleWithCurrentDayFirst = async (
     const daySchedules = entries.filter(
       (entry) => entry.dayOfWeek === checkDay
     );
-    reorderedEntries.push(...daySchedules);
+    reorderedEntries.push(...daySchedules.map(entry => ({
+      ...entry,
+      day: getDayName(entry.dayOfWeek),
+      stream: entry.streamNumber,
+      event: entry.eventTitle,
+      times: formatStreamTimes(entry.dayOfWeek.toString(), entry.streamNumber as 1 | 2)
+    })));
   }
 
   return {
