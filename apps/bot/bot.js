@@ -3890,7 +3890,7 @@ async function makeSweetCall(userId, slotName) {
   try {
     // Import the updated service functions
     const { makeCall } = await import(
-      "./dist/src/modules/sweetCallsService.js"
+      "./dist/modules/sweetCallsService.js"
     );
 
     // Use the new service function
@@ -3975,7 +3975,7 @@ async function getCurrentCallsDisplay() {
   try {
     // Import the updated service functions
     const { getActiveSession, getSessionCalls, formatCallsDisplay } =
-      await import("./dist/src/modules/sweetCallsService.js");
+      await import("./dist/modules/sweetCallsService.js");
 
     // Get active session
     const activeSession = await getActiveSession(prisma);
@@ -4002,7 +4002,7 @@ async function runSweetCallsRaffle() {
   try {
     // Import the updated service functions
     const { raffleCall } = await import(
-      "./dist/src/modules/sweetCallsService.js"
+      "./dist/modules/sweetCallsService.js"
     );
 
     // Use the new service function
@@ -4022,7 +4022,7 @@ async function setSlotMultiplier(slotName, multiplier) {
   try {
     // Import the updated service functions
     const { setSlotMultiplier: setMultiplier } = await import(
-      "./dist/src/modules/sweetCallsService.js"
+      "./dist/modules/sweetCallsService.js"
     );
 
     // Use the new service function
@@ -4045,7 +4045,7 @@ async function getCallboardData() {
   try {
     // Import the updated service functions
     const { getCallboardData: getCallboard } = await import(
-      "./dist/src/modules/sweetCallsService.js"
+      "./dist/modules/sweetCallsService.js"
     );
 
     // Use the new service function
