@@ -6,6 +6,8 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc --project tsconfig.json",
+    "postinstall": "prisma generate",
+    "prestart": "prisma generate",
     "start": "pnpm run build && node dist/index.js",
     "dev": "tsx watch src/index.ts"
   },
