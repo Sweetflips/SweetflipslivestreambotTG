@@ -17,6 +17,8 @@ try {
   console.log("📊 DATABASE_URL:", process.env.DATABASE_URL ? "Set" : "Not set");
   prisma = createPrismaClient();
   console.log("✅ Database connection initialized");
+  console.log("🔍 Prisma client type:", typeof prisma);
+  console.log("🔍 Prisma client has callSession:", !!prisma.callSession);
 } catch (error) {
   console.error("❌ Database initialization failed:", error.message);
   console.log("⚠️ Bot will run without database features");
@@ -3884,12 +3886,25 @@ async function cleanupOldNotifications() {
 // Sweet Calls game functions
 async function makeSweetCall(userId, slotName) {
   if (!prisma) {
+    console.error("❌ Prisma client is null - database not available");
     return { success: false, message: "Database not available" };
+  }
+
+  // Ensure database is connected
+  try {
+    await prisma.$connect();
+  } catch (error) {
+    console.error("❌ Database connection failed:", error);
+    return { success: false, message: "Database connection failed" };
   }
 
   try {
     // Import the updated service functions
     const { makeCall } = await import("./dist/modules/sweetCallsService.js");
+
+    // Debug: Check if prisma is valid
+    console.log("🔍 Prisma client type:", typeof prisma);
+    console.log("🔍 Prisma client has findFirst:", typeof prisma.callSession?.findFirst);
 
     // Use the new service function
     const result = await makeCall(prisma, userId, slotName);
