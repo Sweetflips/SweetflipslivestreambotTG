@@ -3904,7 +3904,10 @@ async function makeSweetCall(userId, slotName) {
 
     // Debug: Check if prisma is valid
     console.log("🔍 Prisma client type:", typeof prisma);
-    console.log("🔍 Prisma client has findFirst:", typeof prisma.callSession?.findFirst);
+    console.log(
+      "🔍 Prisma client has findFirst:",
+      typeof prisma.callSession?.findFirst
+    );
 
     // Use the new service function
     const result = await makeCall(prisma, userId, slotName);
