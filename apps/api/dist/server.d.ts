@@ -9,6 +9,7 @@ export declare class Server {
     private overlayService;
     private callSessionService;
     constructor();
+    initialize(): Promise<void>;
     private setupRoutes;
     private setupErrorHandling;
     start(): Promise<void>;

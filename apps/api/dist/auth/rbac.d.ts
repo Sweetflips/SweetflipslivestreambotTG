@@ -1,4 +1,9 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+export declare enum Role {
+    VIEWER = "VIEWER",
+    MOD = "MOD",
+    OWNER = "OWNER"
+}
 export interface UserContext {
     id: string;
     telegramId?: string;
@@ -20,7 +25,6 @@ export declare class AuthService {
         telegramId?: string;
         telegramUser?: string;
         kickName?: string;
-        cwalletHandle?: string;
         role?: Role;
     }): Promise<UserContext>;
     verifyTelegramAdmin(telegramId: string, chatId: string, botToken: string): Promise<boolean>;

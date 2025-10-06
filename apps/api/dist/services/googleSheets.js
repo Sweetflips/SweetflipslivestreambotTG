@@ -17,7 +17,7 @@ export class GoogleSheetsService {
         try {
             // For service account authentication
             const auth = new google.auth.GoogleAuth({
-                keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE,
+                keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ?? undefined,
                 scopes: ['https://www.googleapis.com/auth/spreadsheets'],
             });
             this.sheets = google.sheets({ version: 'v4', auth });

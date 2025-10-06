@@ -57,7 +57,7 @@ export function parseKickMessage(message) {
     // Check for guess command
     const guessMatch = trimmed.match(KICK_COMMAND_PATTERNS.GUESS);
     if (guessMatch) {
-        const guess = parseInt(guessMatch[1], 10);
+        const guess = parseInt(guessMatch[1] ?? '0', 10);
         if (guess >= 0 && guess <= 1000) {
             return { type: 'guess', data: { guess } };
         }
@@ -70,7 +70,7 @@ export function parseKickMessage(message) {
     // Check for answer command
     const answerMatch = trimmed.match(KICK_COMMAND_PATTERNS.ANSWER);
     if (answerMatch) {
-        return { type: 'answer', data: { answer: sanitizeInput(answerMatch[1]) } };
+        return { type: 'answer', data: { answer: sanitizeInput(answerMatch[1] ?? '') } };
     }
     return { type: 'unknown' };
 }

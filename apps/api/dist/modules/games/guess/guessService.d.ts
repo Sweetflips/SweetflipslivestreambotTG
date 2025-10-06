@@ -1,4 +1,4 @@
-import { GameType, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 export interface GuessResult {
     success: boolean;
     message: string;
@@ -54,9 +54,9 @@ export declare class GuessService {
     private logAudit;
     isAdmin(userId: string): Promise<boolean>;
     isOwner(userId: string): Promise<boolean>;
-    getArchivedGames(gameType?: GameType, limit?: number): Promise<any[]>;
+    getArchivedGames(gameType?: any, limit?: number): Promise<any[]>;
     getArchivedGameDetails(archiveId: string): Promise<any>;
     cleanupOldArchives(daysToKeep: number | undefined, userId: string): Promise<string>;
-    getGameStatistics(gameType?: GameType): Promise<any>;
+    getGameStatistics(gameType?: any): Promise<any>;
 }
 //# sourceMappingURL=guessService.d.ts.map

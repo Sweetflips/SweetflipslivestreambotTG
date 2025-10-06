@@ -1,11 +1,12 @@
-import { BonusEntry, BonusPayout } from '@prisma/client';
 export interface BonusGameResult {
-    gameId: string;
+    gameRoundId: string;
     totalPayout: number;
     entries: RankedEntry[];
     leaderboard: LeaderboardEntry[];
 }
-export interface RankedEntry extends BonusEntry {
+export interface RankedEntry {
+    id: string;
+    value: number;
     user: {
         id: string;
         kickName: string | null;
@@ -15,42 +16,22 @@ export interface RankedEntry extends BonusEntry {
     rank: number;
 }
 export interface LeaderboardEntry {
-    rank: number;
-    userId: string;
-    username: string;
-    guess: number;
+    id: string;
+    value: number;
+    user: {
+        id: string;
+        kickName: string | null;
+        telegramUser: string | null;
+    };
     delta: number;
-    isWinner: boolean;
+    rank: number;
 }
-export declare class BonusGameLogic {
-    static calculateFinalPayout(payouts: BonusPayout[]): number;
-    static rankEntries(entries: (BonusEntry & {
-        user: {
-            id: string;
-            kickName: string | null;
-            telegramUser: string | null;
-        };
-    })[], finalPayout: number): RankedEntry[];
-    static generateLeaderboard(rankedEntries: RankedEntry[], topN?: number): LeaderboardEntry[];
-    static calculateWinners(rankedEntries: RankedEntry[], maxWinners?: number): RankedEntry[];
-    static validateGuess(guess: number): {
-        valid: boolean;
-        error?: string;
-    };
-    static validateBonusName(name: string): {
-        valid: boolean;
-        error?: string;
-    };
-    static validatePayoutAmount(amount: number): {
-        valid: boolean;
-        error?: string;
-    };
-    static formatGameResult(result: BonusGameResult): string;
-    static formatLeaderboard(leaderboard: LeaderboardEntry[]): string;
-    static calculatePayoutDistribution(winners: RankedEntry[], totalPrizePool: number): Array<{
-        userId: string;
-        amount: number;
-        percentage: number;
-    }>;
-}
+export declare function calculateRankings(entries: any[], finalValue: number): RankedEntry[];
+export declare function formatLeaderboard(entries: RankedEntry[]): string;
+export declare function getWinner(entries: RankedEntry[]): RankedEntry | null;
+export declare function formatWinnerMessage(winner: RankedEntry): string;
+export declare function calculatePayouts(entries: RankedEntry[], totalPayout: number): Array<{
+    userId: string;
+    amount: number;
+}>;
 //# sourceMappingURL=bonusLogic.d.ts.map

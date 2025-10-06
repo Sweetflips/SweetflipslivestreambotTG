@@ -63,7 +63,7 @@ export class AuthService {
       return {
         id: user.id,
         telegramId: user.telegramId,
-        kickName: user.kickName || undefined,
+        kickName: user.kickName ?? undefined,
         role: user.role as Role,
       };
     } catch (error) {
@@ -91,7 +91,7 @@ export class AuthService {
       return {
         id: user.id,
         telegramId: user.telegramId,
-        kickName: user.kickName || undefined,
+        kickName: user.kickName ?? undefined,
         role: user.role as Role,
       };
     } catch (error) {
@@ -116,15 +116,15 @@ export class AuthService {
           telegramId: data.telegramId,
         },
         update: {
-          telegramUser: data.telegramUser,
-          kickName: data.kickName,
-          role: data.role,
+          telegramUser: data.telegramUser ?? null,
+          kickName: data.kickName ?? null,
+          role: data.role ?? undefined,
           linkedAt: data.kickName && data.telegramId ? new Date() : undefined,
         },
         create: {
           telegramId: data.telegramId,
-          telegramUser: data.telegramUser,
-          kickName: data.kickName,
+          telegramUser: data.telegramUser ?? null,
+          kickName: data.kickName ?? null,
           role: data.role || Role.VIEWER,
         },
         select: {
@@ -138,7 +138,7 @@ export class AuthService {
       return {
         id: user.id,
         telegramId: user.telegramId,
-        kickName: user.kickName || undefined,
+        kickName: user.kickName ?? undefined,
         role: user.role as Role,
       };
     } catch (error) {

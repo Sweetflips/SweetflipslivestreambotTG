@@ -1,4 +1,4 @@
-import { GameStatus, GameType, PrismaClient, RoundStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { logger } from '../../../telemetry/logger.js';
 import { ConflictError, GameStateError } from '../../../utils/errors.js';
 import { isAnswerClose } from '../../../utils/regex.js';
@@ -21,8 +21,8 @@ export class TriviaService {
         }
         const game = await this.prisma.game.create({
             data: {
-                type: GameType.TRIVIA,
-                status: GameStatus.RUNNING,
+                type: 'TRIVIA',
+                status: 'RUNNING',
                 startedAt: new Date(),
             },
         });
@@ -36,7 +36,7 @@ export class TriviaService {
                 gameId: activeGame.id,
                 question,
                 answer,
-                status: RoundStatus.OPEN,
+                status: 'OPEN',
             },
         });
         logger.info('Trivia round created', { gameId: activeGame.id, roundId: round.id });
@@ -54,7 +54,7 @@ export class TriviaService {
         if (!round) {
             throw new GameStateError('Round not found');
         }
-        if (round.status !== RoundStatus.OPEN) {
+        if (round.status !== 'OPEN') {
             throw new GameStateError('Round is not accepting answers');
         }
         // Check if user already answered
@@ -84,7 +84,7 @@ export class TriviaService {
         const openRound = await this.prisma.triviaRound.findFirst({
             where: {
                 gameId: activeGame.id,
-                status: RoundStatus.OPEN,
+                status: 'OPEN',
             },
             include: {
                 answers: {
@@ -108,7 +108,7 @@ export class TriviaService {
         await this.prisma.triviaRound.update({
             where: { id: openRound.id },
             data: {
-                status: RoundStatus.LOCKED,
+                status: 'LOCKED',
                 lockedAt: new Date(),
             },
         });
@@ -170,7 +170,7 @@ export class TriviaService {
         const game = await this.prisma.game.update({
             where: { id: activeGame.id },
             data: {
-                status: GameStatus.COMPLETED,
+                status: 'COMPLETED',
                 endedAt: new Date(),
             },
         });
@@ -188,7 +188,7 @@ export class TriviaService {
     async getActiveGame() {
         const game = await this.prisma.game.findFirst({
             where: {
-                type: GameType.TRIVIA,
+                type: 'TRIVIA',
                 status: {
                     in: ['RUNNING', 'OPENING'],
                 },
@@ -203,7 +203,7 @@ export class TriviaService {
         const round = await this.prisma.triviaRound.findFirst({
             where: {
                 gameId,
-                status: RoundStatus.OPEN,
+                status: 'OPEN',
             },
         });
         return round;
@@ -214,7 +214,7 @@ export class TriviaService {
             include: {
                 triviaRounds: {
                     where: {
-                        status: RoundStatus.OPEN,
+                        status: 'OPEN',
                     },
                     include: {
                         answers: {

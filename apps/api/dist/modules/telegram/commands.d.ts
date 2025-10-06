@@ -3,7 +3,7 @@ import { BonusService } from '../games/bonus/bonusService.js';
 import { TriviaService } from '../games/trivia/triviaService.js';
 import { LinkService } from '../linking/linkService.js';
 import { PayoutService } from '../payouts/payoutService.js';
-import { TelegramContext } from './middlewares.js';
+import type { TelegramContext } from './middlewares.js';
 export declare class TelegramCommands {
     private prisma;
     private bonusService;

@@ -13,7 +13,7 @@ const logger = pino({
       translateTime: 'SYS:standard',
       ignore: 'pid,hostname',
     },
-  } : undefined,
+  } as any : undefined,
   formatters: {
     level: (label) => ({ level: label }),
   },

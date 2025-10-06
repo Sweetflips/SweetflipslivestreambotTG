@@ -1,6 +1,5 @@
-import { Role } from '@prisma/client';
 import { prisma } from './lib/prisma.js';
-import { FastifyInstance } from 'fastify';
+import { Role } from './auth/rbac.js';
 import { createRBACPreHandler } from './auth/rbac.js';
 import { BonusController } from './modules/games/bonus/bonusController.js';
 import { BonusService } from './modules/games/bonus/bonusService.js';
@@ -68,23 +67,23 @@ export async function registerRoutes(fastify) {
         fastify.get('/stats', async (request, reply) => {
             try {
                 const stats = await prisma.$transaction(async (tx) => {
-                    const [totalUsers, totalGames, totalAwards, activeGames] = await Promise.all([
+                    const [totalUsers, totalGameRounds, totalGuesses, activeGameRounds] = await Promise.all([
                         tx.user.count(),
-                        tx.game.count(),
-                        tx.award.count(),
-                        tx.game.count({
+                        tx.gameRound.count(),
+                        tx.guess.count(),
+                        tx.gameRound.count({
                             where: {
-                                status: {
-                                    in: ['RUNNING', 'OPENING'],
+                                phase: {
+                                    in: ['OPEN', 'IDLE'],
                                 },
                             },
                         }),
                     ]);
                     return {
                         totalUsers,
-                        totalGames,
-                        totalAwards,
-                        activeGames,
+                        totalGameRounds,
+                        totalGuesses,
+                        activeGameRounds,
                     };
                 });
                 return reply.send({
@@ -105,10 +104,10 @@ export async function registerRoutes(fastify) {
     fastify.register(async function (fastify) {
         fastify.get('/state', async (request, reply) => {
             try {
-                const currentGame = await prisma.game.findFirst({
+                const currentGame = await prisma.gameRound.findFirst({
                     where: {
-                        status: {
-                            in: ['RUNNING', 'OPENING'],
+                        phase: {
+                            in: ['OPEN', 'IDLE'],
                         },
                     },
                     include: {
@@ -216,8 +215,8 @@ export async function registerRoutes(fastify) {
         try {
             // Check database connection
             await prisma.$queryRaw `SELECT 1`;
-            // Check if sweet_calls_rounds table exists and is accessible using Prisma ORM
-            await prisma.sweetCallsRound.findFirst();
+            // Check if call_sessions table exists and is accessible using Prisma ORM
+            await prisma.callSession.findFirst();
             // Check Redis connection
             const redis = fastify.redis;
             if (redis) {

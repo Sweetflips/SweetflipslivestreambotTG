@@ -66,7 +66,7 @@ export function getWinner(entries: RankedEntry[]): RankedEntry | null {
     return null;
   }
 
-  return entries[0]; // First entry is the winner (lowest delta)
+  return entries[0] ?? null; // First entry is the winner (lowest delta)
 }
 
 export function formatWinnerMessage(winner: RankedEntry): string {
@@ -82,9 +82,14 @@ export function calculatePayouts(entries: RankedEntry[], totalPayout: number): A
     return [];
   }
 
+  const winner = entries[0];
+  if (!winner) {
+    return [];
+  }
+
   // Simple payout: winner gets everything
   return [{
-    userId: entries[0].user.id,
+    userId: winner.user.id,
     amount: totalPayout,
   }];
 }

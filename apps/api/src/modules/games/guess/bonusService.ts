@@ -1,5 +1,5 @@
-import { GameType, PrismaClient } from '@prisma/client';
-import { NotFoundError } from '../../utils/errors';
+import { PrismaClient } from '@prisma/client';
+import { NotFoundError } from '../../utils/errors.js';
 
 export interface BonusItem {
   id: string;

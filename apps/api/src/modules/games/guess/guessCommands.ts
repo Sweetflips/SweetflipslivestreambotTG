@@ -1,6 +1,6 @@
-import { GameType, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { Context } from 'telegraf';
-import { NotFoundError } from '../../utils/errors';
+import { NotFoundError } from '../../utils/errors.js';
 import { BonusService } from './bonusService';
 import { GuessService } from './guessService';
 
@@ -68,7 +68,7 @@ export class GuessCommands {
       }
 
       // Parse and validate number
-      const guess = parseInt(args[0]);
+      const guess = parseInt(args[0] ?? '0');
       if (isNaN(guess)) {
         await ctx.reply('❌ Please provide a valid number.');
         return;
@@ -119,8 +119,8 @@ export class GuessCommands {
         return;
       }
 
-      const gameType = args[0].toLowerCase();
-      const guessValue = parseInt(args[1]);
+      const gameType = args[0]?.toLowerCase() ?? '';
+      const guessValue = parseInt(args[1] ?? '0');
 
       // Validate game type
       if (gameType !== 'balance' && gameType !== 'bonus') {
@@ -182,7 +182,7 @@ export class GuessCommands {
       }
 
       // Parse and validate number
-      const guess = parseInt(args[0]);
+      const guess = parseInt(args[0] ?? '0');
       if (isNaN(guess)) {
         await ctx.reply('❌ Please provide a valid number.');
         return;
@@ -235,7 +235,7 @@ export class GuessCommands {
         return;
       }
 
-      const command = args[0].toLowerCase();
+      const command = args[0]?.toLowerCase() ?? '';
 
       switch (command) {
         case 'open':
@@ -253,7 +253,7 @@ export class GuessCommands {
             await ctx.reply('❌ Usage: `/balance final <number>`', { parse_mode: 'Markdown' });
             return;
           }
-          const finalValue = parseInt(args[1]);
+          const finalValue = parseInt(args[1] ?? '0');
           if (isNaN(finalValue)) {
             await ctx.reply('❌ Please provide a valid number.');
             return;
@@ -313,7 +313,7 @@ export class GuessCommands {
             await ctx.reply('❌ Usage: `/balance grace <seconds>`', { parse_mode: 'Markdown' });
             return;
           }
-          const graceSeconds = parseInt(args[1]);
+          const graceSeconds = parseInt(args[1] ?? '0');
           if (isNaN(graceSeconds) || graceSeconds < 0) {
             await ctx.reply('❌ Please provide a valid number of seconds (≥0).');
             return;
@@ -331,7 +331,7 @@ export class GuessCommands {
             await ctx.reply('❌ Usage: `/balance window <minutes>`', { parse_mode: 'Markdown' });
             return;
           }
-          const windowMinutes = parseInt(args[1]);
+          const windowMinutes = parseInt(args[1] ?? '0');
           if (isNaN(windowMinutes) || windowMinutes < 0) {
             await ctx.reply('❌ Please provide a valid number of minutes (≥0).');
             return;
@@ -353,8 +353,8 @@ export class GuessCommands {
             await ctx.reply('❌ Usage: `/balance range <min> <max>`', { parse_mode: 'Markdown' });
             return;
           }
-          const minRange = parseInt(args[1]);
-          const maxRange = parseInt(args[2]);
+          const minRange = parseInt(args[1] ?? '0');
+          const maxRange = parseInt(args[2] ?? '0');
           if (isNaN(minRange) || isNaN(maxRange) || minRange >= maxRange) {
             await ctx.reply('❌ Please provide valid min and max values (min < max).');
             return;
@@ -421,7 +421,7 @@ export class GuessCommands {
         return;
       }
 
-      const command = args[0].toLowerCase();
+      const command = args[0]?.toLowerCase() ?? '';
 
       switch (command) {
         case 'open':
@@ -439,7 +439,7 @@ export class GuessCommands {
             await ctx.reply('❌ Usage: `/bonus final <number>`', { parse_mode: 'Markdown' });
             return;
           }
-          const finalValue = parseInt(args[1]);
+          const finalValue = parseInt(args[1] ?? '0');
           if (isNaN(finalValue)) {
             await ctx.reply('❌ Please provide a valid number.');
             return;
@@ -496,7 +496,7 @@ export class GuessCommands {
             await ctx.reply('❌ Usage: `/bonus grace <seconds>`', { parse_mode: 'Markdown' });
             return;
           }
-          const graceSeconds = parseInt(args[1]);
+          const graceSeconds = parseInt(args[1] ?? '0');
           if (isNaN(graceSeconds) || graceSeconds < 0) {
             await ctx.reply('❌ Please provide a valid number of seconds (≥0).');
             return;
@@ -514,7 +514,7 @@ export class GuessCommands {
             await ctx.reply('❌ Usage: `/bonus window <minutes>`', { parse_mode: 'Markdown' });
             return;
           }
-          const windowMinutes = parseInt(args[1]);
+          const windowMinutes = parseInt(args[1] ?? '0');
           if (isNaN(windowMinutes) || windowMinutes < 0) {
             await ctx.reply('❌ Please provide a valid number of minutes (≥0).');
             return;
@@ -536,8 +536,8 @@ export class GuessCommands {
             await ctx.reply('❌ Usage: `/bonus range <min> <max>`', { parse_mode: 'Markdown' });
             return;
           }
-          const minRange = parseInt(args[1]);
-          const maxRange = parseInt(args[2]);
+          const minRange = parseInt(args[1] ?? '0');
+          const maxRange = parseInt(args[2] ?? '0');
           if (isNaN(minRange) || isNaN(maxRange) || minRange >= maxRange) {
             await ctx.reply('❌ Please provide valid min and max values (min < max).');
             return;
@@ -582,7 +582,7 @@ export class GuessCommands {
             await ctx.reply('❌ Usage: `/bonus payout <name> <x>`', { parse_mode: 'Markdown' });
             return;
           }
-          const payoutX = parseInt(args[args.length - 1]);
+          const payoutX = parseInt(args[args.length - 1] ?? '0');
           if (isNaN(payoutX)) {
             await ctx.reply('❌ Please provide a valid payout multiplier.');
             return;
@@ -645,8 +645,8 @@ export class GuessCommands {
         return;
       }
 
-      const gameType = args[0].toLowerCase();
-      const command = args[1].toLowerCase();
+      const gameType = args[0]?.toLowerCase() ?? '';
+      const command = args[1]?.toLowerCase() ?? '';
       const remainingArgs = args.slice(2);
 
       if (gameType !== 'bonus' && gameType !== 'balance') {
@@ -740,13 +740,13 @@ export class GuessCommands {
 
         case 'stats':
           const stats = await this.guessService.getGameStatistics(actualGameType);
-          const gameName = gameType === 'bonus' ? 'Bonus' : 'Balance';
-          let statsText = `📊 **${gameName} Game Statistics:**\n\n`;
+          const statsGameName = gameType === 'bonus' ? 'Bonus' : 'Balance';
+          let statsText = `📊 **${statsGameName} Game Statistics:**\n\n`;
           statsText += `• Total archived games: ${stats.totalArchives}\n`;
           statsText += `• Total guesses across all games: ${stats.totalGuesses}\n\n`;
           if (stats.recentGames.length > 0) {
             statsText += `**Recent Games:**\n`;
-            stats.recentGames.forEach((game, index) => {
+            stats.recentGames.forEach((game: any, index: number) => {
               statsText += `${index + 1}) ${game.totalGuesses} guesses - Final: ${game.finalValue || 'N/A'}\n`;
             });
           }
@@ -758,7 +758,7 @@ export class GuessCommands {
             await ctx.reply('⛔️ Owner only.');
             return;
           }
-          const daysToKeep = remainingArgs.length > 0 ? parseInt(remainingArgs[0]) : 90;
+          const daysToKeep = remainingArgs.length > 0 ? parseInt(remainingArgs[0] ?? '90') : 90;
           if (isNaN(daysToKeep) || daysToKeep < 1) {
             await ctx.reply('❌ Invalid days parameter. Use a number greater than 0.');
             return;
@@ -782,7 +782,7 @@ export class GuessCommands {
   private parseTopN(args: string[]): number {
     const topArg = args.find(arg => arg.startsWith('top='));
     if (topArg) {
-      const topN = parseInt(topArg.split('=')[1]);
+      const topN = parseInt(topArg.split('=')[1] ?? '10');
       return isNaN(topN) ? 10 : Math.max(1, Math.min(50, topN)); // Clamp between 1-50
     }
     return 10; // Default

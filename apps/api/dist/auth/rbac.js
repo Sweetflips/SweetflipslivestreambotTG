@@ -1,6 +1,12 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { logger } from '../telemetry/logger.js';
 import { ForbiddenError, UnauthorizedError } from '../utils/errors.js';
+export var Role;
+(function (Role) {
+    Role["VIEWER"] = "VIEWER";
+    Role["MOD"] = "MOD";
+    Role["OWNER"] = "OWNER";
+})(Role || (Role = {}));
 // Role hierarchy: OWNER > MOD > VIEWER
 const ROLE_HIERARCHY = {
     [Role.VIEWER]: 0,
@@ -39,7 +45,7 @@ export class AuthService {
             return {
                 id: user.id,
                 telegramId: user.telegramId,
-                kickName: user.kickName,
+                kickName: user.kickName ?? undefined,
                 role: user.role,
             };
         }
@@ -65,7 +71,7 @@ export class AuthService {
             return {
                 id: user.id,
                 telegramId: user.telegramId,
-                kickName: user.kickName,
+                kickName: user.kickName ?? undefined,
                 role: user.role,
             };
         }
@@ -76,22 +82,23 @@ export class AuthService {
     }
     async createOrUpdateUser(data) {
         try {
+            if (!data.telegramId) {
+                throw new Error('telegramId is required');
+            }
             const user = await this.prisma.user.upsert({
                 where: {
                     telegramId: data.telegramId,
                 },
                 update: {
-                    telegramUser: data.telegramUser,
-                    kickName: data.kickName,
-                    cwalletHandle: data.cwalletHandle,
-                    role: data.role,
+                    telegramUser: data.telegramUser ?? null,
+                    kickName: data.kickName ?? null,
+                    role: data.role ?? undefined,
                     linkedAt: data.kickName && data.telegramId ? new Date() : undefined,
                 },
                 create: {
                     telegramId: data.telegramId,
-                    telegramUser: data.telegramUser,
-                    kickName: data.kickName,
-                    cwalletHandle: data.cwalletHandle,
+                    telegramUser: data.telegramUser ?? null,
+                    kickName: data.kickName ?? null,
                     role: data.role || Role.VIEWER,
                 },
                 select: {
@@ -104,7 +111,7 @@ export class AuthService {
             return {
                 id: user.id,
                 telegramId: user.telegramId,
-                kickName: user.kickName,
+                kickName: user.kickName ?? undefined,
                 role: user.role,
             };
         }

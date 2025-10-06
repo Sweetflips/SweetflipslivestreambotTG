@@ -27,7 +27,7 @@ export class RateLimiter {
             if (!results) {
                 throw new Error('Redis pipeline execution failed');
             }
-            const currentCount = results[1][1];
+            const currentCount = results[1]?.[1] ?? 0;
             const allowed = currentCount < config.maxRequests;
             const remaining = Math.max(0, config.maxRequests - currentCount - 1);
             const resetTime = now + config.windowMs;

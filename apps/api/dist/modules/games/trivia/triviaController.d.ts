@@ -1,4 +1,4 @@
-import { FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { TriviaService } from './triviaService.js';
 export declare class TriviaController {
     private triviaService;

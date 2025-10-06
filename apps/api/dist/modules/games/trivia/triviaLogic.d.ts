@@ -1,4 +1,3 @@
-import { TriviaAnswer, TriviaRound } from '@prisma/client';
 export interface TriviaGameResult {
     gameId: string;
     totalRounds: number;

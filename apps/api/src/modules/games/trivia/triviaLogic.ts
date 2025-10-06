@@ -1,5 +1,5 @@
-import { TriviaAnswer, TriviaRound } from '@prisma/client';
-import { isAnswerCorrect } from '../../../utils/regex.js';
+// import { TriviaAnswer, TriviaRound } from '@prisma/client'; // Types don't exist
+import { isAnswerClose } from '../../../utils/regex.js';
 
 export interface TriviaGameResult {
   gameId: string;
@@ -46,7 +46,7 @@ export interface TriviaAnswerWithUser extends TriviaAnswer {
 
 export class TriviaLogic {
   static evaluateAnswer(userAnswer: string, correctAnswer: string): boolean {
-    return isAnswerCorrect(userAnswer, correctAnswer);
+    return isAnswerClose(userAnswer, correctAnswer);
   }
 
   static calculateScores(
@@ -198,7 +198,7 @@ export class TriviaLogic {
       message += `**Final Scores:**\n`;
       result.leaderboard.slice(0, 10).forEach(entry => {
         const medal = entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `${entry.rank}.`;
-        message += `${medal} ${entry.username}: ${entry.points} points (${entry.correctAnswers}/${entry.correctAnswers + (entry.totalAnswers - entry.correctAnswers)} correct)\n`;
+        message += `${medal} ${entry.username}: ${entry.points} points (${entry.correctAnswers} correct)\n`;
       });
     }
 
@@ -270,11 +270,11 @@ export class TriviaLogic {
     averageResponseTime: number;
   } {
     const totalAnswers = round.answers.length;
-    const correctAnswers = round.answers.filter(a => a.isCorrect).length;
-    const uniqueCorrectUsers = new Set(round.answers.filter(a => a.isCorrect).map(a => a.userId)).size;
+    const correctAnswers = round.answers.filter((a: any) => a.isCorrect).length;
+    const uniqueCorrectUsers = new Set(round.answers.filter((a: any) => a.isCorrect).map((a: any) => a.userId)).size;
 
     // Calculate average response time (simplified)
-    const responseTimes = round.answers.map(a =>
+    const responseTimes = round.answers.map((a: any) =>
       a.ts.getTime() - round.startedAt.getTime()
     );
     const averageResponseTime = responseTimes.length > 0

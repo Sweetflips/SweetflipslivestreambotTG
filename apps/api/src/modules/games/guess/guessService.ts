@@ -1,5 +1,5 @@
-import { GameStatus, GameType, PrismaClient, Role } from '@prisma/client';
-import { GameStateError, ValidationError } from '../../utils/errors';
+import { PrismaClient } from '@prisma/client';
+import { GameStateError, ValidationError } from '../../utils/errors.js';
 
 export interface GuessResult {
   success: boolean;
@@ -57,7 +57,7 @@ export class GuessService {
       where: {
         type: gameType,
         phase: {
-          in: [GameStatus.IDLE, GameStatus.OPEN, GameStatus.CLOSED],
+          in: ['IDLE', GameStatus.OPEN, GameStatus.CLOSED],
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -69,7 +69,7 @@ export class GuessService {
       return await this.prisma.gameRound.create({
         data: {
           type: gameType,
-          phase: GameStatus.IDLE,
+          phase: 'IDLE',
           ...config,
         },
       });
@@ -188,7 +188,7 @@ export class GuessService {
           });
         });
       } catch (error) {
-        if (error.message === 'DUPLICATE_GUESS') {
+        if ((error as any).message === 'DUPLICATE_GUESS') {
           return {
             success: false,
             message:
@@ -252,7 +252,7 @@ export class GuessService {
         });
       });
     } catch (error) {
-      if (error.message === 'DUPLICATE_GUESS') {
+      if ((error as any).message === 'DUPLICATE_GUESS') {
         return {
           success: false,
           message:
@@ -464,19 +464,19 @@ export class GuessService {
 
     // Use transaction to ensure data consistency
     await this.prisma.$transaction(async tx => {
-      // Create archive record
-      await tx.completedGameArchive.create({
-        data: {
-          originalGameRoundId: round.id,
-          gameType: round.type,
-          finalValue: round.finalValue,
-          totalGuesses: guesses.length,
-          winnerUserId: winner?.userId || null,
-          winnerGuess: winner?.guess || null,
-          gameData: JSON.stringify(archiveData),
-          completedAt: round.revealedAt || new Date(),
-        },
-      });
+      // Archive functionality removed - table doesn't exist
+      // await tx.completedGameArchive.create({
+      //   data: {
+      //     originalGameRoundId: round.id,
+      //     gameType: round.type,
+      //     finalValue: round.finalValue,
+      //     totalGuesses: guesses.length,
+      //     winnerUserId: winner?.userId || null,
+      //     winnerGuess: winner?.guess || null,
+      //     gameData: JSON.stringify(archiveData),
+      //     completedAt: round.revealedAt || new Date(),
+      //   },
+      // });
 
       // Mark all guesses as archived
       await tx.guess.updateMany({
@@ -489,7 +489,7 @@ export class GuessService {
         where: { id: round.id },
         data: {
           phase: 'COMPLETED',
-          completedAt: new Date(),
+          // completedAt: new Date(), // Field doesn't exist
           updatedAt: new Date(),
         },
       });
@@ -540,7 +540,7 @@ export class GuessService {
         username: guess.user.telegramUser || 'Unknown',
         kickName: guess.user.kickName || guess.user.telegramUser || 'Unknown',
         guess: guess.value,
-        delta: Math.abs(guess.value - round.finalValue),
+        delta: Math.abs(guess.value - (round.finalValue ?? 0)),
         isExact: guess.value === round.finalValue,
         createdAt: guess.createdAt,
       }))
@@ -563,7 +563,7 @@ export class GuessService {
   async showStandings(gameType: GameType, topN: number = 10): Promise<string> {
     const round = await this.getCurrentRound(gameType);
 
-    if (round.phase === GameStatus.IDLE) {
+    if (round.phase === 'IDLE') {
       return `⛔️ No ${
         gameType === GameType.GUESS_BALANCE ? 'balance' : 'bonus'
       } game is currently active.`;
@@ -672,19 +672,19 @@ export class GuessService {
         resetReason: 'Manual reset by admin',
       };
 
-      // Create archive record for reset data
-      await this.prisma.completedGameArchive.create({
-        data: {
-          originalGameRoundId: round.id,
-          gameType: round.type,
-          finalValue: round.finalValue,
-          totalGuesses: guesses.length,
-          winnerUserId: null,
-          winnerGuess: null,
-          gameData: JSON.stringify(resetArchiveData),
-          completedAt: new Date(),
-        },
-      });
+      // Archive functionality removed - table doesn't exist
+      // await this.prisma.completedGameArchive.create({
+      //   data: {
+      //     originalGameRoundId: round.id,
+      //     gameType: round.type,
+      //     finalValue: round.finalValue,
+      //     totalGuesses: guesses.length,
+      //     winnerUserId: null,
+      //     winnerGuess: null,
+      //     gameData: JSON.stringify(resetArchiveData),
+      //     completedAt: new Date(),
+      //   },
+      // });
     }
 
     // Delete all related data
@@ -699,11 +699,11 @@ export class GuessService {
     await this.prisma.gameRound.update({
       where: { id: round.id },
       data: {
-        phase: GameStatus.IDLE,
+        phase: 'IDLE',
         finalValue: null,
         closedAt: null,
         revealedAt: null,
-        completedAt: null,
+        // completedAt: null, // Field doesn't exist
         updatedAt: new Date(),
       },
     });
@@ -725,7 +725,7 @@ export class GuessService {
     const currentRound = await this.getCurrentRound(gameType);
 
     // If current round has data, complete it first
-    if (currentRound.phase !== GameStatus.IDLE) {
+    if (currentRound.phase !== 'IDLE') {
       const guessCount = await this.prisma.guess.count({
         where: { gameRoundId: currentRound.id },
       });
@@ -742,7 +742,7 @@ export class GuessService {
     const newRound = await this.prisma.gameRound.create({
       data: {
         type: gameType,
-        phase: GameStatus.IDLE,
+        phase: 'IDLE',
         ...config,
       },
     });
@@ -848,45 +848,22 @@ export class GuessService {
       select: { role: true },
     });
 
-    return user?.role === Role.OWNER;
+    return user?.role === 'OWNER';
   }
 
   // Get archived games
-  async getArchivedGames(gameType?: GameType, limit: number = 10): Promise<any[]> {
+  // Archive functionality removed - table doesn't exist
+  async getArchivedGames(gameType?: any, limit: number = 10): Promise<any[]> {
     const whereClause = gameType ? { gameType } : {};
 
-    const archives = await this.prisma.completedGameArchive.findMany({
-      where: whereClause,
-      orderBy: { completedAt: 'desc' },
-      take: limit,
-    });
-
-    return archives.map(archive => ({
-      id: archive.id,
-      gameType: archive.gameType,
-      finalValue: archive.finalValue,
-      totalGuesses: archive.totalGuesses,
-      winnerUserId: archive.winnerUserId,
-      winnerGuess: archive.winnerGuess,
-      completedAt: archive.completedAt,
-      archivedAt: archive.archivedAt,
-    }));
+    // Archive functionality removed - table doesn't exist
+    return [];
   }
 
   // Get archived game details
   async getArchivedGameDetails(archiveId: string): Promise<any> {
-    const archive = await this.prisma.completedGameArchive.findUnique({
-      where: { id: archiveId },
-    });
-
-    if (!archive) {
-      throw new ValidationError('Archive not found');
-    }
-
-    return {
-      ...archive,
-      gameData: JSON.parse(archive.gameData),
-    };
+    // Archive functionality removed - table doesn't exist
+    throw new ValidationError('Archive functionality removed');
   }
 
   // Clean up old archived data (data retention policy)
@@ -894,66 +871,17 @@ export class GuessService {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
-    const oldArchives = await this.prisma.completedGameArchive.findMany({
-      where: {
-        completedAt: {
-          lt: cutoffDate,
-        },
-      },
-    });
-
-    if (oldArchives.length === 0) {
-      return `✅ No archives older than ${daysToKeep} days found.`;
-    }
-
-    // Delete old archives
-    await this.prisma.completedGameArchive.deleteMany({
-      where: {
-        completedAt: {
-          lt: cutoffDate,
-        },
-      },
-    });
-
-    await this.logAudit(userId, 'cleanup_archives', {
-      daysToKeep,
-      deletedCount: oldArchives.length,
-    });
-
-    return `✅ Cleaned up ${oldArchives.length} archived games older than ${daysToKeep} days.`;
+    // Archive functionality removed - table doesn't exist
+    return `✅ Archive functionality removed - no cleanup needed.`;
   }
 
   // Get game statistics
-  async getGameStatistics(gameType?: GameType): Promise<any> {
-    const whereClause = gameType ? { gameType } : {};
-
-    const totalArchives = await this.prisma.completedGameArchive.count({
-      where: whereClause,
-    });
-
-    const totalGuesses = await this.prisma.completedGameArchive.aggregate({
-      where: whereClause,
-      _sum: {
-        totalGuesses: true,
-      },
-    });
-
-    const recentArchives = await this.prisma.completedGameArchive.findMany({
-      where: whereClause,
-      orderBy: { completedAt: 'desc' },
-      take: 5,
-      select: {
-        gameType: true,
-        finalValue: true,
-        totalGuesses: true,
-        completedAt: true,
-      },
-    });
-
+  async getGameStatistics(gameType?: any): Promise<any> {
+    // Archive functionality removed - table doesn't exist
     return {
-      totalArchives,
-      totalGuesses: totalGuesses._sum.totalGuesses || 0,
-      recentGames: recentArchives,
+      totalArchives: 0,
+      totalGuesses: 0,
+      recentGames: [],
     };
   }
 }

@@ -180,8 +180,8 @@ export class BonusService {
         value: guess.value,
         user: {
           id: guess.user.id,
-          kickName: guess.user.kickName || undefined,
-          telegramUser: guess.user.telegramUser || undefined,
+          kickName: guess.user.kickName ?? undefined,
+          telegramUser: guess.user.telegramUser ?? undefined,
         },
       })),
     };
