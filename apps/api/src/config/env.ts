@@ -48,13 +48,13 @@ const envSchema = z.object({
   OVERLAY_CORS_ORIGIN: z.string().url('Invalid CORS origin'),
 
   // Game Configuration
-  BONUS_HUNT_MAX_GUESS: z.string().transform(Number).pipe(z.number().min(1).max(10000)).default(1000),
-  TRIVIA_ANSWER_TIMEOUT: z.string().transform(Number).pipe(z.number().min(1000).max(300000)).default(30000),
-  LINK_CODE_EXPIRY: z.string().transform(Number).pipe(z.number().min(60000).max(3600000)).default(600000),
+  BONUS_HUNT_MAX_GUESS: z.string().transform(Number).pipe(z.number().min(1).max(10000)).default('1000'),
+  TRIVIA_ANSWER_TIMEOUT: z.string().transform(Number).pipe(z.number().min(1000).max(300000)).default('30000'),
+  LINK_CODE_EXPIRY: z.string().transform(Number).pipe(z.number().min(60000).max(3600000)).default('600000'),
 
   // Monitoring
   SENTRY_DSN: z.string().url().optional(),
-  PROMETHEUS_PORT: z.string().transform(Number).pipe(z.number().min(1).max(65535)).default(9090),
+  PROMETHEUS_PORT: z.string().transform(Number).pipe(z.number().min(1).max(65535)).default('9090'),
 });
 
 export type Env = z.infer<typeof envSchema>;

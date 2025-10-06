@@ -1,4 +1,4 @@
-import { FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { logger } from '../../../telemetry/logger.js';
 import { GameStateError, ValidationError } from '../../../utils/errors.js';
 import { BonusService } from './bonusService.js';
@@ -30,82 +30,16 @@ export class BonusController {
     }
   }
 
-  async addBonus(request: FastifyRequest<{ Body: { name: string } }>, reply: FastifyReply) {
+  async submitGuess(request: FastifyRequest<{ Body: { gameRoundId: string; userId: string; guess: number } }>, reply: FastifyReply) {
     try {
-      const { name } = request.body;
+      const { gameRoundId, userId, guess } = request.body;
 
-      if (!name || typeof name !== 'string') {
+      if (!gameRoundId || typeof gameRoundId !== 'string') {
         return reply.status(400).send({
           success: false,
-          error: 'Bonus name is required',
+          error: 'Game round ID is required',
         });
       }
-
-      const bonus = await this.bonusService.addBonus(name);
-
-      return reply.send({
-        success: true,
-        data: bonus,
-      });
-    } catch (error) {
-      if (error instanceof ValidationError || error instanceof GameStateError) {
-        return reply.status(400).send({
-          success: false,
-          error: error.message,
-        });
-      }
-
-      logger.error('Failed to add bonus:', error);
-      return reply.status(500).send({
-        success: false,
-        error: 'Failed to add bonus',
-      });
-    }
-  }
-
-  async recordPayout(request: FastifyRequest<{ Body: { name: string; amount: number } }>, reply: FastifyReply) {
-    try {
-      const { name, amount } = request.body;
-
-      if (!name || typeof name !== 'string') {
-        return reply.status(400).send({
-          success: false,
-          error: 'Bonus name is required',
-        });
-      }
-
-      if (typeof amount !== 'number') {
-        return reply.status(400).send({
-          success: false,
-          error: 'Payout amount is required',
-        });
-      }
-
-      const payout = await this.bonusService.recordPayout(name, amount);
-
-      return reply.send({
-        success: true,
-        data: payout,
-      });
-    } catch (error) {
-      if (error instanceof ValidationError || error instanceof GameStateError) {
-        return reply.status(400).send({
-          success: false,
-          error: error.message,
-        });
-      }
-
-      logger.error('Failed to record payout:', error);
-      return reply.status(500).send({
-        success: false,
-        error: 'Failed to record payout',
-      });
-    }
-  }
-
-  async submitGuess(request: FastifyRequest<{ Body: { userId: string; guess: number } }>, reply: FastifyReply) {
-    try {
-      const { userId, guess } = request.body;
 
       if (!userId || typeof userId !== 'string') {
         return reply.status(400).send({
@@ -121,7 +55,7 @@ export class BonusController {
         });
       }
 
-      const entry = await this.bonusService.submitGuess(userId, guess);
+      const entry = await this.bonusService.submitGuess(gameRoundId, userId, guess);
 
       return reply.send({
         success: true,
@@ -143,9 +77,11 @@ export class BonusController {
     }
   }
 
-  async closeGame(request: FastifyRequest, reply: FastifyReply) {
+  async closeGame(request: FastifyRequest<{ Params: { gameRoundId: string } }>, reply: FastifyReply) {
     try {
-      const result = await this.bonusService.closeGame();
+      const { gameRoundId } = request.params;
+
+      const result = await this.bonusService.closeGame(gameRoundId);
 
       return reply.send({
         success: true,
@@ -167,37 +103,71 @@ export class BonusController {
     }
   }
 
-  async getGameState(request: FastifyRequest<{ Params: { gameId: string } }>, reply: FastifyReply) {
+  async revealGame(request: FastifyRequest<{ Params: { gameRoundId: string }; Body: { finalValue: number } }>, reply: FastifyReply) {
     try {
-      const { gameId } = request.params;
+      const { gameRoundId } = request.params;
+      const { finalValue } = request.body;
 
-      const state = await this.bonusService.getGameState(gameId);
-
-      if (!state) {
-        return reply.status(404).send({
+      if (typeof finalValue !== 'number') {
+        return reply.status(400).send({
           success: false,
-          error: 'Game not found',
+          error: 'Final value is required',
         });
       }
 
+      const result = await this.bonusService.revealGame(gameRoundId, finalValue);
+
       return reply.send({
         success: true,
-        data: state,
+        data: result,
       });
     } catch (error) {
-      logger.error('Failed to get game state:', error);
+      if (error instanceof GameStateError) {
+        return reply.status(400).send({
+          success: false,
+          error: error.message,
+        });
+      }
+
+      logger.error('Failed to reveal bonus game:', error);
       return reply.status(500).send({
         success: false,
-        error: 'Failed to get game state',
+        error: 'Failed to reveal bonus game',
       });
     }
   }
 
-  async getLeaderboard(request: FastifyRequest<{ Querystring: { gameId?: string } }>, reply: FastifyReply) {
+  async getGameResults(request: FastifyRequest<{ Params: { gameRoundId: string } }>, reply: FastifyReply) {
     try {
-      const { gameId } = request.query;
+      const { gameRoundId } = request.params;
 
-      const leaderboard = await this.bonusService.getLeaderboard(gameId);
+      const results = await this.bonusService.getGameResults(gameRoundId);
+
+      return reply.send({
+        success: true,
+        data: results,
+      });
+    } catch (error) {
+      if (error instanceof GameStateError) {
+        return reply.status(400).send({
+          success: false,
+          error: error.message,
+        });
+      }
+
+      logger.error('Failed to get game results:', error);
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to get game results',
+      });
+    }
+  }
+
+  async getLeaderboard(request: FastifyRequest<{ Params: { gameRoundId: string } }>, reply: FastifyReply) {
+    try {
+      const { gameRoundId } = request.params;
+
+      const leaderboard = await this.bonusService.getLeaderboard(gameRoundId);
 
       return reply.send({
         success: true,
@@ -229,4 +199,3 @@ export class BonusController {
     }
   }
 }
-

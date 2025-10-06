@@ -1,13 +1,13 @@
-import { GameStatus, GameType, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { logger } from '../../../telemetry/logger.js';
 import { ConflictError, GameStateError } from '../../../utils/errors.js';
 
 export interface BonusHuntResult {
-  game: any;
+  gameRound: any;
   totalPayout: number;
   entries: Array<{
     id: string;
-    guess: number;
+    value: number;
     user: {
       id: string;
       kickName?: string;
@@ -20,81 +20,118 @@ export class BonusService {
   constructor(private prisma: PrismaClient) {}
 
   async startGame() {
-    // Check if there's already an active game
-    const activeGame = await this.prisma.game.findFirst({
+    // Check if there's already an active game round
+    const activeGameRound = await this.prisma.gameRound.findFirst({
       where: {
-        status: {
-          in: ['RUNNING', 'OPENING'],
+        type: 'BONUS',
+        phase: {
+          in: ['OPEN', 'IDLE'],
         },
       },
     });
 
-    if (activeGame) {
-      throw new ConflictError('A game is already active');
+    if (activeGameRound) {
+      throw new ConflictError('A bonus game is already active');
     }
 
-    const game = await this.prisma.game.create({
+    // Create new bonus game round
+    const gameRound = await this.prisma.gameRound.create({
       data: {
-        type: GameType.BONUS,
-        status: GameStatus.RUNNING,
-        startedAt: new Date(),
+        type: 'BONUS',
+        phase: 'OPEN',
+        minRange: 1,
+        maxRange: 1000000,
       },
     });
 
-    logger.info('Bonus hunt game started', { gameId: game.id });
-    return game;
+    logger.info(`Started new bonus game: ${gameRound.id}`);
+    return gameRound;
   }
 
-  async addBonus(bonusName: string) {
-    const activeGame = await this.getActiveGame();
+  async closeGame(gameRoundId: string) {
+    const gameRound = await this.prisma.gameRound.findUnique({
+      where: { id: gameRoundId },
+    });
 
-    const bonus = await this.prisma.bonusPayout.create({
+    if (!gameRound) {
+      throw new GameStateError('Game not found');
+    }
+
+    if (gameRound.phase !== 'OPEN') {
+      throw new GameStateError('Game is not open');
+    }
+
+    const updatedGameRound = await this.prisma.gameRound.update({
+      where: { id: gameRoundId },
       data: {
-        gameId: activeGame.id,
-        name: bonusName,
-        amountX: 0, // Will be set when opened
+        phase: 'CLOSED',
+        closedAt: new Date(),
       },
     });
 
-    logger.info('Bonus added to hunt', { gameId: activeGame.id, bonusName });
-    return bonus;
+    logger.info(`Closed bonus game: ${gameRoundId}`);
+    return updatedGameRound;
   }
 
-  async recordPayout(bonusName: string, amountX: number) {
-    const activeGame = await this.getActiveGame();
+  async revealGame(gameRoundId: string, finalValue: number) {
+    const gameRound = await this.prisma.gameRound.findUnique({
+      where: { id: gameRoundId },
+    });
 
-    // Update the bonus payout
-    const payout = await this.prisma.bonusPayout.updateMany({
+    if (!gameRound) {
+      throw new GameStateError('Game not found');
+    }
+
+    if (gameRound.phase !== 'CLOSED') {
+      throw new GameStateError('Game must be closed before revealing');
+    }
+
+    const updatedGameRound = await this.prisma.gameRound.update({
+      where: { id: gameRoundId },
+      data: {
+        phase: 'REVEALED',
+        finalValue,
+        revealedAt: new Date(),
+      },
+    });
+
+    logger.info(`Revealed bonus game: ${gameRoundId} with final value: ${finalValue}`);
+    return updatedGameRound;
+  }
+
+  async submitGuess(gameRoundId: string, userId: string, guess: number) {
+    // Check if game is open
+    const gameRound = await this.prisma.gameRound.findUnique({
+      where: { id: gameRoundId },
+    });
+
+    if (!gameRound) {
+      throw new GameStateError('Game not found');
+    }
+
+    if (gameRound.phase !== 'OPEN') {
+      throw new GameStateError('Game is not accepting guesses');
+    }
+
+    // Check if user already submitted a guess
+    const existingGuess = await this.prisma.guess.findFirst({
       where: {
-        gameId: activeGame.id,
-        name: bonusName,
-      },
-      data: {
-        amountX,
+        gameRoundId,
+        userId,
       },
     });
 
-    if (payout.count === 0) {
-      throw new GameStateError(`Bonus "${bonusName}" not found`);
+    if (existingGuess) {
+      throw new ConflictError('You have already submitted a guess for this game');
     }
 
-    logger.info('Bonus payout recorded', { gameId: activeGame.id, bonusName, amountX });
-    return { gameId: activeGame.id, name: bonusName, amountX };
-  }
-
-  async closeGame(): Promise<BonusHuntResult> {
-    const activeGame = await this.getActiveGame();
-
-    // Calculate total payout
-    const payouts = await this.prisma.bonusPayout.findMany({
-      where: { gameId: activeGame.id },
-    });
-
-    const totalPayout = payouts.reduce((sum, payout) => sum + payout.amountX, 0);
-
-    // Get all entries with users
-    const entries = await this.prisma.bonusEntry.findMany({
-      where: { gameId: activeGame.id },
+    // Create the guess
+    const guessEntry = await this.prisma.guess.create({
+      data: {
+        gameRoundId,
+        userId,
+        value: guess,
+      },
       include: {
         user: {
           select: {
@@ -104,129 +141,17 @@ export class BonusService {
           },
         },
       },
-      orderBy: {
-        createdAt: 'asc',
-      },
     });
 
-    // Sort entries by closest guess (absolute difference from total payout)
-    const sortedEntries = entries.sort((a, b) => {
-      const deltaA = Math.abs(a.guess - totalPayout);
-      const deltaB = Math.abs(b.guess - totalPayout);
-      return deltaA - deltaB;
-    });
-
-    // Update game status
-    const game = await this.prisma.game.update({
-      where: { id: activeGame.id },
-      data: {
-        status: GameStatus.COMPLETED,
-        endedAt: new Date(),
-      },
-    });
-
-    logger.info('Bonus hunt game closed', {
-      gameId: game.id,
-      totalPayout,
-      entriesCount: entries.length,
-    });
-
-    return {
-      game,
-      totalPayout,
-      entries: sortedEntries,
-    };
+    logger.info(`User ${userId} submitted guess ${guess} for game ${gameRoundId}`);
+    return guessEntry;
   }
 
-  async getActiveGame() {
-    const game = await this.prisma.game.findFirst({
-      where: {
-        type: GameType.BONUS,
-        status: {
-          in: ['RUNNING', 'OPENING'],
-        },
-      },
-    });
-
-    if (!game) {
-      throw new GameStateError('No active bonus hunt game');
-    }
-
-    return game;
-  }
-
-  async submitGuess(gameId: string, userId: string, guess: number) {
-    const game = await this.getActiveGame();
-
-    if (game.id !== gameId) {
-      throw new GameStateError('Invalid game ID');
-    }
-
-    // Check if user already submitted a guess
-    const existingEntry = await this.prisma.bonusEntry.findUnique({
-      where: {
-        gameId_userId: {
-          gameId,
-          userId,
-        },
-      },
-    });
-
-    if (existingEntry) {
-      throw new ConflictError('You have already submitted a guess');
-    }
-
-    // Check if this guess value is already taken by another user
-    const existingGuess = await this.prisma.bonusEntry.findFirst({
-      where: {
-        gameId: gameId,
-        guess: guess,
-      },
-    });
-
-    if (existingGuess) {
-      console.log(`Duplicate bonus guess detected: User ${userId} tried to guess ${guess} but it's already taken by user ${existingGuess.userId}`);
-      throw new ConflictError('This guess has already been submitted by another player. Please choose a different number.');
-    }
-
-    // Use transaction to ensure atomicity
-    const entry = await this.prisma.$transaction(async (tx) => {
-      // Double-check within transaction to prevent race conditions
-      const doubleCheck = await tx.bonusEntry.findFirst({
-        where: {
-          gameId: gameId,
-          guess: guess,
-        },
-      });
-
-      if (doubleCheck) {
-        throw new ConflictError('This guess has already been submitted by another player. Please choose a different number.');
-      }
-
-      // Create new entry
-      return await tx.bonusEntry.create({
-        data: {
-          gameId,
-          userId,
-          guess,
-        },
-      });
-    });
-
-    logger.info('Bonus hunt guess submitted', {
-      gameId,
-      userId,
-      guess,
-    });
-
-    return entry;
-  }
-
-  async getGameState(gameId: string) {
-    const game = await this.prisma.game.findUnique({
-      where: { id: gameId },
+  async getGameResults(gameRoundId: string): Promise<BonusHuntResult> {
+    const gameRound = await this.prisma.gameRound.findUnique({
+      where: { id: gameRoundId },
       include: {
-        bonusEntries: {
+        guesses: {
           include: {
             user: {
               select: {
@@ -236,23 +161,70 @@ export class BonusService {
               },
             },
           },
-          orderBy: {
-            createdAt: 'asc',
-          },
         },
-        payouts: true,
+        bonusItems: true,
       },
     });
 
-    if (!game) {
+    if (!gameRound) {
       throw new GameStateError('Game not found');
     }
 
-    const totalPayout = game.payouts.reduce((sum, payout) => sum + payout.amountX, 0);
+    const totalPayout = gameRound.bonusItems.reduce((sum, item) => sum + (item.payoutX || 0), 0);
 
     return {
-      ...game,
+      gameRound,
       totalPayout,
+      entries: gameRound.guesses.map(guess => ({
+        id: guess.id,
+        value: guess.value,
+        user: {
+          id: guess.user.id,
+          kickName: guess.user.kickName || undefined,
+          telegramUser: guess.user.telegramUser || undefined,
+        },
+      })),
     };
+  }
+
+  async getCurrentGame() {
+    return await this.prisma.gameRound.findFirst({
+      where: {
+        type: 'BONUS',
+        phase: 'OPEN',
+      },
+    });
+  }
+
+  async getLeaderboard(gameRoundId: string) {
+    const gameRound = await this.prisma.gameRound.findUnique({
+      where: { id: gameRoundId },
+      include: {
+        guesses: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                kickName: true,
+                telegramUser: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!gameRound || !gameRound.finalValue) {
+      return [];
+    }
+
+    // Calculate distances from final value
+    const entries = gameRound.guesses.map(guess => ({
+      ...guess,
+      distance: Math.abs(guess.value - gameRound.finalValue!),
+    }));
+
+    // Sort by distance (closest first)
+    return entries.sort((a, b) => a.distance - b.distance);
   }
 }

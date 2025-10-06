@@ -1,6 +1,12 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { logger } from '../telemetry/logger.js';
 import { ForbiddenError, UnauthorizedError } from '../utils/errors.js';
+
+export enum Role {
+  VIEWER = 'VIEWER',
+  MOD = 'MOD',
+  OWNER = 'OWNER'
+}
 
 export interface UserContext {
   id: string;
@@ -57,8 +63,8 @@ export class AuthService {
       return {
         id: user.id,
         telegramId: user.telegramId,
-        kickName: user.kickName,
-        role: user.role,
+        kickName: user.kickName || undefined,
+        role: user.role as Role,
       };
     } catch (error) {
       logger.error('Failed to get user by Telegram ID:', error);
@@ -85,8 +91,8 @@ export class AuthService {
       return {
         id: user.id,
         telegramId: user.telegramId,
-        kickName: user.kickName,
-        role: user.role,
+        kickName: user.kickName || undefined,
+        role: user.role as Role,
       };
     } catch (error) {
       logger.error('Failed to get user by Kick name:', error);
@@ -98,10 +104,13 @@ export class AuthService {
     telegramId?: string;
     telegramUser?: string;
     kickName?: string;
-    cwalletHandle?: string;
     role?: Role;
   }): Promise<UserContext> {
     try {
+      if (!data.telegramId) {
+        throw new Error('telegramId is required');
+      }
+
       const user = await this.prisma.user.upsert({
         where: {
           telegramId: data.telegramId,
@@ -109,7 +118,6 @@ export class AuthService {
         update: {
           telegramUser: data.telegramUser,
           kickName: data.kickName,
-          cwalletHandle: data.cwalletHandle,
           role: data.role,
           linkedAt: data.kickName && data.telegramId ? new Date() : undefined,
         },
@@ -117,7 +125,6 @@ export class AuthService {
           telegramId: data.telegramId,
           telegramUser: data.telegramUser,
           kickName: data.kickName,
-          cwalletHandle: data.cwalletHandle,
           role: data.role || Role.VIEWER,
         },
         select: {
@@ -131,8 +138,8 @@ export class AuthService {
       return {
         id: user.id,
         telegramId: user.telegramId,
-        kickName: user.kickName,
-        role: user.role,
+        kickName: user.kickName || undefined,
+        role: user.role as Role,
       };
     } catch (error) {
       logger.error('Failed to create or update user:', error);
