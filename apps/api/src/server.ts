@@ -139,7 +139,11 @@ export class Server {
         return { success: true, session: activeSession };
       } catch (error) {
         reply.code(500);
-          return { success: false, message: 'Error getting active session', error: (error as any).message };
+        return {
+          success: false,
+          message: 'Error getting active session',
+          error: (error as any).message,
+        };
       }
     });
 
@@ -158,7 +162,11 @@ export class Server {
           return { success: true, session: newSession };
         } catch (error) {
           reply.code(500);
-          return { success: false, message: 'Error creating session', error: (error as any).message };
+          return {
+            success: false,
+            message: 'Error creating session',
+            error: (error as any).message,
+          };
         }
       }
     );
@@ -179,7 +187,11 @@ export class Server {
           return { success: true, message: 'Session closed successfully' };
         } catch (error) {
           reply.code(500);
-          return { success: false, message: 'Error closing session', error: (error as any).message };
+          return {
+            success: false,
+            message: 'Error closing session',
+            error: (error as any).message,
+          };
         }
       }
     );
@@ -200,7 +212,11 @@ export class Server {
           return { success: true, message: 'Session revealed successfully' };
         } catch (error) {
           reply.code(500);
-          return { success: false, message: 'Error revealing session', error: (error as any).message };
+          return {
+            success: false,
+            message: 'Error revealing session',
+            error: (error as any).message,
+          };
         }
       }
     );
@@ -220,7 +236,11 @@ export class Server {
         return result;
       } catch (error) {
         reply.code(500);
-        return { success: false, message: 'Error making call entry', error: (error as any).message };
+        return {
+          success: false,
+          message: 'Error making call entry',
+          error: (error as any).message,
+        };
       }
     });
 
@@ -231,7 +251,11 @@ export class Server {
         return { success: true, entries };
       } catch (error) {
         reply.code(500);
-        return { success: false, message: 'Error getting call entries', error: (error as any).message };
+        return {
+          success: false,
+          message: 'Error getting call entries',
+          error: (error as any).message,
+        };
       }
     });
 
@@ -262,7 +286,11 @@ export class Server {
           return { success: true, message: 'Multiplier set successfully' };
         } catch (error) {
           reply.code(500);
-          return { success: false, message: 'Error setting multiplier', error: (error as any).message };
+          return {
+            success: false,
+            message: 'Error setting multiplier',
+            error: (error as any).message,
+          };
         }
       }
     );
@@ -297,7 +325,7 @@ export class Server {
     try {
       // Initialize the server
       await this.initialize();
-      
+
       // Connect to database
       await connectDatabase();
 

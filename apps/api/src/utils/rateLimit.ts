@@ -19,9 +19,7 @@ export class RateLimiter {
     identifier: string,
     config: RateLimitConfig
   ): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
-    const key = config.keyGenerator
-      ? config.keyGenerator(identifier)
-      : `rate_limit:${identifier}`;
+    const key = config.keyGenerator ? config.keyGenerator(identifier) : `rate_limit:${identifier}`;
 
     const now = Date.now();
     const windowStart = now - config.windowMs;
@@ -48,7 +46,7 @@ export class RateLimiter {
         throw new Error('Redis pipeline execution failed');
       }
 
-      const currentCount = results[1]?.[1] as number ?? 0;
+      const currentCount = (results[1]?.[1] as number) ?? 0;
       const allowed = currentCount < config.maxRequests;
       const remaining = Math.max(0, config.maxRequests - currentCount - 1);
       const resetTime = now + config.windowMs;
@@ -71,15 +69,14 @@ export class RateLimiter {
     }
   }
 
-  async consumeLimit(
-    identifier: string,
-    config: RateLimitConfig
-  ): Promise<void> {
+  async consumeLimit(identifier: string, config: RateLimitConfig): Promise<void> {
     const result = await this.checkLimit(identifier, config);
 
     if (!result.allowed) {
       throw new RateLimitError(
-        `Rate limit exceeded. Try again in ${Math.ceil((result.resetTime - Date.now()) / 1000)} seconds.`
+        `Rate limit exceeded. Try again in ${Math.ceil(
+          (result.resetTime - Date.now()) / 1000
+        )} seconds.`
       );
     }
   }

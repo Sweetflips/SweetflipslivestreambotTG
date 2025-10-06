@@ -24,7 +24,9 @@ export function normalizeAnswer(answer: string): string {
 
 // Calculate Levenshtein distance for fuzzy matching
 export function levenshteinDistance(str1: string, str2: string): number {
-  const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+  const matrix = Array(str2.length + 1)
+    .fill(null)
+    .map(() => Array(str1.length + 1).fill(null));
 
   for (let i = 0; i <= str1.length; i++) {
     matrix[0]![i] = i;
@@ -49,7 +51,11 @@ export function levenshteinDistance(str1: string, str2: string): number {
 }
 
 // Check if answer is close enough (fuzzy match)
-export function isAnswerClose(userAnswer: string, correctAnswer: string, threshold: number = 2): boolean {
+export function isAnswerClose(
+  userAnswer: string,
+  correctAnswer: string,
+  threshold: number = 2
+): boolean {
   const normalizedUser = normalizeAnswer(userAnswer);
   const normalizedCorrect = normalizeAnswer(correctAnswer);
 

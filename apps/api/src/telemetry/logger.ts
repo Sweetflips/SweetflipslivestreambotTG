@@ -6,16 +6,19 @@ const env = getEnv();
 // Create base logger
 const logger = pino({
   level: env.LOG_LEVEL,
-  transport: env.NODE_ENV === 'development' ? {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      translateTime: 'SYS:standard',
-      ignore: 'pid,hostname',
-    },
-  } as any : undefined,
+  transport:
+    env.NODE_ENV === 'development'
+      ? ({
+          target: 'pino-pretty',
+          options: {
+            colorize: true,
+            translateTime: 'SYS:standard',
+            ignore: 'pid,hostname',
+          },
+        } as any)
+      : undefined,
   formatters: {
-    level: (label) => ({ level: label }),
+    level: label => ({ level: label }),
   },
   timestamp: pino.stdTimeFunctions.isoTime,
 });
@@ -55,7 +58,11 @@ export function logError(error: Error, context: Record<string, any> = {}) {
   });
 }
 
-export function logPerformance(operation: string, duration: number, data: Record<string, any> = {}) {
+export function logPerformance(
+  operation: string,
+  duration: number,
+  data: Record<string, any> = {}
+) {
   logger.info({
     type: 'performance',
     operation,
