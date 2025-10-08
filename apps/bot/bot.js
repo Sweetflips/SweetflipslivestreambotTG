@@ -1267,18 +1267,53 @@ bot.command("balanceboard", async (ctx) => {
       leaderboardText = `🏁 <b>Final Balance: ${gameState.balance.finalBalance.toLocaleString()}</b>\n\n`;
     }
 
+    let guesses = [];
+    let hasGuesses = false;
+
+    // Check database first if available
+    if (guessService && prisma) {
+      try {
+        const currentRound = await guessService.getCurrentRound("GUESS_BALANCE");
+        if (currentRound) {
+          const dbGuesses = await prisma.guess.findMany({
+            where: {
+              gameRoundId: currentRound.id,
+            },
+            include: {
+              user: true,
+            },
+            orderBy: {
+              value: "asc",
+            },
+          });
+
+          if (dbGuesses.length > 0) {
+            hasGuesses = true;
+            guesses = dbGuesses.map(guess => ({
+              kickName: guess.user.kickName || guess.user.telegramUser || "Unknown",
+              guess: guess.value,
+              timestamp: new Date(guess.createdAt).getTime(),
+            }));
+          }
+        }
+      } catch (error) {
+        console.error("❌ Error fetching balance guesses from database:", error);
+      }
+    }
+
+    // Fallback to in-memory storage if no database guesses found
+    if (!hasGuesses && gameState.balance.guesses.size > 0) {
+      hasGuesses = true;
+      guesses = Array.from(gameState.balance.guesses.values());
+    }
+
     console.log(
-      `📊 Balanceboard - Total guesses: ${gameState.balance.guesses.size}`
-    );
-    console.log(
-      `📊 Balanceboard - Game state guesses:`,
-      Array.from(gameState.balance.guesses.entries())
+      `📊 Balanceboard - Total guesses: ${hasGuesses ? guesses.length : 0}`
     );
 
-    if (gameState.balance.guesses.size === 0) {
+    if (!hasGuesses) {
       leaderboardText += `No guesses recorded yet. Use /guess balance &lt;number&gt; to make a guess!`;
     } else {
-      const guesses = Array.from(gameState.balance.guesses.values());
       const targetBalance = gameState.balance.isFinalized
         ? gameState.balance.finalBalance
         : liveBalance;
@@ -1337,10 +1372,49 @@ bot.command("bonusboard", async (ctx) => {
       leaderboardText = `🏆 <b>Final Bonus Total: ${gameState.bonus.finalBonus}</b>\n\n`;
     }
 
-    if (gameState.bonus.guesses.size === 0) {
+    let guesses = [];
+    let hasGuesses = false;
+
+    // Check database first if available
+    if (guessService && prisma) {
+      try {
+        const currentRound = await guessService.getCurrentRound("GUESS_BONUS");
+        if (currentRound) {
+          const dbGuesses = await prisma.guess.findMany({
+            where: {
+              gameRoundId: currentRound.id,
+            },
+            include: {
+              user: true,
+            },
+            orderBy: {
+              value: "asc",
+            },
+          });
+
+          if (dbGuesses.length > 0) {
+            hasGuesses = true;
+            guesses = dbGuesses.map(guess => ({
+              kickName: guess.user.kickName || guess.user.telegramUser || "Unknown",
+              guess: guess.value,
+              timestamp: new Date(guess.createdAt).getTime(),
+            }));
+          }
+        }
+      } catch (error) {
+        console.error("❌ Error fetching guesses from database:", error);
+      }
+    }
+
+    // Fallback to in-memory storage if no database guesses found
+    if (!hasGuesses && gameState.bonus.guesses.size > 0) {
+      hasGuesses = true;
+      guesses = Array.from(gameState.bonus.guesses.values());
+    }
+
+    if (!hasGuesses) {
       leaderboardText += `No guesses recorded yet. Use /guess bonus &lt;number&gt; to make a guess!`;
     } else {
-      const guesses = Array.from(gameState.bonus.guesses.values());
       const targetBonus = gameState.bonus.isFinalized
         ? gameState.bonus.finalBonus
         : gameState.bonus.bonusAmount;
