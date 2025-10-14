@@ -112,7 +112,11 @@ export class Server {
             }
             catch (error) {
                 reply.code(500);
-                return { success: false, message: 'Error getting active session', error: error.message };
+                return {
+                    success: false,
+                    message: 'Error getting active session',
+                    error: error.message,
+                };
             }
         });
         this.fastify.post('/call-sessions/create', {
@@ -128,7 +132,11 @@ export class Server {
             }
             catch (error) {
                 reply.code(500);
-                return { success: false, message: 'Error creating session', error: error.message };
+                return {
+                    success: false,
+                    message: 'Error creating session',
+                    error: error.message,
+                };
             }
         });
         this.fastify.post('/call-sessions/:sessionId/close', {
@@ -145,7 +153,11 @@ export class Server {
             }
             catch (error) {
                 reply.code(500);
-                return { success: false, message: 'Error closing session', error: error.message };
+                return {
+                    success: false,
+                    message: 'Error closing session',
+                    error: error.message,
+                };
             }
         });
         this.fastify.post('/call-sessions/:sessionId/reveal', {
@@ -162,7 +174,11 @@ export class Server {
             }
             catch (error) {
                 reply.code(500);
-                return { success: false, message: 'Error revealing session', error: error.message };
+                return {
+                    success: false,
+                    message: 'Error revealing session',
+                    error: error.message,
+                };
             }
         });
         this.fastify.post('/call-entries', async (request, reply) => {
@@ -180,7 +196,11 @@ export class Server {
             }
             catch (error) {
                 reply.code(500);
-                return { success: false, message: 'Error making call entry', error: error.message };
+                return {
+                    success: false,
+                    message: 'Error making call entry',
+                    error: error.message,
+                };
             }
         });
         this.fastify.get('/call-entries', async (request, reply) => {
@@ -191,7 +211,11 @@ export class Server {
             }
             catch (error) {
                 reply.code(500);
-                return { success: false, message: 'Error getting call entries', error: error.message };
+                return {
+                    success: false,
+                    message: 'Error getting call entries',
+                    error: error.message,
+                };
             }
         });
         this.fastify.post('/call-entries/:sessionId/:slotName/multiplier', {
@@ -213,7 +237,11 @@ export class Server {
             }
             catch (error) {
                 reply.code(500);
-                return { success: false, message: 'Error setting multiplier', error: error.message };
+                return {
+                    success: false,
+                    message: 'Error setting multiplier',
+                    error: error.message,
+                };
             }
         });
     }

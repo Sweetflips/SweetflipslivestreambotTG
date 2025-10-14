@@ -1,4 +1,5 @@
-import { GameStatus, GameType, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import { GameType } from '../games/guess/guessService.js';
 import { getEnv } from '../../../config/env.js';
 import { logger } from '../../../telemetry/logger.js';
 

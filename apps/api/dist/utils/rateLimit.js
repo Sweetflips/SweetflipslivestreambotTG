@@ -7,9 +7,7 @@ export class RateLimiter {
         this.redis = redis;
     }
     async checkLimit(identifier, config) {
-        const key = config.keyGenerator
-            ? config.keyGenerator(identifier)
-            : `rate_limit:${identifier}`;
+        const key = config.keyGenerator ? config.keyGenerator(identifier) : `rate_limit:${identifier}`;
         const now = Date.now();
         const windowStart = now - config.windowMs;
         try {

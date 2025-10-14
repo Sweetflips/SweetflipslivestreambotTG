@@ -1274,6 +1274,8 @@ bot.command("balanceboard", async (ctx) => {
         const currentRound = await guessService.getCurrentRound(
           "GUESS_BALANCE"
         );
+        console.log(`📊 Balanceboard - Round found: ${currentRound ? 'Yes' : 'No'}, Phase: ${currentRound?.phase}`);
+        
         if (currentRound) {
           const dbGuesses = await prisma.guess.findMany({
             where: {
@@ -1286,6 +1288,8 @@ bot.command("balanceboard", async (ctx) => {
               value: "asc",
             },
           });
+
+          console.log(`📊 Balanceboard - Database guesses found: ${dbGuesses.length}`);
 
           if (dbGuesses.length > 0) {
             hasGuesses = true;
@@ -1382,6 +1386,8 @@ bot.command("bonusboard", async (ctx) => {
     if (guessService && prisma) {
       try {
         const currentRound = await guessService.getCurrentRound("GUESS_BONUS");
+        console.log(`🎁 Bonusboard - Round found: ${currentRound ? 'Yes' : 'No'}, Phase: ${currentRound?.phase}`);
+        
         if (currentRound) {
           const dbGuesses = await prisma.guess.findMany({
             where: {
@@ -1394,6 +1400,8 @@ bot.command("bonusboard", async (ctx) => {
               value: "asc",
             },
           });
+
+          console.log(`🎁 Bonusboard - Database guesses found: ${dbGuesses.length}`);
 
           if (dbGuesses.length > 0) {
             hasGuesses = true;

@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { Context } from 'telegraf';
 import { NotFoundError } from '../../utils/errors.js';
 import { BonusService } from './bonusService';
-import { GuessService } from './guessService';
+import { GuessService, GameType } from './guessService';
 export class GuessCommands {
     prisma;
     guessService;

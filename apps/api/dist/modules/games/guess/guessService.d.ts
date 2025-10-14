@@ -1,4 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+export declare enum GameType {
+    GUESS_BALANCE = "GUESS_BALANCE",
+    GUESS_BONUS = "GUESS_BONUS"
+}
 export interface GuessResult {
     success: boolean;
     message: string;

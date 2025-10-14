@@ -21,7 +21,9 @@ export function normalizeAnswer(answer) {
 }
 // Calculate Levenshtein distance for fuzzy matching
 export function levenshteinDistance(str1, str2) {
-    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    const matrix = Array(str2.length + 1)
+        .fill(null)
+        .map(() => Array(str1.length + 1).fill(null));
     for (let i = 0; i <= str1.length; i++) {
         matrix[0][i] = i;
     }

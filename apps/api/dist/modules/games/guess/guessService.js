@@ -1,5 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { GameStateError, ValidationError } from '../../utils/errors.js';
+export var GameType;
+(function (GameType) {
+    GameType["GUESS_BALANCE"] = "GUESS_BALANCE";
+    GameType["GUESS_BONUS"] = "GUESS_BONUS";
+})(GameType || (GameType = {}));
 export class GuessService {
     prisma;
     constructor(prisma) {
@@ -32,7 +37,7 @@ export class GuessService {
             where: {
                 type: gameType,
                 phase: {
-                    in: ['IDLE', GameStatus.OPEN, GameStatus.CLOSED],
+                    in: ['IDLE', 'OPEN', 'CLOSED'],
                 },
             },
             orderBy: { createdAt: 'desc' },
@@ -54,11 +59,11 @@ export class GuessService {
     async submitGuess(userId, gameType, value, isEdit = false) {
         const round = await this.getCurrentRound(gameType);
         // Validate game state
-        if (round.phase !== GameStatus.OPEN) {
-            if (round.phase === GameStatus.CLOSED || round.phase === GameStatus.REVEALED) {
+        if (round.phase !== 'OPEN') {
+            if (round.phase === 'CLOSED' || round.phase === 'REVEALED') {
                 return {
                     success: false,
-                    message: `⛔️ Guessing is closed. ${round.phase === GameStatus.REVEALED
+                    message: `⛔️ Guessing is closed. ${round.phase === 'REVEALED'
                         ? 'Results have been revealed!'
                         : 'Waiting for results!'}`,
                 };
@@ -212,13 +217,13 @@ export class GuessService {
     // Open a game round
     async openRound(gameType, userId) {
         const round = await this.getCurrentRound(gameType);
-        if (round.phase === GameStatus.OPEN) {
+        if (round.phase === 'OPEN') {
             return `✅ *${gameType === GameType.GUESS_BALANCE ? 'Balance' : 'Bonus'}* guesses are already OPEN.`;
         }
         await this.prisma.gameRound.update({
             where: { id: round.id },
             data: {
-                phase: GameStatus.OPEN,
+                phase: 'OPEN',
                 updatedAt: new Date(),
             },
         });
@@ -229,7 +234,7 @@ export class GuessService {
     // Close a game round
     async closeRound(gameType, userId) {
         const round = await this.getCurrentRound(gameType);
-        if (round.phase !== GameStatus.OPEN) {
+        if (round.phase !== 'OPEN') {
             return `⛔️ *${gameType === GameType.GUESS_BALANCE ? 'Balance' : 'Bonus'}* guesses are not currently open.`;
         }
         const guessCount = await this.prisma.guess.count({
@@ -238,7 +243,7 @@ export class GuessService {
         await this.prisma.gameRound.update({
             where: { id: round.id },
             data: {
-                phase: GameStatus.CLOSED,
+                phase: 'CLOSED',
                 closedAt: new Date(),
                 updatedAt: new Date(),
             },
@@ -265,14 +270,14 @@ export class GuessService {
         if (!round.finalValue) {
             return `❌ Final value must be set before revealing results. Use /${gameType === GameType.GUESS_BALANCE ? 'balance' : 'bonus'} final <number> first.`;
         }
-        if (round.phase === GameStatus.REVEALED) {
+        if (round.phase === 'REVEALED') {
             return `✅ Results have already been revealed.`;
         }
         const leaderboard = await this.getLeaderboard(gameType, topN);
         await this.prisma.gameRound.update({
             where: { id: round.id },
             data: {
-                phase: GameStatus.REVEALED,
+                phase: 'REVEALED',
                 revealedAt: new Date(),
                 updatedAt: new Date(),
             },
@@ -300,7 +305,7 @@ export class GuessService {
     // Complete a game round and archive all data
     async completeGameRound(gameType, userId) {
         const round = await this.getCurrentRound(gameType);
-        if (round.phase !== GameStatus.REVEALED) {
+        if (round.phase !== 'REVEALED') {
             return `❌ Game must be revealed before completion. Use /${gameType === GameType.GUESS_BALANCE ? 'balance' : 'bonus'} reveal first.`;
         }
         if (round.phase === 'COMPLETED') {
@@ -453,7 +458,7 @@ export class GuessService {
             return `📊 **Current Standings:**\n\nNo guesses submitted yet.`;
         }
         let message = `📊 **Current Standings:**\n\n${guessCount} guess${guessCount === 1 ? '' : 'es'} submitted.`;
-        if (round.phase === GameStatus.REVEALED && round.finalValue) {
+        if (round.phase === 'REVEALED' && round.finalValue) {
             // Show actual leaderboard if revealed
             const leaderboard = await this.getLeaderboard(gameType, topN);
             if (leaderboard.length > 0) {
