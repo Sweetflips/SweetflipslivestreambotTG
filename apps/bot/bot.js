@@ -1238,7 +1238,6 @@ bot.command("guess", async (ctx) => {
 
 bot.command("balanceboard", async (ctx) => {
   try {
-    // Log command usage for debugging
     const chatType = ctx.chat?.type || "unknown";
     const chatId = ctx.chat?.id || "unknown";
     console.log(`📊 /balanceboard command used in ${chatType} chat: ${chatId}`);
@@ -1270,10 +1269,11 @@ bot.command("balanceboard", async (ctx) => {
     let guesses = [];
     let hasGuesses = false;
 
-    // Check database first if available
     if (guessService && prisma) {
       try {
-        const currentRound = await guessService.getCurrentRound("GUESS_BALANCE");
+        const currentRound = await guessService.getCurrentRound(
+          "GUESS_BALANCE"
+        );
         if (currentRound) {
           const dbGuesses = await prisma.guess.findMany({
             where: {
@@ -1289,26 +1289,29 @@ bot.command("balanceboard", async (ctx) => {
 
           if (dbGuesses.length > 0) {
             hasGuesses = true;
-            guesses = dbGuesses.map(guess => ({
-              kickName: guess.user.kickName || guess.user.telegramUser || "Unknown",
+            guesses = dbGuesses.map((guess) => ({
+              kickName:
+                guess.user.kickName || guess.user.telegramUser || "Unknown",
               guess: guess.value,
               timestamp: new Date(guess.createdAt).getTime(),
             }));
           }
         }
       } catch (error) {
-        console.error("❌ Error fetching balance guesses from database:", error);
+        console.error(
+          "❌ Error fetching balance guesses from database:",
+          error
+        );
       }
     }
 
-    // Fallback to in-memory storage if no database guesses found
     if (!hasGuesses && gameState.balance.guesses.size > 0) {
       hasGuesses = true;
       guesses = Array.from(gameState.balance.guesses.values());
     }
 
     console.log(
-      `📊 Balanceboard - Total guesses: ${hasGuesses ? guesses.length : 0}`
+      `📊 Balanceboard - Total guesses: ${hasGuesses ? guesses.length : 0}, Game Open: ${gameState.balance.isOpen}`
     );
 
     if (!hasGuesses) {
@@ -1353,7 +1356,6 @@ bot.command("balanceboard", async (ctx) => {
 
 bot.command("bonusboard", async (ctx) => {
   try {
-    // Log command usage for debugging
     const chatType = ctx.chat?.type || "unknown";
     const chatId = ctx.chat?.id || "unknown";
     console.log(`🎁 /bonusboard command used in ${chatType} chat: ${chatId}`);
@@ -1375,7 +1377,6 @@ bot.command("bonusboard", async (ctx) => {
     let guesses = [];
     let hasGuesses = false;
 
-    // Check database first if available
     if (guessService && prisma) {
       try {
         const currentRound = await guessService.getCurrentRound("GUESS_BONUS");
@@ -1394,8 +1395,9 @@ bot.command("bonusboard", async (ctx) => {
 
           if (dbGuesses.length > 0) {
             hasGuesses = true;
-            guesses = dbGuesses.map(guess => ({
-              kickName: guess.user.kickName || guess.user.telegramUser || "Unknown",
+            guesses = dbGuesses.map((guess) => ({
+              kickName:
+                guess.user.kickName || guess.user.telegramUser || "Unknown",
               guess: guess.value,
               timestamp: new Date(guess.createdAt).getTime(),
             }));
@@ -1406,11 +1408,14 @@ bot.command("bonusboard", async (ctx) => {
       }
     }
 
-    // Fallback to in-memory storage if no database guesses found
     if (!hasGuesses && gameState.bonus.guesses.size > 0) {
       hasGuesses = true;
       guesses = Array.from(gameState.bonus.guesses.values());
     }
+
+    console.log(
+      `🎁 Bonusboard - Total guesses: ${hasGuesses ? guesses.length : 0}, Game Open: ${gameState.bonus.isOpen}`
+    );
 
     if (!hasGuesses) {
       leaderboardText += `No guesses recorded yet. Use /guess bonus &lt;number&gt; to make a guess!`;
