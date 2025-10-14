@@ -91,7 +91,9 @@ export class GuessService {
       return await this.prisma.gameRound.findFirst({
         where: {
           type: gameType,
-          phase: "OPEN",
+          phase: {
+            in: ["IDLE", "OPEN", "CLOSED"],
+          },
         },
         orderBy: {
           createdAt: "desc",
