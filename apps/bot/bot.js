@@ -1804,12 +1804,35 @@ bot.command("add", async (ctx) => {
     return;
   }
 
-  gameState.bonus.bonusAmount += 1;
-  gameState.bonus.bonusList.push(bonusName);
+  if (guessService && prisma) {
+    try {
+      const bonusRound = await guessService.getCurrentRound("GUESS_BONUS");
+      
+      await prisma.bonusItem.create({
+        data: {
+          gameRoundId: bonusRound.id,
+          name: bonusName,
+        },
+      });
 
-  await ctx.reply(
-    `✅ Added bonus: "${bonusName}"\n\nTotal bonuses: ${gameState.bonus.bonusAmount}`
-  );
+      gameState.bonus.bonusAmount += 1;
+      gameState.bonus.bonusList.push(bonusName);
+
+      await ctx.reply(
+        `✅ Added bonus: "${bonusName}"\n\nTotal bonuses: ${gameState.bonus.bonusAmount}`
+      );
+    } catch (error) {
+      console.error("❌ Error adding bonus item:", error);
+      await ctx.reply(`❌ Failed to add bonus item. Please try again.`);
+    }
+  } else {
+    gameState.bonus.bonusAmount += 1;
+    gameState.bonus.bonusList.push(bonusName);
+
+    await ctx.reply(
+      `✅ Added bonus: "${bonusName}"\n\nTotal bonuses: ${gameState.bonus.bonusAmount}`
+    );
+  }
 });
 
 bot.command("remove", async (ctx) => {
@@ -1836,12 +1859,41 @@ bot.command("remove", async (ctx) => {
     return;
   }
 
-  gameState.bonus.bonusAmount = Math.max(0, gameState.bonus.bonusAmount - 1);
-  gameState.bonus.bonusList.splice(bonusIndex, 1);
+  if (guessService && prisma) {
+    try {
+      const bonusRound = await guessService.getCurrentRound("GUESS_BONUS");
+      
+      const bonusItem = await prisma.bonusItem.findFirst({
+        where: {
+          gameRoundId: bonusRound.id,
+          name: bonusName,
+        },
+      });
 
-  await ctx.reply(
-    `✅ Removed bonus: "${bonusName}"\n\nTotal bonuses: ${gameState.bonus.bonusAmount}`
-  );
+      if (bonusItem) {
+        await prisma.bonusItem.delete({
+          where: { id: bonusItem.id },
+        });
+      }
+
+      gameState.bonus.bonusAmount = Math.max(0, gameState.bonus.bonusAmount - 1);
+      gameState.bonus.bonusList.splice(bonusIndex, 1);
+
+      await ctx.reply(
+        `✅ Removed bonus: "${bonusName}"\n\nTotal bonuses: ${gameState.bonus.bonusAmount}`
+      );
+    } catch (error) {
+      console.error("❌ Error removing bonus item:", error);
+      await ctx.reply(`❌ Failed to remove bonus item. Please try again.`);
+    }
+  } else {
+    gameState.bonus.bonusAmount = Math.max(0, gameState.bonus.bonusAmount - 1);
+    gameState.bonus.bonusList.splice(bonusIndex, 1);
+
+    await ctx.reply(
+      `✅ Removed bonus: "${bonusName}"\n\nTotal bonuses: ${gameState.bonus.bonusAmount}`
+    );
+  }
 });
 
 bot.command("setrole", async (ctx) => {
@@ -4276,37 +4328,43 @@ async function syncGameStateWithDatabase() {
 
   try {
     console.log("🔄 Syncing game state with database...");
-    
+
     const balanceRound = await guessService.getCurrentRound("GUESS_BALANCE");
     if (balanceRound) {
       gameState.balance.isOpen = balanceRound.phase === "OPEN";
-      gameState.balance.isFinalized = balanceRound.phase === "REVEALED" || balanceRound.finalValue !== null;
+      gameState.balance.isFinalized =
+        balanceRound.phase === "REVEALED" || balanceRound.finalValue !== null;
       gameState.balance.finalBalance = balanceRound.finalValue;
-      
+
       const balanceGuessCount = await prisma.guess.count({
         where: { gameRoundId: balanceRound.id },
       });
-      console.log(`📊 Balance: Phase=${balanceRound.phase}, Guesses=${balanceGuessCount}`);
+      console.log(
+        `📊 Balance: Phase=${balanceRound.phase}, Guesses=${balanceGuessCount}`
+      );
     }
 
     const bonusRound = await guessService.getCurrentRound("GUESS_BONUS");
     if (bonusRound) {
       gameState.bonus.isOpen = bonusRound.phase === "OPEN";
-      gameState.bonus.isFinalized = bonusRound.phase === "REVEALED" || bonusRound.finalValue !== null;
+      gameState.bonus.isFinalized =
+        bonusRound.phase === "REVEALED" || bonusRound.finalValue !== null;
       gameState.bonus.finalBonus = bonusRound.finalValue;
-      
+
       const bonusItems = await prisma.bonusItem.findMany({
         where: { gameRoundId: bonusRound.id },
         orderBy: { createdAt: "asc" },
       });
-      
+
       gameState.bonus.bonusAmount = bonusItems.length;
-      gameState.bonus.bonusList = bonusItems.map(item => item.name);
-      
+      gameState.bonus.bonusList = bonusItems.map((item) => item.name);
+
       const bonusGuessCount = await prisma.guess.count({
         where: { gameRoundId: bonusRound.id },
       });
-      console.log(`🎁 Bonus: Phase=${bonusRound.phase}, Items=${bonusItems.length}, Guesses=${bonusGuessCount}`);
+      console.log(
+        `🎁 Bonus: Phase=${bonusRound.phase}, Items=${bonusItems.length}, Guesses=${bonusGuessCount}`
+      );
     }
 
     console.log("✅ Game state synced with database");
@@ -4335,7 +4393,7 @@ async function startBot() {
         const { GuessService } = await import("./guessService.js");
         guessService = new GuessService(prisma);
         console.log("✅ GuessService initialized for database storage");
-        
+
         await syncGameStateWithDatabase();
       } catch (error) {
         console.error("❌ GuessService initialization failed:", error.message);
