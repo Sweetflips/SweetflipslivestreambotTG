@@ -1311,7 +1311,9 @@ bot.command("balanceboard", async (ctx) => {
     }
 
     console.log(
-      `📊 Balanceboard - Total guesses: ${hasGuesses ? guesses.length : 0}, Game Open: ${gameState.balance.isOpen}`
+      `📊 Balanceboard - Total guesses: ${
+        hasGuesses ? guesses.length : 0
+      }, Game Open: ${gameState.balance.isOpen}`
     );
 
     if (!hasGuesses) {
@@ -1414,7 +1416,9 @@ bot.command("bonusboard", async (ctx) => {
     }
 
     console.log(
-      `🎁 Bonusboard - Total guesses: ${hasGuesses ? guesses.length : 0}, Game Open: ${gameState.bonus.isOpen}`
+      `🎁 Bonusboard - Total guesses: ${
+        hasGuesses ? guesses.length : 0
+      }, Game Open: ${gameState.bonus.isOpen}`
     );
 
     if (!hasGuesses) {
@@ -4264,6 +4268,53 @@ function setupAutomatedScheduleMessaging() {
 }
 
 // Start bot with auto-restart capabilities
+async function syncGameStateWithDatabase() {
+  if (!guessService || !prisma) {
+    console.log("⚠️ Skipping game state sync - database not available");
+    return;
+  }
+
+  try {
+    console.log("🔄 Syncing game state with database...");
+    
+    const balanceRound = await guessService.getCurrentRound("GUESS_BALANCE");
+    if (balanceRound) {
+      gameState.balance.isOpen = balanceRound.phase === "OPEN";
+      gameState.balance.isFinalized = balanceRound.phase === "REVEALED" || balanceRound.finalValue !== null;
+      gameState.balance.finalBalance = balanceRound.finalValue;
+      
+      const balanceGuessCount = await prisma.guess.count({
+        where: { gameRoundId: balanceRound.id },
+      });
+      console.log(`📊 Balance: Phase=${balanceRound.phase}, Guesses=${balanceGuessCount}`);
+    }
+
+    const bonusRound = await guessService.getCurrentRound("GUESS_BONUS");
+    if (bonusRound) {
+      gameState.bonus.isOpen = bonusRound.phase === "OPEN";
+      gameState.bonus.isFinalized = bonusRound.phase === "REVEALED" || bonusRound.finalValue !== null;
+      gameState.bonus.finalBonus = bonusRound.finalValue;
+      
+      const bonusItems = await prisma.bonusItem.findMany({
+        where: { gameRoundId: bonusRound.id },
+        orderBy: { createdAt: "asc" },
+      });
+      
+      gameState.bonus.bonusAmount = bonusItems.length;
+      gameState.bonus.bonusList = bonusItems.map(item => item.name);
+      
+      const bonusGuessCount = await prisma.guess.count({
+        where: { gameRoundId: bonusRound.id },
+      });
+      console.log(`🎁 Bonus: Phase=${bonusRound.phase}, Items=${bonusItems.length}, Guesses=${bonusGuessCount}`);
+    }
+
+    console.log("✅ Game state synced with database");
+  } catch (error) {
+    console.error("❌ Error syncing game state:", error);
+  }
+}
+
 async function startBot() {
   console.log("🤖 Starting SweetflipsStreamBot...");
   console.log(
@@ -4272,7 +4323,6 @@ async function startBot() {
   );
 
   try {
-    // Wait for database to be ready
     console.log("⏳ Waiting for database to be ready...");
     const dbReady = await waitForDatabase();
 
@@ -4281,11 +4331,12 @@ async function startBot() {
         "⚠️ Database not ready, starting bot without database features"
       );
     } else {
-      // Initialize GuessService for database storage
       try {
         const { GuessService } = await import("./guessService.js");
         guessService = new GuessService(prisma);
         console.log("✅ GuessService initialized for database storage");
+        
+        await syncGameStateWithDatabase();
       } catch (error) {
         console.error("❌ GuessService initialization failed:", error.message);
         console.log("⚠️ Bot will run without GuessService features");
@@ -4293,20 +4344,15 @@ async function startBot() {
       }
     }
 
-    // Launch the bot
     await bot.launch();
     console.log("✅ Bot launched successfully");
 
-    // Reset restart count on successful start
     restartCount = 0;
 
-    // Start health monitoring
     startHealthMonitoring();
 
-    // Set up automated schedule messaging
     setupAutomatedScheduleMessaging();
 
-    // Set up graceful shutdown handlers
     setupGracefulShutdown();
   } catch (error) {
     console.error("❌ Failed to start bot:", error);
@@ -4317,7 +4363,6 @@ async function startBot() {
       );
     }
 
-    // Attempt restart if not shutting down
     if (!isShuttingDown) {
       await gracefulRestart();
     } else {
