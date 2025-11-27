@@ -2366,57 +2366,33 @@ async function sendLiveAnnouncement() {
   const now = new Date();
 
   // Format time for different timezones
-  const utcTime = now.toLocaleString("en-US", {
+  const utcDate = now.toLocaleString("en-US", {
     timeZone: "UTC",
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZoneName: "short",
   });
 
-  const istTime = now.toLocaleString("en-US", {
-    timeZone: "Asia/Kolkata",
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+  const utcTime = now.toLocaleString("en-US", {
+    timeZone: "UTC",
     hour: "2-digit",
     minute: "2-digit",
-    timeZoneName: "short",
+    hour12: true,
   });
 
-  const pstTime = now.toLocaleString("en-US", {
-    timeZone: "America/Los_Angeles",
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
+  const utcTimeFormatted = `${utcDate} at ${utcTime} UTC`;
 
-  const liveMessage = `🔴 <b>SWEETFLIPS IS LIVE!</b> 🔴
+  const liveMessage = `❤️ SWEETFLIPS IS LIVE ❤️
 
-🎮 <b>Join the stream now:</b>
-👉 https://kick.com/sweetflips
+▶️ Join us on KICK (https://kick.com/sweetflips)
 
-⏰ <b>Started:</b>
-🌍 UTC: ${utcTime}
-🇮🇳 IST: ${istTime}
-🇺🇸 PST: ${pstTime}
+⏰ Started:
+🌍 UTC: ${utcTimeFormatted}
 
-💬 <b>Get involved:</b>
-• Link your Kick account with /kick
-• Participate in live games
-• Chat with the community
-• Win rewards!
+💵Earn by watching through linking your Kick here (https://www.kickdashboard.com/login)
 
-🚀 <b>Don't miss out - join now!</b>
-#SweetflipsLive #KickStreaming #GamingCommunity`;
+Join us on Razed (https://www.razed.com/signup/?raf=SweetFlips) & LuxDrop (https://luxdrop.com/r/sweetflips) 🔥`;
 
   try {
     const result = await getAllGroups();
