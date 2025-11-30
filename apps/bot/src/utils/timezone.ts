@@ -4,7 +4,9 @@ export interface StreamTime {
 }
 
 function convertUTCToIST(utcTime: string): string {
-  const [hours, minutes] = utcTime.split(':').map(Number);
+  const parts = utcTime.split(':');
+  const hours = Number(parts[0]) || 0;
+  const minutes = Number(parts[1]) || 0;
   let istHours = hours + 5;
   let istMinutes = minutes + 30;
   if (istMinutes >= 60) {
@@ -18,7 +20,9 @@ function convertUTCToIST(utcTime: string): string {
 }
 
 function convertUTCToPST(utcTime: string): string {
-  const [hours, minutes] = utcTime.split(':').map(Number);
+  const parts = utcTime.split(':');
+  const hours = Number(parts[0]) || 0;
+  const minutes = Number(parts[1]) || 0;
   let pstHours = hours - 8;
   if (pstHours < 0) {
     pstHours += 24;

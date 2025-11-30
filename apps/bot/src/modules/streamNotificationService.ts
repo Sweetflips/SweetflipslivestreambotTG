@@ -167,7 +167,6 @@ export const createStreamReminderMessage = (
   const utcTime = getStreamTimeUTC(reminder.dayOfWeek, reminder.streamNumber);
   const times = formatStreamTimes(utcTime, reminder.streamNumber);
 
-  const utcTime = times.find((t) => t.label === "UTC")?.time || "Unknown";
   const istTime = times.find((t) => t.label === "IST")?.time || "Unknown";
   const pstTime = times.find((t) => t.label === "PST")?.time || "Unknown";
 

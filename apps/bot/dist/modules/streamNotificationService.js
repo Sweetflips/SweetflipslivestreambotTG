@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { getDayName } from "../utils/dayName";
 import { formatStreamTimes } from "../utils/timezone";
+import { getStreamTimeInMinutes, getStreamTimeUTC } from "../utils/streamTimes.js";
 export const checkForUpcomingStreams = async (prismaClient, hoursBefore = 2) => {
     if (!prismaClient) {
         return [];
@@ -10,26 +11,15 @@ export const checkForUpcomingStreams = async (prismaClient, hoursBefore = 2) => 
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
-    // Stream times in minutes from midnight UTC
-    const stream1Time = 8 * 60; // 8:00 AM UTC
-    const stream2Time = 18 * 60; // 6:00 PM UTC
     const reminders = [];
-    // Check current day for streams starting in exactly 'hoursBefore' hours
-    const targetTimeInMinutes = currentTimeInMinutes + hoursBefore * 60;
-    // Check if target time falls within a stream time window
-    const stream1TargetTime = stream1Time - hoursBefore * 60;
-    const stream2TargetTime = stream2Time - hoursBefore * 60;
-    // Get active schedules
     const schedules = await prismaClient.schedule.findMany({
         where: { isActive: true },
         orderBy: [{ dayOfWeek: "asc" }, { streamNumber: "asc" }],
     });
-    // Check current day
     const currentDaySchedules = schedules.filter((schedule) => schedule.dayOfWeek === currentDayOfWeek);
     for (const schedule of currentDaySchedules) {
-        const streamTime = schedule.streamNumber === 1 ? stream1Time : stream2Time;
+        const streamTime = getStreamTimeInMinutes(schedule.dayOfWeek, schedule.streamNumber);
         const reminderTime = streamTime - hoursBefore * 60;
-        // Check if current time is within 5 minutes of the reminder time
         if (Math.abs(currentTimeInMinutes - reminderTime) <= 5) {
             const eventDate = new Date();
             eventDate.setHours(Math.floor(streamTime / 60), streamTime % 60, 0, 0);
@@ -45,14 +35,11 @@ export const checkForUpcomingStreams = async (prismaClient, hoursBefore = 2) => 
             });
         }
     }
-    // Check next day for streams (in case we're checking late at night)
     const nextDay = (currentDayOfWeek + 1) % 7;
     const nextDaySchedules = schedules.filter((schedule) => schedule.dayOfWeek === nextDay);
     for (const schedule of nextDaySchedules) {
-        const streamTime = schedule.streamNumber === 1 ? stream1Time : stream2Time;
+        const streamTime = getStreamTimeInMinutes(schedule.dayOfWeek, schedule.streamNumber);
         const reminderTime = streamTime - hoursBefore * 60;
-        // For next day, check if current time is within 5 minutes of the reminder time
-        // (this handles cases where we're checking late at night for next day's early stream)
         if (Math.abs(currentTimeInMinutes - reminderTime) <= 5) {
             const eventDate = new Date();
             eventDate.setDate(eventDate.getDate() + 1);
@@ -127,8 +114,8 @@ export const recordNotificationSent = async (prismaClient, dayOfWeek, streamNumb
     }
 };
 export const createStreamReminderMessage = (reminder) => {
-    const times = formatStreamTimes(reminder.streamNumber === 1 ? "08:00" : "18:00", reminder.streamNumber);
-    const utcTime = times.find((t) => t.label === "UTC")?.time || "Unknown";
+    const utcTime = getStreamTimeUTC(reminder.dayOfWeek, reminder.streamNumber);
+    const times = formatStreamTimes(utcTime, reminder.streamNumber);
     const istTime = times.find((t) => t.label === "IST")?.time || "Unknown";
     const pstTime = times.find((t) => t.label === "PST")?.time || "Unknown";
     return (`🚀 <b>Stream Reminder!</b>\n\n` +

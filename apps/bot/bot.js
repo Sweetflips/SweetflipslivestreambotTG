@@ -530,8 +530,8 @@ async function sendScheduleToAllGroups() {
         `📅 <b>Stream Schedule</b>\n\n` +
         `No scheduled streams found for the next 7 days.\n\n` +
         `<b>Stream Times:</b>\n` +
-        `• Stream 1: 8:00 AM UTC (1:30 PM IST, 12:00 AM PST)\n` +
-        `• Stream 2: 6:00 PM UTC (11:30 PM IST, 10:00 AM PST)\n\n` +
+        `• Stream 1 (Early): 9:00 AM UTC\n` +
+        `• Stream 2 (Late): Variable times (1:00 PM UTC Tue/Thu/Fri, 7:00 PM UTC Mon/Wed/Sat/Sun)\n\n` +
         `Check back later for updates!`;
     } else {
       scheduleMessage = `📅 <b>Stream Schedule - ${scheduleData.currentDay} & Next 7 Days</b>\n\n`;
@@ -584,9 +584,9 @@ async function sendScheduleToAllGroups() {
         }
       }
 
-      scheduleMessage += `<b>Stream Times:</b>\n`;
-      scheduleMessage += `• Stream 1: 8:00 AM UTC (1:30 PM IST, 12:00 AM PST)\n`;
-      scheduleMessage += `• Stream 2: 6:00 PM UTC (11:30 PM IST, 10:00 AM PST)\n\n`;
+      scheduleMessage += `<b>General Stream Times:</b>\n`;
+      scheduleMessage += `• Stream 1 (Early): 9:00 AM UTC\n`;
+      scheduleMessage += `• Stream 2 (Late): 1:00 PM UTC (Tue/Thu/Fri) or 7:00 PM UTC (Mon/Wed/Sat/Sun)\n\n`;
       scheduleMessage += `🎮 Join us at https://kick.com/sweetflips`;
     }
 
@@ -2710,8 +2710,8 @@ bot.command("schedule", async (ctx) => {
             `📅 <b>Stream Schedule</b>\n\n` +
               `No scheduled streams found for the next 7 days.\n\n` +
               `<b>Stream Times:</b>\n` +
-              `• Stream 1: 8:00 AM UTC (1:30 PM IST, 12:00 AM PST)\n` +
-              `• Stream 2: 6:00 PM UTC (11:30 PM IST, 10:00 AM PST)\n\n` +
+              `• Stream 1 (Early): 9:00 AM UTC\n` +
+              `• Stream 2 (Late): Variable times (1:00 PM UTC Tue/Thu/Fri, 7:00 PM UTC Mon/Wed/Sat/Sun)\n\n` +
               `Check back later for updates!`,
             { parse_mode: "HTML" }
           );
@@ -2768,9 +2768,9 @@ bot.command("schedule", async (ctx) => {
           }
         }
 
-        message += `<b>Stream Times:</b>\n`;
-        message += `• Stream 1: 8:00 AM UTC (1:30 PM IST, 12:00 AM PST)\n`;
-        message += `• Stream 2: 6:00 PM UTC (11:30 PM IST, 10:00 AM PST)\n\n`;
+        message += `<b>General Stream Times:</b>\n`;
+        message += `• Stream 1 (Early): 9:00 AM UTC\n`;
+        message += `• Stream 2 (Late): 1:00 PM UTC (Tue/Thu/Fri) or 7:00 PM UTC (Mon/Wed/Sat/Sun)\n\n`;
         message += `🎮 Join us at https://kick.com/sweetflips`;
 
         await ctx.reply(message, { parse_mode: "HTML" });
@@ -4341,17 +4341,17 @@ function setupAutomatedScheduleMessaging() {
   );
 
   console.log("✅ Automated schedule messaging configured:");
-  console.log("   🌅 Morning broadcast: 8:00 AM UTC");
-  console.log("   🌆 Afternoon broadcast: 3:00 PM UTC");
-  console.log("   🚀 Stream 1 reminder: 6:00 AM UTC (2h before)");
-  console.log("   🚀 Stream 2 reminder: 4:00 PM UTC (2h before)");
+  console.log("   🌅 Morning broadcast: 9:00 AM UTC");
+  console.log("   🌆 Afternoon broadcast: 1:00 PM UTC");
+  console.log("   🚀 Stream 1 reminder: 7:00 AM UTC (2h before)");
+  console.log("   🚀 Stream 2 reminder: 11:00 AM UTC (Tue/Thu/Fri) or 5:00 PM UTC (Mon/Wed/Sat/Sun)");
   console.log("   🧹 Daily cleanup: 12:00 AM UTC");
 
-  // Store references for cleanup
   global.morningSchedule = morningSchedule;
   global.afternoonSchedule = afternoonSchedule;
   global.stream1Reminder = stream1Reminder;
-  global.stream2Reminder = stream2Reminder;
+  global.stream2ReminderEarly = stream2ReminderEarly;
+  global.stream2ReminderLate = stream2ReminderLate;
   global.cleanupSchedule = cleanupSchedule;
 }
 
@@ -4492,9 +4492,13 @@ function setupGracefulShutdown() {
       global.stream1Reminder.stop();
       console.log("✅ Stream 1 reminder stopped");
     }
-    if (global.stream2Reminder) {
-      global.stream2Reminder.stop();
-      console.log("✅ Stream 2 reminder stopped");
+    if (global.stream2ReminderEarly) {
+      global.stream2ReminderEarly.stop();
+      console.log("✅ Stream 2 reminder (early) stopped");
+    }
+    if (global.stream2ReminderLate) {
+      global.stream2ReminderLate.stop();
+      console.log("✅ Stream 2 reminder (late) stopped");
     }
     if (global.cleanupSchedule) {
       global.cleanupSchedule.stop();
