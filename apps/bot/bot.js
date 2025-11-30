@@ -279,25 +279,19 @@ async function getScheduleWithCurrentDayFirst() {
     });
 
     const now = new Date();
-    const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const currentDayOfWeek = now.getDay();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
-    // Stream times in minutes from midnight UTC
-    const stream1Time = 8 * 60; // 8:00 AM UTC
-    const stream2Time = 18 * 60; // 6:00 PM UTC
-
-    // Find the next upcoming stream
     let nextStream = null;
     let nextStreamTime = null;
 
-    // Check current day first
     const currentDayEntries = entries.filter(
       (entry) => entry.dayOfWeek === currentDayOfWeek
     );
     for (const entry of currentDayEntries) {
-      const streamTime = entry.streamNumber === 1 ? stream1Time : stream2Time;
+      const streamTime = getStreamTimeInMinutes(entry.dayOfWeek, entry.streamNumber);
       if (streamTime > currentTimeInMinutes) {
         const timeUntilStream = streamTime - currentTimeInMinutes;
         if (nextStreamTime === null || timeUntilStream < nextStreamTime) {
@@ -311,7 +305,6 @@ async function getScheduleWithCurrentDayFirst() {
       }
     }
 
-    // If no stream today, check next 7 days
     if (nextStream === null) {
       for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
         const checkDay = (currentDayOfWeek + dayOffset) % 7;
@@ -320,8 +313,7 @@ async function getScheduleWithCurrentDayFirst() {
         );
 
         for (const entry of dayEntries) {
-          const streamTime =
-            entry.streamNumber === 1 ? stream1Time : stream2Time;
+          const streamTime = getStreamTimeInMinutes(entry.dayOfWeek, entry.streamNumber);
           const totalMinutesUntilStream = dayOffset * 24 * 60 + streamTime;
 
           if (
@@ -392,11 +384,6 @@ async function cleanupOldEvents() {
     const currentMinute = now.getMinutes();
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
-    // Stream times in minutes from midnight UTC
-    const stream1Time = 8 * 60; // 8:00 AM UTC
-    const stream2Time = 18 * 60; // 6:00 PM UTC
-
-    // Clean up events from previous days
     const previousDay = (currentDayOfWeek - 1 + 7) % 7;
     await prisma.schedule.updateMany({
       where: {
@@ -409,10 +396,9 @@ async function cleanupOldEvents() {
       },
     });
 
-    // Clean up events from current day that have passed 3+ hours
     const threeHoursInMinutes = 3 * 60;
 
-    // Check stream 1 (8:00 AM UTC)
+    const stream1Time = getStreamTimeInMinutes(currentDayOfWeek, 1);
     if (currentTimeInMinutes > stream1Time + threeHoursInMinutes) {
       await prisma.schedule.updateMany({
         where: {
@@ -427,7 +413,7 @@ async function cleanupOldEvents() {
       });
     }
 
-    // Check stream 2 (6:00 PM UTC)
+    const stream2Time = getStreamTimeInMinutes(currentDayOfWeek, 2);
     if (currentTimeInMinutes > stream2Time + threeHoursInMinutes) {
       await prisma.schedule.updateMany({
         where: {
@@ -462,16 +448,55 @@ function getDayName(dayOfWeek) {
   return days[dayOfWeek] || "Unknown";
 }
 
-// Helper function to get stream time in different timezones
-function getStreamTimes(streamNumber) {
-  const stream1UTC = "08:00"; // 8 AM UTC
-  const stream2UTC = "18:00"; // 6 PM UTC
+function getStreamTimeInMinutes(dayOfWeek, streamNumber) {
+  const stream1Time = 9 * 60;
+  
+  if (streamNumber === 1) {
+    return stream1Time;
+  }
+  
+  const lateStreamDays = [0, 1, 3, 6];
+  if (lateStreamDays.includes(dayOfWeek)) {
+    return 19 * 60;
+  }
+  
+  return 13 * 60;
+}
 
-  const utcTime = streamNumber === 1 ? stream1UTC : stream2UTC;
+function getStreamTimeUTC(dayOfWeek, streamNumber) {
+  const minutes = getStreamTimeInMinutes(dayOfWeek, streamNumber);
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+}
 
-  // Convert to different timezones
-  const istTime = streamNumber === 1 ? "12:30" : "22:30"; // +5:30 from UTC
-  const pstTime = streamNumber === 1 ? "23:00" : "09:00"; // -8 from UTC (PST)
+function convertUTCToIST(utcTime) {
+  const [hours, minutes] = utcTime.split(':').map(Number);
+  let istHours = hours + 5;
+  let istMinutes = minutes + 30;
+  if (istMinutes >= 60) {
+    istMinutes -= 60;
+    istHours += 1;
+  }
+  if (istHours >= 24) {
+    istHours -= 24;
+  }
+  return `${istHours.toString().padStart(2, '0')}:${istMinutes.toString().padStart(2, '0')}`;
+}
+
+function convertUTCToPST(utcTime) {
+  const [hours, minutes] = utcTime.split(':').map(Number);
+  let pstHours = hours - 8;
+  if (pstHours < 0) {
+    pstHours += 24;
+  }
+  return `${pstHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+}
+
+function getStreamTimes(dayOfWeek, streamNumber) {
+  const utcTime = getStreamTimeUTC(dayOfWeek, streamNumber);
+  const istTime = convertUTCToIST(utcTime);
+  const pstTime = convertUTCToPST(utcTime);
 
   return {
     utc: utcTime,
@@ -551,7 +576,7 @@ async function sendScheduleToAllGroups() {
           scheduleMessage += `${dayHeader}\n`;
 
           for (const schedule of daySchedules) {
-            const times = getStreamTimes(schedule.streamNumber);
+            const times = getStreamTimes(schedule.dayOfWeek, schedule.streamNumber);
             scheduleMessage += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
             scheduleMessage += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
           }
@@ -1274,8 +1299,12 @@ bot.command("balanceboard", async (ctx) => {
         const currentRound = await guessService.getCurrentRound(
           "GUESS_BALANCE"
         );
-        console.log(`📊 Balanceboard - Round found: ${currentRound ? 'Yes' : 'No'}, Phase: ${currentRound?.phase}`);
-        
+        console.log(
+          `📊 Balanceboard - Round found: ${
+            currentRound ? "Yes" : "No"
+          }, Phase: ${currentRound?.phase}`
+        );
+
         if (currentRound) {
           const dbGuesses = await prisma.guess.findMany({
             where: {
@@ -1289,7 +1318,9 @@ bot.command("balanceboard", async (ctx) => {
             },
           });
 
-          console.log(`📊 Balanceboard - Database guesses found: ${dbGuesses.length}`);
+          console.log(
+            `📊 Balanceboard - Database guesses found: ${dbGuesses.length}`
+          );
 
           if (dbGuesses.length > 0) {
             hasGuesses = true;
@@ -1386,8 +1417,12 @@ bot.command("bonusboard", async (ctx) => {
     if (guessService && prisma) {
       try {
         const currentRound = await guessService.getCurrentRound("GUESS_BONUS");
-        console.log(`🎁 Bonusboard - Round found: ${currentRound ? 'Yes' : 'No'}, Phase: ${currentRound?.phase}`);
-        
+        console.log(
+          `🎁 Bonusboard - Round found: ${
+            currentRound ? "Yes" : "No"
+          }, Phase: ${currentRound?.phase}`
+        );
+
         if (currentRound) {
           const dbGuesses = await prisma.guess.findMany({
             where: {
@@ -1401,7 +1436,9 @@ bot.command("bonusboard", async (ctx) => {
             },
           });
 
-          console.log(`🎁 Bonusboard - Database guesses found: ${dbGuesses.length}`);
+          console.log(
+            `🎁 Bonusboard - Database guesses found: ${dbGuesses.length}`
+          );
 
           if (dbGuesses.length > 0) {
             hasGuesses = true;
@@ -1815,7 +1852,7 @@ bot.command("add", async (ctx) => {
   if (guessService && prisma) {
     try {
       const bonusRound = await guessService.getCurrentRound("GUESS_BONUS");
-      
+
       await prisma.bonusItem.create({
         data: {
           gameRoundId: bonusRound.id,
@@ -1870,7 +1907,7 @@ bot.command("remove", async (ctx) => {
   if (guessService && prisma) {
     try {
       const bonusRound = await guessService.getCurrentRound("GUESS_BONUS");
-      
+
       const bonusItem = await prisma.bonusItem.findFirst({
         where: {
           gameRoundId: bonusRound.id,
@@ -1884,7 +1921,10 @@ bot.command("remove", async (ctx) => {
         });
       }
 
-      gameState.bonus.bonusAmount = Math.max(0, gameState.bonus.bonusAmount - 1);
+      gameState.bonus.bonusAmount = Math.max(
+        0,
+        gameState.bonus.bonusAmount - 1
+      );
       gameState.bonus.bonusList.splice(bonusIndex, 1);
 
       await ctx.reply(
@@ -2720,7 +2760,7 @@ bot.command("schedule", async (ctx) => {
             message += `${dayHeader}\n`;
 
             for (const schedule of daySchedules) {
-              const times = getStreamTimes(schedule.streamNumber);
+              const times = getStreamTimes(schedule.dayOfWeek, schedule.streamNumber);
               message += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
               message += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
             }
@@ -2809,7 +2849,7 @@ bot.command("schedule", async (ctx) => {
       );
 
       if (success) {
-        const times = getStreamTimes(streamNumber);
+        const times = getStreamTimes(dayOfWeek, streamNumber);
         await ctx.reply(
           `✅ <b>Schedule Entry Added!</b>\n\n` +
             `<b>Day:</b> ${getDayName(dayOfWeek)}\n` +
@@ -3959,7 +3999,7 @@ async function recordNotificationSent(
 
 // Create stream reminder message
 function createStreamReminderMessage(reminder) {
-  const times = getStreamTimes(reminder.streamNumber);
+  const times = getStreamTimes(reminder.dayOfWeek, reminder.streamNumber);
 
   return (
     `🚀 <b>Stream Reminder!</b>\n\n` +
@@ -4197,11 +4237,10 @@ async function getCallboardData() {
 function setupAutomatedScheduleMessaging() {
   console.log("⏰ Setting up automated schedule messaging...");
 
-  // Schedule for 8:00 AM UTC (0 8 * * *)
   const morningSchedule = cron.schedule(
-    "0 8 * * *",
+    "0 9 * * *",
     async () => {
-      console.log("🌅 Morning schedule broadcast triggered (8:00 AM UTC)");
+      console.log("🌅 Morning schedule broadcast triggered (9:00 AM UTC)");
       try {
         const result = await sendScheduleToAllGroups();
         console.log(
@@ -4217,11 +4256,10 @@ function setupAutomatedScheduleMessaging() {
     }
   );
 
-  // Schedule for 3:00 PM UTC (0 15 * * *)
   const afternoonSchedule = cron.schedule(
-    "0 15 * * *",
+    "0 13 * * *",
     async () => {
-      console.log("🌆 Afternoon schedule broadcast triggered (3:00 PM UTC)");
+      console.log("🌆 Afternoon schedule broadcast triggered (1:00 PM UTC)");
       try {
         const result = await sendScheduleToAllGroups();
         console.log(
@@ -4237,11 +4275,10 @@ function setupAutomatedScheduleMessaging() {
     }
   );
 
-  // 2-hour reminder for Stream 1 (6:00 AM UTC - 2 hours before 8:00 AM)
   const stream1Reminder = cron.schedule(
-    "0 6 * * *",
+    "0 7 * * *",
     async () => {
-      console.log("🚀 Stream 1 reminder triggered (6:00 AM UTC)");
+      console.log("🚀 Stream 1 reminder triggered (7:00 AM UTC)");
       try {
         await sendStreamReminders(1);
       } catch (error) {
@@ -4254,11 +4291,26 @@ function setupAutomatedScheduleMessaging() {
     }
   );
 
-  // 2-hour reminder for Stream 2 (4:00 PM UTC - 2 hours before 6:00 PM)
-  const stream2Reminder = cron.schedule(
-    "0 16 * * *",
+  const stream2ReminderEarly = cron.schedule(
+    "0 11 * * 2,4,5",
     async () => {
-      console.log("🚀 Stream 2 reminder triggered (4:00 PM UTC)");
+      console.log("🚀 Stream 2 reminder triggered (11:00 AM UTC for Tue/Thu/Fri)");
+      try {
+        await sendStreamReminders(2);
+      } catch (error) {
+        console.error("❌ Error in Stream 2 reminder:", error);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
+    }
+  );
+
+  const stream2ReminderLate = cron.schedule(
+    "0 17 * * 0,1,3,6",
+    async () => {
+      console.log("🚀 Stream 2 reminder triggered (5:00 PM UTC for Mon/Wed/Sat/Sun)");
       try {
         await sendStreamReminders(2);
       } catch (error) {

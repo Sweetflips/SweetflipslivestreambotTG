@@ -70,9 +70,7 @@ export class GuessService {
 
       return {
         success: true,
-        message: `✅ Saved *${value}*. You can edit once within ${
-          round.graceWindow
-        }s.`,
+        message: `✅ Saved *${value}*. You can edit once within ${round.graceWindow}s.`,
         isEdit: false,
         graceWindowRemaining: round.graceWindow,
       };

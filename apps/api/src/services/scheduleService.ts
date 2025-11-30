@@ -19,10 +19,19 @@ export interface StreamTime {
 
 export class ScheduleService {
   private prisma: PrismaClient;
-  private streamTimes: StreamTime[] = [
-    { hour: 8, minute: 0, timezone: 'UTC' }, // 8am UTC
-    { hour: 18, minute: 0, timezone: 'UTC' }, // 6pm UTC
-  ];
+  
+  private getStreamTime(dayOfWeek: number, streamNumber: number): StreamTime {
+    if (streamNumber === 1) {
+      return { hour: 9, minute: 0, timezone: 'UTC' };
+    }
+    
+    const lateStreamDays = [0, 1, 3, 6];
+    if (lateStreamDays.includes(dayOfWeek)) {
+      return { hour: 19, minute: 0, timezone: 'UTC' };
+    }
+    
+    return { hour: 13, minute: 0, timezone: 'UTC' };
+  }
 
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
@@ -109,20 +118,24 @@ export class ScheduleService {
     }
   }
 
-  async getStreamTime(streamNumber: number): Promise<StreamTime> {
+  async getStreamTime(dayOfWeek: number, streamNumber: number): Promise<StreamTime> {
     if (streamNumber < 1 || streamNumber > 2) {
       throw new Error('Stream number must be 1 or 2');
     }
 
-    const streamTime = this.streamTimes[streamNumber - 1];
-    if (!streamTime) {
-      throw new Error('Invalid stream number');
+    if (dayOfWeek < 0 || dayOfWeek > 6) {
+      throw new Error('Day of week must be between 0 (Sunday) and 6 (Saturday)');
     }
-    return streamTime;
+
+    return this.getStreamTime(dayOfWeek, streamNumber);
   }
 
   async getAllStreamTimes(): Promise<StreamTime[]> {
-    return [...this.streamTimes];
+    return [
+      { hour: 9, minute: 0, timezone: 'UTC' },
+      { hour: 13, minute: 0, timezone: 'UTC' },
+      { hour: 19, minute: 0, timezone: 'UTC' },
+    ];
   }
 
   formatScheduleForDisplay(schedules: ScheduleEntry[]): string {
@@ -141,13 +154,11 @@ export class ScheduleService {
       message += `**${days[day]}:**\n`;
 
       for (const schedule of daySchedules) {
-        const streamTime = this.streamTimes[schedule.streamNumber - 1];
-        if (streamTime) {
-          const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute
-            .toString()
-            .padStart(2, '0')} ${streamTime.timezone}`;
-          message += `  ${schedule.streamNumber}. ${timeStr} - ${schedule.eventTitle}\n`;
-        }
+        const streamTime = this.getStreamTime(schedule.dayOfWeek, schedule.streamNumber);
+        const timeStr = `${streamTime.hour.toString().padStart(2, '0')}:${streamTime.minute
+          .toString()
+          .padStart(2, '0')} ${streamTime.timezone}`;
+        message += `  ${schedule.streamNumber}. ${timeStr} - ${schedule.eventTitle}\n`;
       }
 
       message += '\n';
@@ -185,19 +196,17 @@ export class ScheduleService {
         const daySchedules = schedules.filter(s => s.dayOfWeek === dayOfWeek);
 
         for (const schedule of daySchedules) {
-          const streamTime = this.streamTimes[schedule.streamNumber - 1];
-          if (streamTime) {
-            const streamDate = new Date(checkDate);
-            streamDate.setUTCHours(streamTime.hour, streamTime.minute, 0, 0);
+          const streamTime = this.getStreamTime(dayOfWeek, schedule.streamNumber);
+          const streamDate = new Date(checkDate);
+          streamDate.setUTCHours(streamTime.hour, streamTime.minute, 0, 0);
 
-            nextStreams.push({
-              date: streamDate,
-              dayOfWeek,
-              streamNumber: schedule.streamNumber,
-              eventTitle: schedule.eventTitle,
-              streamTime,
-            });
-          }
+          nextStreams.push({
+            date: streamDate,
+            dayOfWeek,
+            streamNumber: schedule.streamNumber,
+            eventTitle: schedule.eventTitle,
+            streamTime,
+          });
         }
       }
 

@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { getDayName } from "../utils/dayName";
 import { formatStreamTimes, type StreamTime } from "../utils/timezone";
+import { getStreamTimeInMinutes, getStreamTimeUTC } from "../utils/streamTimes.js";
 
 export interface ScheduleEntry {
   dayOfWeek: number;
@@ -85,10 +86,8 @@ export const getActiveSchedule = async (
   });
 
   return entries.map((entry) => {
-    const times = formatStreamTimes(
-      entry.streamNumber === 1 ? "08:00" : "18:00",
-      entry.streamNumber as 1 | 2
-    );
+    const utcTime = getStreamTimeUTC(entry.dayOfWeek, entry.streamNumber as 1 | 2);
+    const times = formatStreamTimes(utcTime, entry.streamNumber as 1 | 2);
 
     return {
       day: getDayName(entry.dayOfWeek),
@@ -128,25 +127,19 @@ export const getScheduleWithCurrentDayFirst = async (
   });
 
   const now = new Date();
-  const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const currentDayOfWeek = now.getDay();
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
   const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
-  // Stream times in minutes from midnight UTC
-  const stream1Time = 8 * 60; // 8:00 AM UTC
-  const stream2Time = 18 * 60; // 6:00 PM UTC
-
-  // Find the next upcoming stream
   let nextStream: string | null = null;
   let nextStreamTime: number | null = null;
 
-  // Check current day first
   const currentDayEntries = entries.filter(
     (entry) => entry.dayOfWeek === currentDayOfWeek
   );
   for (const entry of currentDayEntries) {
-    const streamTime = entry.streamNumber === 1 ? stream1Time : stream2Time;
+    const streamTime = getStreamTimeInMinutes(entry.dayOfWeek, entry.streamNumber as 1 | 2);
     if (streamTime > currentTimeInMinutes) {
       const timeUntilStream = streamTime - currentTimeInMinutes;
       if (nextStreamTime === null || timeUntilStream < nextStreamTime) {
@@ -160,7 +153,6 @@ export const getScheduleWithCurrentDayFirst = async (
     }
   }
 
-  // If no stream today, check next 7 days
   if (nextStream === null) {
     for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
       const checkDay = (currentDayOfWeek + dayOffset) % 7;
@@ -169,7 +161,7 @@ export const getScheduleWithCurrentDayFirst = async (
       );
 
       for (const entry of dayEntries) {
-        const streamTime = entry.streamNumber === 1 ? stream1Time : stream2Time;
+        const streamTime = getStreamTimeInMinutes(entry.dayOfWeek, entry.streamNumber as 1 | 2);
         const totalMinutesUntilStream = dayOffset * 24 * 60 + streamTime;
 
         if (
@@ -177,11 +169,11 @@ export const getScheduleWithCurrentDayFirst = async (
           totalMinutesUntilStream < nextStreamTime
         ) {
           nextStreamTime = totalMinutesUntilStream;
-          const daysUntil = Math.floor(totalMinutesUntilStream / (24 * 60));
+          const daysUntil = Math.floor(nextStreamTime / (24 * 60));
           const hoursUntil = Math.floor(
-            (totalMinutesUntilStream % (24 * 60)) / 60
+            (nextStreamTime % (24 * 60)) / 60
           );
-          const minutesUntil = totalMinutesUntilStream % 60;
+          const minutesUntil = nextStreamTime % 60;
 
           let timeString = "";
           if (daysUntil > 0) timeString += `${daysUntil}d `;
@@ -204,35 +196,34 @@ export const getScheduleWithCurrentDayFirst = async (
     (entry) => entry.dayOfWeek === currentDayOfWeek
   );
   reorderedEntries.push(
-    ...currentDaySchedules.map((entry) => ({
-      ...entry,
-      day: getDayName(entry.dayOfWeek),
-      stream: entry.streamNumber,
-      event: entry.eventTitle,
-      times: formatStreamTimes(
-        entry.dayOfWeek.toString(),
-        entry.streamNumber as 1 | 2
-      ),
-    }))
+    ...currentDaySchedules.map((entry) => {
+      const utcTime = getStreamTimeUTC(entry.dayOfWeek, entry.streamNumber as 1 | 2);
+      return {
+        ...entry,
+        day: getDayName(entry.dayOfWeek),
+        stream: entry.streamNumber,
+        event: entry.eventTitle,
+        times: formatStreamTimes(utcTime, entry.streamNumber as 1 | 2),
+      };
+    })
   );
 
-  // Add remaining days in order
   for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
     const checkDay = (currentDayOfWeek + dayOffset) % 7;
     const daySchedules = entries.filter(
       (entry) => entry.dayOfWeek === checkDay
     );
     reorderedEntries.push(
-      ...daySchedules.map((entry) => ({
-        ...entry,
-        day: getDayName(entry.dayOfWeek),
-        stream: entry.streamNumber,
-        event: entry.eventTitle,
-        times: formatStreamTimes(
-          entry.dayOfWeek.toString(),
-          entry.streamNumber as 1 | 2
-        ),
-      }))
+      ...daySchedules.map((entry) => {
+        const utcTime = getStreamTimeUTC(entry.dayOfWeek, entry.streamNumber as 1 | 2);
+        return {
+          ...entry,
+          day: getDayName(entry.dayOfWeek),
+          stream: entry.streamNumber,
+          event: entry.eventTitle,
+          times: formatStreamTimes(utcTime, entry.streamNumber as 1 | 2),
+        };
+      })
     );
   }
 
@@ -256,11 +247,6 @@ export const cleanupOldEvents = async (
   const currentMinute = now.getMinutes();
   const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
-  // Stream times in minutes from midnight UTC
-  const stream1Time = 8 * 60; // 8:00 AM UTC
-  const stream2Time = 18 * 60; // 6:00 PM UTC
-
-  // Clean up events from previous days
   const previousDay = (currentDayOfWeek - 1 + 7) % 7;
   await prisma.schedule.updateMany({
     where: {
@@ -273,10 +259,9 @@ export const cleanupOldEvents = async (
     },
   });
 
-  // Clean up events from current day that have passed 3+ hours
   const threeHoursInMinutes = 3 * 60;
 
-  // Check stream 1 (8:00 AM UTC)
+  const stream1Time = getStreamTimeInMinutes(currentDayOfWeek, 1);
   if (currentTimeInMinutes > stream1Time + threeHoursInMinutes) {
     await prisma.schedule.updateMany({
       where: {
@@ -291,7 +276,7 @@ export const cleanupOldEvents = async (
     });
   }
 
-  // Check stream 2 (6:00 PM UTC)
+  const stream2Time = getStreamTimeInMinutes(currentDayOfWeek, 2);
   if (currentTimeInMinutes > stream2Time + threeHoursInMinutes) {
     await prisma.schedule.updateMany({
       where: {

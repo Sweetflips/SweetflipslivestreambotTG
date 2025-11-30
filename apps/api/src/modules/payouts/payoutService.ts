@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
-import { GameType } from '../games/guess/guessService.js';
 import { getEnv } from '../../../config/env.js';
 import { logger } from '../../../telemetry/logger.js';
+import { GameType } from '../games/guess/guessService.js';
 
 const env = getEnv();
 
@@ -57,7 +57,8 @@ export class PayoutService {
     });
 
     // Determine winners (top 3 or top 10% if more than 30 entries)
-    const maxWinners = game.bonusEntries.length > 30 ? Math.ceil(game.bonusEntries.length * 0.1) : 3;
+    const maxWinners =
+      game.bonusEntries.length > 30 ? Math.ceil(game.bonusEntries.length * 0.1) : 3;
     const winners = sortedEntries.slice(0, maxWinners);
 
     // Generate tip commands
