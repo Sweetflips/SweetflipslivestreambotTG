@@ -624,33 +624,28 @@ export class GuessService {
 
   // Reset current round
   async resetRound(gameType: GameType, userId: string): Promise<string> {
-    const round = await this.prisma.gameRound.findFirst({
+    const rounds = await this.prisma.gameRound.findMany({
       where: {
         type: gameType,
         phase: {
           not: 'COMPLETED',
         },
       },
-      orderBy: { createdAt: 'desc' },
     });
 
-    if (!round) {
+    if (rounds.length === 0) {
       return `❌ No active game round found to reset.`;
     }
 
-    if (round.phase === 'COMPLETED') {
-      return `❌ Cannot reset a completed game. Use /${
-        gameType === GameType.GUESS_BALANCE ? 'balance' : 'bonus'
-      } new to start a fresh game.`;
-    }
+    const roundIds = rounds.map(r => r.id);
 
     const guessCount = await this.prisma.guess.count({
-      where: { gameRoundId: round.id },
+      where: { gameRoundId: { in: roundIds } },
     });
 
     if (guessCount > 0) {
       const guesses = await this.prisma.guess.findMany({
-        where: { gameRoundId: round.id },
+        where: { gameRoundId: { in: roundIds } },
         include: {
           user: {
             select: {
@@ -664,15 +659,15 @@ export class GuessService {
       });
 
       const resetArchiveData = {
-        gameRound: {
-          id: round.id,
-          type: round.type,
-          finalValue: round.finalValue,
-          createdAt: round.createdAt,
-          closedAt: round.closedAt,
-          revealedAt: round.revealedAt,
-          phase: round.phase,
-        },
+        gameRounds: rounds.map(r => ({
+          id: r.id,
+          type: r.type,
+          finalValue: r.finalValue,
+          createdAt: r.createdAt,
+          closedAt: r.closedAt,
+          revealedAt: r.revealedAt,
+          phase: r.phase,
+        })),
         guesses: guesses.map(guess => ({
           id: guess.id,
           userId: guess.userId,
@@ -688,15 +683,15 @@ export class GuessService {
     }
 
     await this.prisma.guess.deleteMany({
-      where: { gameRoundId: round.id },
+      where: { gameRoundId: { in: roundIds } },
     });
 
     await this.prisma.bonusItem.deleteMany({
-      where: { gameRoundId: round.id },
+      where: { gameRoundId: { in: roundIds } },
     });
 
-    await this.prisma.gameRound.delete({
-      where: { id: round.id },
+    await this.prisma.gameRound.deleteMany({
+      where: { id: { in: roundIds } },
     });
 
     await this.logAudit(userId, `reset_${gameType.toLowerCase()}`, {
