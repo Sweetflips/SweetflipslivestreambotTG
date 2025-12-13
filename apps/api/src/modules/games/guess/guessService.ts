@@ -624,22 +624,31 @@ export class GuessService {
 
   // Reset current round
   async resetRound(gameType: GameType, userId: string): Promise<string> {
-    const round = await this.getCurrentRound(gameType);
+    const round = await this.prisma.gameRound.findFirst({
+      where: {
+        type: gameType,
+        phase: {
+          not: 'COMPLETED',
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-    // Only allow reset if game is not completed/archived
+    if (!round) {
+      return `❌ No active game round found to reset.`;
+    }
+
     if (round.phase === 'COMPLETED') {
       return `❌ Cannot reset a completed game. Use /${
         gameType === GameType.GUESS_BALANCE ? 'balance' : 'bonus'
       } new to start a fresh game.`;
     }
 
-    // Archive current data if there are guesses before resetting
     const guessCount = await this.prisma.guess.count({
       where: { gameRoundId: round.id },
     });
 
     if (guessCount > 0) {
-      // Create a backup archive before resetting
       const guesses = await this.prisma.guess.findMany({
         where: { gameRoundId: round.id },
         include: {
@@ -676,23 +685,8 @@ export class GuessService {
         totalGuesses: guesses.length,
         resetReason: 'Manual reset by admin',
       };
-
-      // Archive functionality removed - table doesn't exist
-      // await this.prisma.completedGameArchive.create({
-      //   data: {
-      //     originalGameRoundId: round.id,
-      //     gameType: round.type,
-      //     finalValue: round.finalValue,
-      //     totalGuesses: guesses.length,
-      //     winnerUserId: null,
-      //     winnerGuess: null,
-      //     gameData: JSON.stringify(resetArchiveData),
-      //     completedAt: new Date(),
-      //   },
-      // });
     }
 
-    // Delete all related data
     await this.prisma.guess.deleteMany({
       where: { gameRoundId: round.id },
     });
@@ -701,28 +695,20 @@ export class GuessService {
       where: { gameRoundId: round.id },
     });
 
-    await this.prisma.gameRound.update({
+    await this.prisma.gameRound.delete({
       where: { id: round.id },
-      data: {
-        phase: 'IDLE',
-        finalValue: null,
-        closedAt: null,
-        revealedAt: null,
-        // completedAt: null, // Field doesn't exist
-        updatedAt: new Date(),
-      },
     });
 
     await this.logAudit(userId, `reset_${gameType.toLowerCase()}`, {
       gameType,
-      archivedGuesses: guessCount,
+      deletedGuesses: guessCount,
     });
 
-    const archiveNote = guessCount > 0 ? ` (${guessCount} guesses archived before reset)` : '';
+    const deletedNote = guessCount > 0 ? ` (${guessCount} guesses deleted)` : '';
 
     return `✅ ${
       gameType === GameType.GUESS_BALANCE ? 'Balance' : 'Bonus'
-    } game reset. All guesses and results cleared.${archiveNote}`;
+    } game reset. All guesses and results cleared.${deletedNote}`;
   }
 
   // Start a new game round (creates fresh round)

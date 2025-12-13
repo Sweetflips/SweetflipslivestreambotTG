@@ -169,19 +169,45 @@ export class GuessService {
 
   async resetRound(gameType, userId) {
     try {
-      // Close any open rounds
-      await this.prisma.gameRound.updateMany({
+      const round = await this.prisma.gameRound.findFirst({
         where: {
           type: gameType,
-          phase: "OPEN",
+          phase: {
+            not: "COMPLETED",
+          },
         },
-        data: {
-          phase: "CLOSED",
-          closedAt: new Date(),
+        orderBy: {
+          createdAt: "desc",
         },
       });
 
-      return `✅ ${gameType} round reset!`;
+      if (!round) {
+        return `❌ No active game round found to reset.`;
+      }
+
+      if (round.phase === "COMPLETED") {
+        return `❌ Cannot reset a completed game.`;
+      }
+
+      const guessCount = await this.prisma.guess.count({
+        where: { gameRoundId: round.id },
+      });
+
+      await this.prisma.guess.deleteMany({
+        where: { gameRoundId: round.id },
+      });
+
+      await this.prisma.bonusItem.deleteMany({
+        where: { gameRoundId: round.id },
+      });
+
+      await this.prisma.gameRound.delete({
+        where: { id: round.id },
+      });
+
+      const deletedNote = guessCount > 0 ? ` (${guessCount} guesses deleted)` : "";
+
+      return `✅ ${gameType} round reset. All guesses and results cleared.${deletedNote}`;
     } catch (error) {
       console.error("Error resetting round:", error);
       return "❌ Failed to reset round.";
