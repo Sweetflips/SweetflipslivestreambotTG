@@ -507,132 +507,70 @@ function getStreamTimes(dayOfWeek, streamNumber) {
 
 // Automated schedule messaging function
 async function sendScheduleToAllGroups() {
-  try {
-    console.log("📅 Starting automated schedule broadcast...");
+  const scheduleData = await getScheduleWithCurrentDayFirst();
 
-    // Get all active groups
-    const result = await getAllGroups();
-    const allGroups = result.groupIds;
+  let scheduleMessage;
 
-    if (allGroups.length === 0) {
-      console.log("⚠️ No groups found for schedule broadcast");
-      return { success: 0, failed: 0, groups: [] };
+  if (scheduleData.schedules.length === 0) {
+    scheduleMessage =
+      `📅 <b>Stream Schedule</b>\n\n` +
+      `No scheduled streams found for the next 7 days.\n\n` +
+      `<b>Stream Times:</b>\n` +
+      `• Stream 1 (Early): 9:00 AM UTC\n` +
+      `• Stream 2 (Late): Variable times (1:00 PM UTC Tue/Thu/Fri, 7:00 PM UTC Mon/Wed/Sat/Sun)\n\n` +
+      `Check back later for updates!`;
+  } else {
+    scheduleMessage = `📅 <b>Stream Schedule - ${scheduleData.currentDay} & Next 7 Days</b>\n\n`;
+
+    if (scheduleData.nextStream) {
+      scheduleMessage += `⏰ <b>Next Stream:</b> ${scheduleData.nextStream}\n\n`;
     }
 
-    // Get current schedule with current day first
-    const scheduleData = await getScheduleWithCurrentDayFirst();
-
-    // Build schedule message (exactly like /schedule command)
-    let scheduleMessage;
-
-    if (scheduleData.schedules.length === 0) {
-      scheduleMessage =
-        `📅 <b>Stream Schedule</b>\n\n` +
-        `No scheduled streams found for the next 7 days.\n\n` +
-        `<b>Stream Times:</b>\n` +
-        `• Stream 1 (Early): 9:00 AM UTC\n` +
-        `• Stream 2 (Late): Variable times (1:00 PM UTC Tue/Thu/Fri, 7:00 PM UTC Mon/Wed/Sat/Sun)\n\n` +
-        `Check back later for updates!`;
-    } else {
-      scheduleMessage = `📅 <b>Stream Schedule - ${scheduleData.currentDay} & Next 7 Days</b>\n\n`;
-
-      // Show next upcoming stream at the top
-      if (scheduleData.nextStream) {
-        scheduleMessage += `⏰ <b>Next Stream:</b> ${scheduleData.nextStream}\n\n`;
+    const schedulesByDay = {};
+    for (const schedule of scheduleData.schedules) {
+      if (!schedulesByDay[schedule.dayOfWeek]) {
+        schedulesByDay[schedule.dayOfWeek] = [];
       }
+      schedulesByDay[schedule.dayOfWeek].push(schedule);
+    }
 
-      // Group schedules by day
-      const schedulesByDay = {};
-      for (const schedule of scheduleData.schedules) {
-        if (!schedulesByDay[schedule.dayOfWeek]) {
-          schedulesByDay[schedule.dayOfWeek] = [];
+    const currentDayOfWeek = new Date().getDay();
+    const orderedDays = [];
+
+    orderedDays.push(currentDayOfWeek);
+
+    for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
+      const checkDay = (currentDayOfWeek + dayOffset) % 7;
+      orderedDays.push(checkDay);
+    }
+
+    for (const day of orderedDays) {
+      const dayName = getDayName(day);
+      const daySchedules = schedulesByDay[day] || [];
+
+      if (daySchedules.length > 0) {
+        const isCurrentDay = day === currentDayOfWeek;
+        const dayHeader = isCurrentDay
+          ? `📅 <b>${dayName} (Today)</b>`
+          : `<b>${dayName}</b>`;
+        scheduleMessage += `${dayHeader}\n`;
+
+        for (const schedule of daySchedules) {
+          const times = getStreamTimes(schedule.dayOfWeek, schedule.streamNumber);
+          scheduleMessage += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
+          scheduleMessage += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
         }
-        schedulesByDay[schedule.dayOfWeek].push(schedule);
-      }
-
-      // Display schedule for each day (current day first, then upcoming days)
-      const currentDayOfWeek = new Date().getDay();
-      const orderedDays = [];
-
-      // Add current day first
-      orderedDays.push(currentDayOfWeek);
-
-      // Add remaining days in order
-      for (let dayOffset = 1; dayOffset < 7; dayOffset++) {
-        const checkDay = (currentDayOfWeek + dayOffset) % 7;
-        orderedDays.push(checkDay);
-      }
-
-      for (const day of orderedDays) {
-        const dayName = getDayName(day);
-        const daySchedules = schedulesByDay[day] || [];
-
-        if (daySchedules.length > 0) {
-          // Highlight current day
-          const isCurrentDay = day === currentDayOfWeek;
-          const dayHeader = isCurrentDay
-            ? `📅 <b>${dayName} (Today)</b>`
-            : `<b>${dayName}</b>`;
-          scheduleMessage += `${dayHeader}\n`;
-
-          for (const schedule of daySchedules) {
-            const times = getStreamTimes(schedule.dayOfWeek, schedule.streamNumber);
-            scheduleMessage += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
-            scheduleMessage += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
-          }
-          scheduleMessage += `\n`;
-        }
-      }
-
-      scheduleMessage += `<b>General Stream Times:</b>\n`;
-      scheduleMessage += `• Stream 1 (Early): 9:00 AM UTC\n`;
-      scheduleMessage += `• Stream 2 (Late): 1:00 PM UTC (Tue/Thu/Fri) or 7:00 PM UTC (Mon/Wed/Sat/Sun)\n\n`;
-      scheduleMessage += `🎮 Join us at https://kick.com/sweetflips`;
-    }
-
-    // Send to all groups
-    let successCount = 0;
-    let failedCount = 0;
-    const results = [];
-
-    console.log(`📢 Sending schedule to ${allGroups.length} groups...`);
-
-    for (const groupId of allGroups) {
-      try {
-        await bot.telegram.sendMessage(groupId, scheduleMessage, {
-          parse_mode: "HTML",
-          disable_web_page_preview: false,
-        });
-        successCount++;
-        results.push({ groupId, status: "success" });
-        console.log(`✅ Schedule sent to group ${groupId}`);
-
-        // Small delay to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch (error) {
-        failedCount++;
-        results.push({ groupId, status: "failed", error: error.message });
-        console.error(
-          `❌ Failed to send schedule to group ${groupId}:`,
-          error.message
-        );
+        scheduleMessage += `\n`;
       }
     }
 
-    console.log(`\n📊 Schedule Broadcast Results:`);
-    console.log(`✅ Successfully sent: ${successCount} groups`);
-    console.log(`❌ Failed: ${failedCount} groups`);
-    console.log(
-      `📈 Success rate: ${((successCount / allGroups.length) * 100).toFixed(
-        1
-      )}%`
-    );
-
-    return { success: successCount, failed: failedCount, groups: results };
-  } catch (error) {
-    console.error("❌ Error in automated schedule broadcast:", error);
-    return { success: 0, failed: 0, groups: [], error: error.message };
+    scheduleMessage += `<b>General Stream Times:</b>\n`;
+    scheduleMessage += `• Stream 1 (Early): 9:00 AM UTC\n`;
+    scheduleMessage += `• Stream 2 (Late): 1:00 PM UTC (Tue/Thu/Fri) or 7:00 PM UTC (Mon/Wed/Sat/Sun)\n\n`;
+    scheduleMessage += `🎮 Join us at https://kick.com/sweetflips`;
   }
+
+  return await broadcastHtmlToAllGroups(scheduleMessage, "Schedule Broadcast");
 }
 
 // Check for required environment variables
@@ -991,6 +929,7 @@ bot.help(async (ctx) => {
         `/remove &lt;bonus name&gt; - Remove a bonus (counts as -1)\n\n` +
         `/live - Send live announcement to all groups\n` +
         `/broadcastschedule - Manually send schedule to all groups\n` +
+        `/broadcast &lt;message&gt; - Broadcast an HTML message to all groups\n` +
         `/findgroups - Find all group chats where bot is a member\n` +
         `/groupstats - Show detailed group management statistics\n` +
         `/testgroups - Test group detection functionality\n` +
@@ -2401,11 +2340,116 @@ async function getAllGroups() {
   };
 }
 
+async function broadcastHtmlToAllGroups(message, logPrefix = "Broadcast") {
+  try {
+    const result = await getAllGroups();
+    const allGroups = result.groupIds;
+
+    if (allGroups.length === 0) {
+      console.log(`⚠️ No groups found for ${logPrefix.toLowerCase()}`);
+      return { success: 0, failed: 0, groups: [] };
+    }
+
+    let successCount = 0;
+    let failedCount = 0;
+    const results = [];
+    const failedGroups = [];
+
+    console.log(`📢 ${logPrefix} to ${allGroups.length} groups...`);
+
+    for (const groupId of allGroups) {
+      try {
+        await bot.telegram.sendMessage(groupId, message, {
+          parse_mode: "HTML",
+          disable_web_page_preview: false,
+        });
+        successCount++;
+        results.push({ groupId, status: "success", attempt: 1 });
+        console.log(`✅ ${logPrefix} sent to group ${groupId}`);
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(
+          `❌ Failed to send to group ${groupId} (attempt 1):`,
+          error.message
+        );
+
+        if (isRetryableError(error)) {
+          failedGroups.push({ groupId, error: error.message, attempt: 1 });
+        } else {
+          failedCount++;
+          results.push({
+            groupId,
+            status: "failed",
+            error: error.message,
+            attempt: 1,
+          });
+
+          if (isPermanentError(error)) {
+            global.knownGroups.delete(groupId);
+            await markGroupInactive(groupId);
+            console.log(`🗑️ Removed inactive group: ${groupId}`);
+          }
+        }
+      }
+    }
+
+    if (failedGroups.length > 0) {
+      console.log(`🔄 Retrying ${failedGroups.length} failed groups...`);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      for (const { groupId, error: originalError } of failedGroups) {
+        try {
+          await bot.telegram.sendMessage(groupId, message, {
+            parse_mode: "HTML",
+            disable_web_page_preview: false,
+          });
+          successCount++;
+          results.push({ groupId, status: "success", attempt: 2 });
+          console.log(`✅ ${logPrefix} sent to group ${groupId} (retry successful)`);
+
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        } catch (error) {
+          failedCount++;
+          results.push({
+            groupId,
+            status: "failed",
+            error: error.message,
+            originalError: originalError,
+            attempt: 2,
+          });
+          console.error(
+            `❌ Failed to send to group ${groupId} (retry failed):`,
+            error.message
+          );
+
+          if (isPermanentError(error)) {
+            global.knownGroups.delete(groupId);
+            await markGroupInactive(groupId);
+            console.log(`🗑️ Removed inactive group: ${groupId}`);
+          }
+        }
+      }
+    }
+
+    console.log(`\n📊 ${logPrefix} Results:`);
+    console.log(`✅ Successfully sent: ${successCount} groups`);
+    console.log(`❌ Failed: ${failedCount} groups`);
+    console.log(
+      `📈 Success rate: ${((successCount / allGroups.length) * 100).toFixed(1)}%`
+    );
+
+    return { success: successCount, failed: failedCount, groups: results };
+  } catch (error) {
+    console.error(`❌ Error in ${logPrefix.toLowerCase()}:`, error);
+    return { success: 0, failed: 0, groups: [], error: error.message };
+  }
+}
+
 // Function to send live announcement to all groups
 async function sendLiveAnnouncement() {
   const now = new Date();
 
-  // Format time for different timezones
   const utcDate = now.toLocaleString("en-US", {
     timeZone: "UTC",
     weekday: "long",
@@ -2434,116 +2478,7 @@ async function sendLiveAnnouncement() {
 
 Join us on Razed (https://www.razed.com/signup/?raf=SweetFlips) & LuxDrop (https://luxdrop.com/r/sweetflips) 🔥`;
 
-  try {
-    const result = await getAllGroups();
-    const allGroups = result.groupIds;
-
-    if (allGroups.length === 0) {
-      console.log("⚠️ No groups found to send live announcement");
-      return { success: 0, failed: 0, groups: [] };
-    }
-
-    let successCount = 0;
-    let failedCount = 0;
-    const results = [];
-    const failedGroups = []; // Groups to retry
-
-    console.log(
-      `📢 Sending live announcement to ${allGroups.length} groups...`
-    );
-
-    // First attempt - send to all groups
-    for (const groupId of allGroups) {
-      try {
-        await bot.telegram.sendMessage(groupId, liveMessage, {
-          parse_mode: "HTML",
-          disable_web_page_preview: false,
-        });
-        successCount++;
-        results.push({ groupId, status: "success", attempt: 1 });
-        console.log(`✅ Live announcement sent to group ${groupId}`);
-
-        // Small delay to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch (error) {
-        console.error(
-          `❌ Failed to send to group ${groupId} (attempt 1):`,
-          error.message
-        );
-
-        // Check if it's a retryable error
-        if (isRetryableError(error)) {
-          failedGroups.push({ groupId, error: error.message, attempt: 1 });
-        } else {
-          failedCount++;
-          results.push({
-            groupId,
-            status: "failed",
-            error: error.message,
-            attempt: 1,
-          });
-        }
-      }
-    }
-
-    // Retry failed groups after a short delay
-    if (failedGroups.length > 0) {
-      console.log(`🔄 Retrying ${failedGroups.length} failed groups...`);
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
-
-      for (const { groupId, error: originalError } of failedGroups) {
-        try {
-          await bot.telegram.sendMessage(groupId, liveMessage, {
-            parse_mode: "HTML",
-            disable_web_page_preview: false,
-          });
-          successCount++;
-          results.push({ groupId, status: "success", attempt: 2 });
-          console.log(
-            `✅ Live announcement sent to group ${groupId} (retry successful)`
-          );
-
-          // Small delay to avoid rate limiting
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        } catch (error) {
-          failedCount++;
-          results.push({
-            groupId,
-            status: "failed",
-            error: error.message,
-            originalError: originalError,
-            attempt: 2,
-          });
-          console.error(
-            `❌ Failed to send to group ${groupId} (retry failed):`,
-            error.message
-          );
-
-          // Remove from known groups if bot was removed or group doesn't exist
-          if (isPermanentError(error)) {
-            global.knownGroups.delete(groupId);
-            console.log(
-              `🗑️ Removed inactive group from known groups: ${groupId}`
-            );
-          }
-        }
-      }
-    }
-
-    console.log(`\n📊 Live Announcement Results:`);
-    console.log(`✅ Successfully sent: ${successCount} groups`);
-    console.log(`❌ Failed: ${failedCount} groups`);
-    console.log(
-      `📈 Success rate: ${((successCount / allGroups.length) * 100).toFixed(
-        1
-      )}%`
-    );
-
-    return { success: successCount, failed: failedCount, groups: results };
-  } catch (error) {
-    console.error("❌ Error sending live announcement:", error);
-    return { success: 0, failed: 0, groups: [], error: error.message };
-  }
+  return await broadcastHtmlToAllGroups(liveMessage, "Live Announcement");
 }
 
 // Helper function to determine if an error is retryable
@@ -3173,6 +3108,66 @@ bot.command("broadcastschedule", async (ctx) => {
   } catch (error) {
     console.error("❌ Error in broadcastschedule command:", error);
     await ctx.reply("❌ Error sending schedule broadcast. Please try again.");
+  }
+});
+
+bot.command("broadcast", async (ctx) => {
+  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+
+  if (!isAdmin(user)) {
+    await ctx.reply(`⛔️ Mods only.`);
+    return;
+  }
+
+  const messageText = ctx.message.text.trim();
+  const commandMatch = messageText.match(/^\/broadcast\s+(.+)$/s);
+
+  if (!commandMatch || !commandMatch[1]) {
+    await ctx.reply(
+      `❌ <b>Usage:</b> <code>/broadcast &lt;HTML message&gt;</code>\n\n` +
+        `📝 <b>Example:</b>\n` +
+        `<code>/broadcast &lt;b&gt;Hello&lt;/b&gt; everyone! This is a test message.`,
+      { parse_mode: "HTML" }
+    );
+    return;
+  }
+
+  const broadcastMessage = commandMatch[1];
+
+  await ctx.reply("📢 Broadcasting message to all groups...");
+
+  try {
+    const result = await broadcastHtmlToAllGroups(
+      broadcastMessage,
+      "Broadcast"
+    );
+
+    if (result.success > 0) {
+      await ctx.reply(
+        `✅ Broadcast sent successfully!\n\n` +
+          `📊 <b>Results:</b>\n` +
+          `✅ Success: ${result.success} groups\n` +
+          `❌ Failed: ${result.failed} groups\n\n` +
+          `📢 Message shared with all groups!`,
+        { parse_mode: "HTML" }
+      );
+    } else {
+      await ctx.reply(
+        `❌ Failed to send broadcast.\n\n` +
+          `📊 <b>Results:</b>\n` +
+          `✅ Success: ${result.success} groups\n` +
+          `❌ Failed: ${result.failed} groups\n\n` +
+          `⚠️ No groups were reached.\n\n` +
+          `<b>Try this:</b>\n` +
+          `1. Use /findgroups to discover group IDs\n` +
+          `2. Set ADMIN_GROUP_IDS in Railway environment variables\n` +
+          `3. Make sure bot is added to group chats`,
+        { parse_mode: "HTML" }
+      );
+    }
+  } catch (error) {
+    console.error("❌ Error in broadcast command:", error);
+    await ctx.reply("❌ Error sending broadcast. Please try again.");
   }
 });
 
