@@ -1,19 +1,19 @@
 import type { MiddlewareFn } from "telegraf";
 import type { BotContext } from "../dependencies";
 
-async function placeJapOrder(
+async function placePanelOrder(
   serviceId: number,
   link: string,
   quantity?: number
 ): Promise<
   { success: true; orderId: number } | { success: false; error: string }
 > {
-  const apiKey = process.env.JAP_API_KEY;
+  const apiKey = process.env.PANEL_API_KEY;
   const apiUrl =
-    process.env.JAP_API_URL || "https://thelordofthepanels.com/api/v2";
+    process.env.PANEL_API_URL || "https://thelordofthepanels.com/api/v2";
 
   if (!apiKey) {
-    return { success: false, error: "JAP_API_KEY not configured" };
+    return { success: false, error: "PANEL_API_KEY not configured" };
   }
 
   const formData = new URLSearchParams({
@@ -150,12 +150,12 @@ function getEnvServiceId(name: string) {
 }
 
 async function fetchPanelServices() {
-  const apiKey = process.env.JAP_API_KEY;
+  const apiKey = process.env.PANEL_API_KEY;
   const apiUrl =
-    process.env.JAP_API_URL || "https://thelordofthepanels.com/api/v2";
+    process.env.PANEL_API_URL || "https://thelordofthepanels.com/api/v2";
 
   if (!apiKey) {
-    throw new Error("JAP_API_KEY not configured");
+    throw new Error("PANEL_API_KEY not configured");
   }
 
   if (cachedPanelServices && cachedPanelServicesAt) {
@@ -199,8 +199,8 @@ async function fetchPanelServices() {
 }
 
 async function resolveReelServiceIds() {
-  const viewsId = getEnvServiceId("JAP_REEL_VIEWS_SERVICE_ID");
-  const likesId = getEnvServiceId("JAP_REEL_LIKES_SERVICE_ID");
+  const viewsId = getEnvServiceId("PANEL_REEL_VIEWS_SERVICE_ID");
+  const likesId = getEnvServiceId("PANEL_REEL_LIKES_SERVICE_ID");
 
   if (viewsId && likesId) {
     return {
@@ -228,7 +228,10 @@ async function resolveReelServiceIds() {
       };
     }
   } catch (error) {
-    console.log("Auto-detection failed, using defaults:", error instanceof Error ? error.message : "Unknown error");
+    console.log(
+      "Auto-detection failed, using defaults:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
   }
 
   const defaultViewsId = 8851;
@@ -278,11 +281,11 @@ export const createReelCommand =
     }
 
     const defaultViews = parseInt(
-      process.env.JAP_DEFAULT_REEL_VIEWS || "500",
+      process.env.PANEL_DEFAULT_REEL_VIEWS || "500",
       10
     );
     const defaultLikes = parseInt(
-      process.env.JAP_DEFAULT_REEL_LIKES || "50",
+      process.env.PANEL_DEFAULT_REEL_LIKES || "50",
       10
     );
 
@@ -326,8 +329,8 @@ export const createReelCommand =
       await ctx.reply(`⏳ Placing orders...`);
 
       const [viewsResult, likesResult] = await Promise.all([
-        placeJapOrder(resolved.views.id, reelUrl, viewsOrderQuantity),
-        placeJapOrder(resolved.likes.id, reelUrl, likesOrderQuantity),
+        placePanelOrder(resolved.views.id, reelUrl, viewsOrderQuantity),
+        placePanelOrder(resolved.likes.id, reelUrl, likesOrderQuantity),
       ]);
 
       let responseText = `📱 <b>Reel Order Results:</b>\n\n`;

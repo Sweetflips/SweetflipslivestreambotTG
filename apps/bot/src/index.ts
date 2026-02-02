@@ -1,6 +1,7 @@
 import { createBot } from "./bot";
 import { createHelpCommand } from "./commands/help";
 import { createKickCommand } from "./commands/kick";
+import { createPanelServicesCommand } from "./commands/panelservices";
 import { createReelCommand } from "./commands/reel";
 import { createStartCommand } from "./commands/start";
 import { handleKickLinking } from "./handlers/accountLinking";
@@ -25,6 +26,7 @@ const bootstrap = async () => {
   bot.start(createStartCommand());
   bot.help(createHelpCommand());
   bot.command("kick", createKickCommand());
+  bot.command("panelservices", createPanelServicesCommand());
   bot.command("reel", createReelCommand());
   bot.on("text", handleKickLinking);
 

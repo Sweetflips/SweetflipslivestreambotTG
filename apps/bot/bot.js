@@ -1982,13 +1982,13 @@ bot.command("listusers", async (ctx) => {
   }
 });
 
-async function placeJapOrder(serviceId, link, quantity) {
-  const apiKey = process.env.JAP_API_KEY;
+async function placePanelOrder(serviceId, link, quantity) {
+  const apiKey = process.env.PANEL_API_KEY;
   const apiUrl =
-    process.env.JAP_API_URL || "https://thelordofthepanels.com/api/v2";
+    process.env.PANEL_API_URL || "https://thelordofthepanels.com/api/v2";
 
   if (!apiKey) {
-    throw new Error("JAP_API_KEY not configured");
+    throw new Error("PANEL_API_KEY not configured");
   }
 
   const formData = new URLSearchParams({
@@ -2035,12 +2035,12 @@ let cachedPanelServices = null;
 let cachedPanelServicesAt = null;
 
 async function fetchPanelServices() {
-  const apiKey = process.env.JAP_API_KEY;
+  const apiKey = process.env.PANEL_API_KEY;
   const apiUrl =
-    process.env.JAP_API_URL || "https://thelordofthepanels.com/api/v2";
+    process.env.PANEL_API_URL || "https://thelordofthepanels.com/api/v2";
 
   if (!apiKey) {
-    throw new Error("JAP_API_KEY not configured");
+    throw new Error("PANEL_API_KEY not configured");
   }
 
   if (cachedPanelServices && cachedPanelServicesAt) {
@@ -2160,8 +2160,8 @@ function getEnvServiceId(name) {
 }
 
 async function resolveReelServiceIds() {
-  const viewsId = getEnvServiceId("JAP_REEL_VIEWS_SERVICE_ID");
-  const likesId = getEnvServiceId("JAP_REEL_LIKES_SERVICE_ID");
+  const viewsId = getEnvServiceId("PANEL_REEL_VIEWS_SERVICE_ID");
+  const likesId = getEnvServiceId("PANEL_REEL_LIKES_SERVICE_ID");
 
   if (viewsId && likesId) {
     return {
@@ -2220,20 +2220,20 @@ bot.command("panelservices", async (ctx) => {
       const viewsMeta = best.views.service;
       const likesMeta = best.likes.service;
 
-      const viewsLine = viewsMeta
-        ? `${best.views.id} - ${viewsMeta.name} (type ${viewsMeta.type}, min ${viewsMeta.min}, max ${viewsMeta.max})`
-        : `${best.views.id} - (set via env JAP_REEL_VIEWS_SERVICE_ID)`;
+        const viewsLine = viewsMeta
+          ? `${best.views.id} - ${viewsMeta.name} (type ${viewsMeta.type}, min ${viewsMeta.min}, max ${viewsMeta.max})`
+          : `${best.views.id} - (set via env PANEL_REEL_VIEWS_SERVICE_ID)`;
 
-      const likesLine = likesMeta
-        ? `${best.likes.id} - ${likesMeta.name} (type ${likesMeta.type}, min ${likesMeta.min}, max ${likesMeta.max})`
-        : `${best.likes.id} - (set via env JAP_REEL_LIKES_SERVICE_ID)`;
+        const likesLine = likesMeta
+          ? `${best.likes.id} - ${likesMeta.name} (type ${likesMeta.type}, min ${likesMeta.min}, max ${likesMeta.max})`
+          : `${best.likes.id} - (set via env PANEL_REEL_LIKES_SERVICE_ID)`;
 
-      await ctx.reply(
-        `🎛️ <b>Reel Services</b>\n\n` +
-          `<b>Views</b>\n${viewsLine}\n\n` +
-          `<b>Likes</b>\n${likesLine}\n\n` +
-          `Set overrides with:\n` +
-          `JAP_REEL_VIEWS_SERVICE_ID and JAP_REEL_LIKES_SERVICE_ID`,
+        await ctx.reply(
+          `🎛️ <b>Reel Services</b>\n\n` +
+            `<b>Views</b>\n${viewsLine}\n\n` +
+            `<b>Likes</b>\n${likesLine}\n\n` +
+            `Set overrides with:\n` +
+            `PANEL_REEL_VIEWS_SERVICE_ID and PANEL_REEL_LIKES_SERVICE_ID`,
         { parse_mode: "HTML" }
       );
       return;
@@ -2312,10 +2312,10 @@ bot.command("reel", async (ctx) => {
   }
 
   const defaultViews = parseInt(
-    process.env.JAP_DEFAULT_REEL_VIEWS || "500",
+    process.env.PANEL_DEFAULT_REEL_VIEWS || "500",
     10
   );
-  const defaultLikes = parseInt(process.env.JAP_DEFAULT_REEL_LIKES || "50", 10);
+  const defaultLikes = parseInt(process.env.PANEL_DEFAULT_REEL_LIKES || "50", 10);
 
   let viewsQty = defaultViews;
   let likesQty = defaultLikes;
@@ -2353,8 +2353,8 @@ bot.command("reel", async (ctx) => {
     await ctx.reply(`⏳ Placing orders...`);
 
     const [viewsResult, likesResult] = await Promise.all([
-      placeJapOrder(resolved.views.id, reelUrl, viewsOrderQuantity),
-      placeJapOrder(resolved.likes.id, reelUrl, likesOrderQuantity),
+      placePanelOrder(resolved.views.id, reelUrl, viewsOrderQuantity),
+      placePanelOrder(resolved.likes.id, reelUrl, likesOrderQuantity),
     ]);
 
     let responseText = `📱 <b>Reel Order Results:</b>\n\n`;

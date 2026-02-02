@@ -6,10 +6,12 @@ const environmentSchema = z.object({
   GOOGLE_SERVICE_ACCOUNT_KEY: z.string().optional(),
   GOOGLE_SPREADSHEET_ID: z.string().optional(),
   ADMIN_GROUP_IDS: z.string().optional(),
-  JAP_API_KEY: z.string().optional(),
-  JAP_DEFAULT_REEL_VIEWS: z.string().optional(),
-  JAP_DEFAULT_REEL_LIKES: z.string().optional(),
-  JAP_API_URL: z.string().optional(),
+  PANEL_API_KEY: z.string().optional(),
+  PANEL_DEFAULT_REEL_VIEWS: z.string().optional(),
+  PANEL_DEFAULT_REEL_LIKES: z.string().optional(),
+  PANEL_API_URL: z.string().optional(),
+  PANEL_REEL_VIEWS_SERVICE_ID: z.string().optional(),
+  PANEL_REEL_LIKES_SERVICE_ID: z.string().optional(),
 });
 
 const parseEnvironment = () => {
