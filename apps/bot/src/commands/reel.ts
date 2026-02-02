@@ -10,7 +10,7 @@ async function placeJapOrder(
 > {
   const apiKey = process.env.JAP_API_KEY;
   const apiUrl =
-    process.env.JAP_API_URL || "https://justanotherpanel.com/api/v2";
+    process.env.JAP_API_URL || "https://thelordofthepanels.com/api/v2";
 
   if (!apiKey) {
     return { success: false, error: "JAP_API_KEY not configured" };

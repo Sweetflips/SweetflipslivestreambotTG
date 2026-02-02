@@ -1984,7 +1984,7 @@ bot.command("listusers", async (ctx) => {
 async function placeJapOrder(serviceId, link, quantity) {
   const apiKey = process.env.JAP_API_KEY;
   const apiUrl =
-    process.env.JAP_API_URL || "https://justanotherpanel.com/api/v2";
+    process.env.JAP_API_URL || "https://thelordofthepanels.com/api/v2";
 
   if (!apiKey) {
     throw new Error("JAP_API_KEY not configured");

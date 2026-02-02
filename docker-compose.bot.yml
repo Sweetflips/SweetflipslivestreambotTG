@@ -15,7 +15,7 @@ services:
       - JAP_API_KEY=${JAP_API_KEY}
       - JAP_DEFAULT_REEL_VIEWS=${JAP_DEFAULT_REEL_VIEWS:-500}
       - JAP_DEFAULT_REEL_LIKES=${JAP_DEFAULT_REEL_LIKES:-50}
-      - JAP_API_URL=${JAP_API_URL:-https://justanotherpanel.com/api/v2}
+      - JAP_API_URL=${JAP_API_URL:-https://thelordofthepanels.com/api/v2}
       - AUTO_RESTART_ENABLED=true
       - HEALTH_CHECK_INTERVAL=30000
       - MAX_RESTART_ATTEMPTS=10
