@@ -48,7 +48,6 @@ const adminHelp =
   `/addgroup - Manually add a group ID for live announcements\n\n` +
   `/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt; - Add schedule entry\n` +
   `/schedule remove &lt;day&gt; &lt;stream&gt; - Remove schedule entry\n\n` +
-  `/panelservices reel - Show detected panel service IDs for reel views/likes (OWNER only)\n` +
   `/setrole &lt;telegram_id&gt; &lt;MOD|OWNER&gt; - Set user role\n` +
   `/listusers - List all users`;
 
