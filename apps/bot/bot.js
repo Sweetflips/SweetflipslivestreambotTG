@@ -291,7 +291,10 @@ async function getScheduleWithCurrentDayFirst() {
       (entry) => entry.dayOfWeek === currentDayOfWeek
     );
     for (const entry of currentDayEntries) {
-      const streamTime = getStreamTimeInMinutes(entry.dayOfWeek, entry.streamNumber);
+      const streamTime = getStreamTimeInMinutes(
+        entry.dayOfWeek,
+        entry.streamNumber
+      );
       if (streamTime > currentTimeInMinutes) {
         const timeUntilStream = streamTime - currentTimeInMinutes;
         if (nextStreamTime === null || timeUntilStream < nextStreamTime) {
@@ -313,7 +316,10 @@ async function getScheduleWithCurrentDayFirst() {
         );
 
         for (const entry of dayEntries) {
-          const streamTime = getStreamTimeInMinutes(entry.dayOfWeek, entry.streamNumber);
+          const streamTime = getStreamTimeInMinutes(
+            entry.dayOfWeek,
+            entry.streamNumber
+          );
           const totalMinutesUntilStream = dayOffset * 24 * 60 + streamTime;
 
           if (
@@ -450,16 +456,16 @@ function getDayName(dayOfWeek) {
 
 function getStreamTimeInMinutes(dayOfWeek, streamNumber) {
   const stream1Time = 9 * 60;
-  
+
   if (streamNumber === 1) {
     return stream1Time;
   }
-  
+
   const lateStreamDays = [0, 1, 3, 6];
   if (lateStreamDays.includes(dayOfWeek)) {
     return 19 * 60;
   }
-  
+
   return 13 * 60;
 }
 
@@ -467,11 +473,13 @@ function getStreamTimeUTC(dayOfWeek, streamNumber) {
   const minutes = getStreamTimeInMinutes(dayOfWeek, streamNumber);
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  return `${hours.toString().padStart(2, "0")}:${mins
+    .toString()
+    .padStart(2, "0")}`;
 }
 
 function convertUTCToIST(utcTime) {
-  const [hours, minutes] = utcTime.split(':').map(Number);
+  const [hours, minutes] = utcTime.split(":").map(Number);
   let istHours = hours + 5;
   let istMinutes = minutes + 30;
   if (istMinutes >= 60) {
@@ -481,16 +489,20 @@ function convertUTCToIST(utcTime) {
   if (istHours >= 24) {
     istHours -= 24;
   }
-  return `${istHours.toString().padStart(2, '0')}:${istMinutes.toString().padStart(2, '0')}`;
+  return `${istHours.toString().padStart(2, "0")}:${istMinutes
+    .toString()
+    .padStart(2, "0")}`;
 }
 
 function convertUTCToPST(utcTime) {
-  const [hours, minutes] = utcTime.split(':').map(Number);
+  const [hours, minutes] = utcTime.split(":").map(Number);
   let pstHours = hours - 8;
   if (pstHours < 0) {
     pstHours += 24;
   }
-  return `${pstHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  return `${pstHours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}`;
 }
 
 function getStreamTimes(dayOfWeek, streamNumber) {
@@ -556,7 +568,10 @@ async function sendScheduleToAllGroups() {
         scheduleMessage += `${dayHeader}\n`;
 
         for (const schedule of daySchedules) {
-          const times = getStreamTimes(schedule.dayOfWeek, schedule.streamNumber);
+          const times = getStreamTimes(
+            schedule.dayOfWeek,
+            schedule.streamNumber
+          );
           scheduleMessage += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
           scheduleMessage += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
         }
@@ -936,6 +951,7 @@ bot.help(async (ctx) => {
         `/addgroup - Manually add a group ID for live announcements\n\n` +
         `/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt; - Add schedule entry\n` +
         `/schedule remove &lt;day&gt; &lt;stream&gt; - Remove schedule entry\n\n` +
+        `/reel &lt;instagram_reel_url&gt; [views_qty] [likes_qty] - Order Instagram reel views and likes\n\n` +
         `/setrole &lt;telegram_id&gt; &lt;MOD|OWNER&gt; - Set user role\n` +
         `/listusers - List all users\n\n`;
 
@@ -1965,6 +1981,147 @@ bot.command("listusers", async (ctx) => {
   }
 });
 
+async function placeJapOrder(serviceId, link, quantity) {
+  const apiKey = process.env.JAP_API_KEY;
+  const apiUrl =
+    process.env.JAP_API_URL || "https://justanotherpanel.com/api/v2";
+
+  if (!apiKey) {
+    throw new Error("JAP_API_KEY not configured");
+  }
+
+  const formData = new URLSearchParams({
+    key: apiKey,
+    action: "add",
+    service: serviceId.toString(),
+    link: link,
+    quantity: quantity.toString(),
+  });
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      body: formData,
+      headers: {
+        "User-Agent": "Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+
+    if (data.order) {
+      return { success: true, orderId: data.order };
+    } else if (data.error) {
+      return { success: false, error: data.error };
+    } else {
+      return { success: false, error: "Unknown API response format" };
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+bot.command("reel", async (ctx) => {
+  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+
+  if (!isAdmin(user)) {
+    await ctx.reply(`⛔️ Mods and owners only.`);
+    return;
+  }
+
+  const args = ctx.message.text.split(" ").slice(1);
+
+  if (args.length < 1) {
+    await ctx.reply(
+      `❌ Usage: /reel <instagram_reel_url> [views_qty] [likes_qty]\n\n` +
+        `Examples:\n` +
+        `/reel https://www.instagram.com/reel/ABC123/\n` +
+        `/reel https://www.instagram.com/reel/ABC123/ 1000 100`
+    );
+    return;
+  }
+
+  const reelUrl = args[0];
+
+  if (!reelUrl.includes("instagram.com/reel/")) {
+    await ctx.reply(
+      `❌ Invalid Instagram reel URL. Must contain "instagram.com/reel/"`
+    );
+    return;
+  }
+
+  const defaultViews = parseInt(
+    process.env.JAP_DEFAULT_REEL_VIEWS || "500",
+    10
+  );
+  const defaultLikes = parseInt(process.env.JAP_DEFAULT_REEL_LIKES || "50", 10);
+
+  let viewsQty = defaultViews;
+  let likesQty = defaultLikes;
+
+  if (args.length >= 2) {
+    const parsedViews = parseInt(args[1], 10);
+    if (isNaN(parsedViews) || parsedViews <= 0) {
+      await ctx.reply(`❌ Invalid views quantity. Must be a positive number.`);
+      return;
+    }
+    viewsQty = parsedViews;
+  }
+
+  if (args.length >= 3) {
+    const parsedLikes = parseInt(args[2], 10);
+    if (isNaN(parsedLikes) || parsedLikes <= 0) {
+      await ctx.reply(`❌ Invalid likes quantity. Must be a positive number.`);
+      return;
+    }
+    likesQty = parsedLikes;
+  }
+
+  try {
+    await ctx.reply(
+      `⏳ Placing orders for reel views (${viewsQty}) and likes (${likesQty})...`
+    );
+
+    const [viewsResult, likesResult] = await Promise.all([
+      placeJapOrder(5993, reelUrl, viewsQty),
+      placeJapOrder(8851, reelUrl, likesQty),
+    ]);
+
+    let responseText = `📱 <b>Reel Order Results:</b>\n\n`;
+
+    if (viewsResult.success) {
+      responseText += `✅ Views (Service 5993): Order #${viewsResult.orderId}\n`;
+    } else {
+      responseText += `❌ Views (Service 5993): ${viewsResult.error}\n`;
+    }
+
+    if (likesResult.success) {
+      responseText += `✅ Likes (Service 8851): Order #${likesResult.orderId}\n`;
+    } else {
+      responseText += `❌ Likes (Service 8851): ${likesResult.error}\n`;
+    }
+
+    if (viewsResult.success && likesResult.success) {
+      responseText += `\n✅ Both orders placed successfully!`;
+    } else if (viewsResult.success || likesResult.success) {
+      responseText += `\n⚠️ Partial success - one order failed.`;
+    } else {
+      responseText += `\n❌ Both orders failed.`;
+    }
+
+    await ctx.reply(responseText, { parse_mode: "HTML" });
+  } catch (error) {
+    console.error("❌ Error placing reel orders:", error);
+    await ctx.reply(`❌ Error placing orders: ${error.message}`);
+  }
+});
+
 // Function to check if bot is a member of a specific chat
 async function isBotMember(chatId) {
   try {
@@ -2406,7 +2563,9 @@ async function broadcastHtmlToAllGroups(message, logPrefix = "Broadcast") {
           });
           successCount++;
           results.push({ groupId, status: "success", attempt: 2 });
-          console.log(`✅ ${logPrefix} sent to group ${groupId} (retry successful)`);
+          console.log(
+            `✅ ${logPrefix} sent to group ${groupId} (retry successful)`
+          );
 
           await new Promise((resolve) => setTimeout(resolve, 150));
         } catch (error) {
@@ -2436,7 +2595,9 @@ async function broadcastHtmlToAllGroups(message, logPrefix = "Broadcast") {
     console.log(`✅ Successfully sent: ${successCount} groups`);
     console.log(`❌ Failed: ${failedCount} groups`);
     console.log(
-      `📈 Success rate: ${((successCount / allGroups.length) * 100).toFixed(1)}%`
+      `📈 Success rate: ${((successCount / allGroups.length) * 100).toFixed(
+        1
+      )}%`
     );
 
     return { success: successCount, failed: failedCount, groups: results };
@@ -2695,7 +2856,10 @@ bot.command("schedule", async (ctx) => {
             message += `${dayHeader}\n`;
 
             for (const schedule of daySchedules) {
-              const times = getStreamTimes(schedule.dayOfWeek, schedule.streamNumber);
+              const times = getStreamTimes(
+                schedule.dayOfWeek,
+                schedule.streamNumber
+              );
               message += `• Stream ${schedule.streamNumber}: ${schedule.eventTitle}\n`;
               message += `  🌍 UTC: ${times.utc} | 🇮🇳 IST: ${times.ist} | 🇺🇸 PST: ${times.pst}\n`;
             }
@@ -4289,7 +4453,9 @@ function setupAutomatedScheduleMessaging() {
   const stream2ReminderEarly = cron.schedule(
     "0 11 * * 2,4,5",
     async () => {
-      console.log("🚀 Stream 2 reminder triggered (11:00 AM UTC for Tue/Thu/Fri)");
+      console.log(
+        "🚀 Stream 2 reminder triggered (11:00 AM UTC for Tue/Thu/Fri)"
+      );
       try {
         await sendStreamReminders(2);
       } catch (error) {
@@ -4305,7 +4471,9 @@ function setupAutomatedScheduleMessaging() {
   const stream2ReminderLate = cron.schedule(
     "0 17 * * 0,1,3,6",
     async () => {
-      console.log("🚀 Stream 2 reminder triggered (5:00 PM UTC for Mon/Wed/Sat/Sun)");
+      console.log(
+        "🚀 Stream 2 reminder triggered (5:00 PM UTC for Mon/Wed/Sat/Sun)"
+      );
       try {
         await sendStreamReminders(2);
       } catch (error) {
@@ -4339,7 +4507,9 @@ function setupAutomatedScheduleMessaging() {
   console.log("   🌅 Morning broadcast: 9:00 AM UTC");
   console.log("   🌆 Afternoon broadcast: 1:00 PM UTC");
   console.log("   🚀 Stream 1 reminder: 7:00 AM UTC (2h before)");
-  console.log("   🚀 Stream 2 reminder: 11:00 AM UTC (Tue/Thu/Fri) or 5:00 PM UTC (Mon/Wed/Sat/Sun)");
+  console.log(
+    "   🚀 Stream 2 reminder: 11:00 AM UTC (Tue/Thu/Fri) or 5:00 PM UTC (Mon/Wed/Sat/Sun)"
+  );
   console.log("   🧹 Daily cleanup: 12:00 AM UTC");
 
   global.morningSchedule = morningSchedule;
