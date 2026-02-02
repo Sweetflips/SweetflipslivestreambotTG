@@ -2220,20 +2220,20 @@ bot.command("panelservices", async (ctx) => {
       const viewsMeta = best.views.service;
       const likesMeta = best.likes.service;
 
-        const viewsLine = viewsMeta
-          ? `${best.views.id} - ${viewsMeta.name} (type ${viewsMeta.type}, min ${viewsMeta.min}, max ${viewsMeta.max})`
-          : `${best.views.id} - (set via env PANEL_REEL_VIEWS_SERVICE_ID)`;
+      const viewsLine = viewsMeta
+        ? `${best.views.id} - ${viewsMeta.name} (type ${viewsMeta.type}, min ${viewsMeta.min}, max ${viewsMeta.max})`
+        : `${best.views.id} - (set via env PANEL_REEL_VIEWS_SERVICE_ID)`;
 
-        const likesLine = likesMeta
-          ? `${best.likes.id} - ${likesMeta.name} (type ${likesMeta.type}, min ${likesMeta.min}, max ${likesMeta.max})`
-          : `${best.likes.id} - (set via env PANEL_REEL_LIKES_SERVICE_ID)`;
+      const likesLine = likesMeta
+        ? `${best.likes.id} - ${likesMeta.name} (type ${likesMeta.type}, min ${likesMeta.min}, max ${likesMeta.max})`
+        : `${best.likes.id} - (set via env PANEL_REEL_LIKES_SERVICE_ID)`;
 
-        await ctx.reply(
-          `🎛️ <b>Reel Services</b>\n\n` +
-            `<b>Views</b>\n${viewsLine}\n\n` +
-            `<b>Likes</b>\n${likesLine}\n\n` +
-            `Set overrides with:\n` +
-            `PANEL_REEL_VIEWS_SERVICE_ID and PANEL_REEL_LIKES_SERVICE_ID`,
+      await ctx.reply(
+        `🎛️ <b>Reel Services</b>\n\n` +
+          `<b>Views</b>\n${viewsLine}\n\n` +
+          `<b>Likes</b>\n${likesLine}\n\n` +
+          `Set overrides with:\n` +
+          `PANEL_REEL_VIEWS_SERVICE_ID and PANEL_REEL_LIKES_SERVICE_ID`,
         { parse_mode: "HTML" }
       );
       return;
@@ -2315,7 +2315,10 @@ bot.command("reel", async (ctx) => {
     process.env.PANEL_DEFAULT_REEL_VIEWS || "500",
     10
   );
-  const defaultLikes = parseInt(process.env.PANEL_DEFAULT_REEL_LIKES || "50", 10);
+  const defaultLikes = parseInt(
+    process.env.PANEL_DEFAULT_REEL_LIKES || "50",
+    10
+  );
 
   let viewsQty = defaultViews;
   let likesQty = defaultLikes;
