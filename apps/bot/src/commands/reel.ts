@@ -4,7 +4,7 @@ import type { BotContext } from "../dependencies";
 async function placeJapOrder(
   serviceId: number,
   link: string,
-  quantity: number
+  quantity?: number
 ): Promise<
   { success: true; orderId: number } | { success: false; error: string }
 > {
@@ -21,8 +21,11 @@ async function placeJapOrder(
     action: "add",
     service: serviceId.toString(),
     link: link,
-    quantity: quantity.toString(),
   });
+
+  if (quantity !== undefined) {
+    formData.set("quantity", quantity.toString());
+  }
 
   try {
     const response = await fetch(apiUrl, {
@@ -57,6 +60,184 @@ async function placeJapOrder(
       error instanceof Error ? error.message : "Unknown error occurred";
     return { success: false, error: message };
   }
+}
+
+type PanelService = {
+  service?: string | number;
+  name?: string;
+  category?: string;
+  type?: string;
+  min?: string | number;
+  max?: string | number;
+};
+
+let cachedPanelServices: PanelService[] | null = null;
+let cachedPanelServicesAt: number | null = null;
+
+function normalizeServiceField(value: unknown) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  return String(value).toLowerCase();
+}
+
+function parseIntSafe(value: unknown) {
+  const n = parseInt(String(value), 10);
+  if (Number.isFinite(n)) {
+    return n;
+  }
+  return null;
+}
+
+function scoreServiceFor(tokens: string[], service: PanelService) {
+  const haystack =
+    normalizeServiceField(service.name) +
+    " " +
+    normalizeServiceField(service.category) +
+    " " +
+    normalizeServiceField(service.type);
+
+  let score = 0;
+  for (const t of tokens) {
+    if (haystack.includes(t)) {
+      score += 1;
+    }
+  }
+  return score;
+}
+
+function pickBestService(services: PanelService[], tokens: string[]) {
+  let best: PanelService | null = null;
+  let bestScore = -1;
+
+  for (const s of services) {
+    const score = scoreServiceFor(tokens, s);
+    if (score > bestScore) {
+      bestScore = score;
+      best = s;
+    }
+  }
+
+  return best;
+}
+
+function isPackageService(service: PanelService) {
+  const type = normalizeServiceField(service.type);
+  const min = parseIntSafe(service.min);
+  const max = parseIntSafe(service.max);
+
+  if (type.includes("package")) {
+    return true;
+  }
+
+  if (min === 1 && max === 1) {
+    return true;
+  }
+
+  return false;
+}
+
+function getEnvServiceId(name: string) {
+  const raw = process.env[name];
+  if (!raw) {
+    return null;
+  }
+  const parsed = parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
+async function fetchPanelServices() {
+  const apiKey = process.env.JAP_API_KEY;
+  const apiUrl =
+    process.env.JAP_API_URL || "https://thelordofthepanels.com/api/v2";
+
+  if (!apiKey) {
+    throw new Error("JAP_API_KEY not configured");
+  }
+
+  if (cachedPanelServices && cachedPanelServicesAt) {
+    const ageMs = Date.now() - cachedPanelServicesAt;
+    if (ageMs < 5 * 60 * 1000) {
+      return cachedPanelServices;
+    }
+  }
+
+  const formData = new URLSearchParams({
+    key: apiKey,
+    action: "services",
+  });
+
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    body: formData,
+    headers: {
+      "User-Agent": "Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `API request failed: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const data = (await response.json()) as unknown;
+  if (!Array.isArray(data)) {
+    const errorMessage =
+      data && typeof data === "object" && "error" in data
+        ? String((data as { error: string }).error)
+        : "Invalid services response";
+    throw new Error(errorMessage);
+  }
+
+  cachedPanelServices = data as PanelService[];
+  cachedPanelServicesAt = Date.now();
+  return cachedPanelServices;
+}
+
+async function resolveReelServiceIds() {
+  const viewsId = getEnvServiceId("JAP_REEL_VIEWS_SERVICE_ID");
+  const likesId = getEnvServiceId("JAP_REEL_LIKES_SERVICE_ID");
+
+  if (viewsId && likesId) {
+    return {
+      views: { id: viewsId, service: null as PanelService | null },
+      likes: { id: likesId, service: null as PanelService | null },
+    };
+  }
+
+  try {
+    const services = await fetchPanelServices();
+
+    const viewsTokens = ["instagram", "reel", "view"];
+    const likesTokens = ["instagram", "reel", "like"];
+
+    const bestViews = pickBestService(services, viewsTokens);
+    const bestLikes = pickBestService(services, likesTokens);
+
+    const bestViewsId = bestViews ? parseIntSafe(bestViews.service) : null;
+    const bestLikesId = bestLikes ? parseIntSafe(bestLikes.service) : null;
+
+    if (bestViewsId && bestLikesId) {
+      return {
+        views: { id: bestViewsId, service: bestViews },
+        likes: { id: bestLikesId, service: bestLikes },
+      };
+    }
+  } catch (error) {
+    console.log("Auto-detection failed, using defaults:", error instanceof Error ? error.message : "Unknown error");
+  }
+
+  const defaultViewsId = 8851;
+  const defaultLikesId = 1781;
+
+  return {
+    views: { id: defaultViewsId, service: null as PanelService | null },
+    likes: { id: defaultLikesId, service: null as PanelService | null },
+  };
 }
 
 export const createReelCommand =
@@ -131,27 +312,36 @@ export const createReelCommand =
     }
 
     try {
-      await ctx.reply(
-        `⏳ Placing orders for reel views (${viewsQty}) and likes (${likesQty})...`
-      );
+      const resolved = await resolveReelServiceIds();
+      const viewsIsPackage = resolved.views.service
+        ? isPackageService(resolved.views.service)
+        : false;
+      const likesIsPackage = resolved.likes.service
+        ? isPackageService(resolved.likes.service)
+        : false;
+
+      const viewsOrderQuantity = viewsIsPackage ? undefined : viewsQty;
+      const likesOrderQuantity = likesIsPackage ? undefined : likesQty;
+
+      await ctx.reply(`⏳ Placing orders...`);
 
       const [viewsResult, likesResult] = await Promise.all([
-        placeJapOrder(5993, reelUrl, viewsQty),
-        placeJapOrder(8851, reelUrl, likesQty),
+        placeJapOrder(resolved.views.id, reelUrl, viewsOrderQuantity),
+        placeJapOrder(resolved.likes.id, reelUrl, likesOrderQuantity),
       ]);
 
       let responseText = `📱 <b>Reel Order Results:</b>\n\n`;
 
       if (viewsResult.success) {
-        responseText += `✅ Views (Service 5993): Order #${viewsResult.orderId}\n`;
+        responseText += `✅ Views (Service ${resolved.views.id}): Order #${viewsResult.orderId}\n`;
       } else {
-        responseText += `❌ Views (Service 5993): ${viewsResult.error}\n`;
+        responseText += `❌ Views (Service ${resolved.views.id}): ${viewsResult.error}\n`;
       }
 
       if (likesResult.success) {
-        responseText += `✅ Likes (Service 8851): Order #${likesResult.orderId}\n`;
+        responseText += `✅ Likes (Service ${resolved.likes.id}): Order #${likesResult.orderId}\n`;
       } else {
-        responseText += `❌ Likes (Service 8851): ${likesResult.error}\n`;
+        responseText += `❌ Likes (Service ${resolved.likes.id}): ${likesResult.error}\n`;
       }
 
       if (viewsResult.success && likesResult.success) {

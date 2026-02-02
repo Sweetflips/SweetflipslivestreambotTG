@@ -952,6 +952,7 @@ bot.help(async (ctx) => {
         `/schedule add &lt;day&gt; &lt;stream&gt; &lt;title&gt; - Add schedule entry\n` +
         `/schedule remove &lt;day&gt; &lt;stream&gt; - Remove schedule entry\n\n` +
         `/reel &lt;instagram_reel_url&gt; [views_qty] [likes_qty] - Order Instagram reel views and likes\n\n` +
+        `/panelservices reel - Show detected panel service IDs for reel views/likes (OWNER only)\n` +
         `/setrole &lt;telegram_id&gt; &lt;MOD|OWNER&gt; - Set user role\n` +
         `/listusers - List all users\n\n`;
 
@@ -1995,8 +1996,11 @@ async function placeJapOrder(serviceId, link, quantity) {
     action: "add",
     service: serviceId.toString(),
     link: link,
-    quantity: quantity.toString(),
   });
+
+  if (quantity !== undefined && quantity !== null) {
+    formData.set("quantity", quantity.toString());
+  }
 
   try {
     const response = await fetch(apiUrl, {
@@ -2026,6 +2030,257 @@ async function placeJapOrder(serviceId, link, quantity) {
     return { success: false, error: error.message };
   }
 }
+
+let cachedPanelServices = null;
+let cachedPanelServicesAt = null;
+
+async function fetchPanelServices() {
+  const apiKey = process.env.JAP_API_KEY;
+  const apiUrl =
+    process.env.JAP_API_URL || "https://thelordofthepanels.com/api/v2";
+
+  if (!apiKey) {
+    throw new Error("JAP_API_KEY not configured");
+  }
+
+  if (cachedPanelServices && cachedPanelServicesAt) {
+    const ageMs = Date.now() - cachedPanelServicesAt;
+    if (ageMs < 5 * 60 * 1000) {
+      return cachedPanelServices;
+    }
+  }
+
+  const formData = new URLSearchParams({
+    key: apiKey,
+    action: "services",
+  });
+
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    body: formData,
+    headers: {
+      "User-Agent": "Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `API request failed: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data)) {
+    const errorMessage =
+      data && typeof data === "object" && data.error
+        ? data.error
+        : "Invalid services response";
+    throw new Error(errorMessage);
+  }
+
+  cachedPanelServices = data;
+  cachedPanelServicesAt = Date.now();
+  return data;
+}
+
+function normalizeServiceField(value) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  return String(value).toLowerCase();
+}
+
+function scoreServiceFor(tokens, service) {
+  const haystack =
+    normalizeServiceField(service.name) +
+    " " +
+    normalizeServiceField(service.category) +
+    " " +
+    normalizeServiceField(service.type);
+
+  let score = 0;
+  for (const t of tokens) {
+    if (haystack.includes(t)) {
+      score += 1;
+    }
+  }
+  return score;
+}
+
+function pickBestService(services, tokens) {
+  let best = null;
+  let bestScore = -1;
+
+  for (const s of services) {
+    const score = scoreServiceFor(tokens, s);
+    if (score > bestScore) {
+      bestScore = score;
+      best = s;
+    }
+  }
+
+  return best;
+}
+
+function parseIntSafe(value) {
+  const n = parseInt(String(value), 10);
+  if (Number.isFinite(n)) {
+    return n;
+  }
+  return null;
+}
+
+function isPackageService(service) {
+  const type = normalizeServiceField(service.type);
+  const min = parseIntSafe(service.min);
+  const max = parseIntSafe(service.max);
+
+  if (type.includes("package")) {
+    return true;
+  }
+
+  if (min === 1 && max === 1) {
+    return true;
+  }
+
+  return false;
+}
+
+function getEnvServiceId(name) {
+  const raw = process.env[name];
+  if (!raw) {
+    return null;
+  }
+  const parsed = parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
+async function resolveReelServiceIds() {
+  const viewsId = getEnvServiceId("JAP_REEL_VIEWS_SERVICE_ID");
+  const likesId = getEnvServiceId("JAP_REEL_LIKES_SERVICE_ID");
+
+  if (viewsId && likesId) {
+    return {
+      views: { id: viewsId, service: null },
+      likes: { id: likesId, service: null },
+    };
+  }
+
+  try {
+    const services = await fetchPanelServices();
+
+    const viewsTokens = ["instagram", "reel", "view"];
+    const likesTokens = ["instagram", "reel", "like"];
+
+    const bestViews = pickBestService(services, viewsTokens);
+    const bestLikes = pickBestService(services, likesTokens);
+
+    const bestViewsId = bestViews ? parseIntSafe(bestViews.service) : null;
+    const bestLikesId = bestLikes ? parseIntSafe(bestLikes.service) : null;
+
+    if (bestViewsId && bestLikesId) {
+      return {
+        views: { id: bestViewsId, service: bestViews },
+        likes: { id: bestLikesId, service: bestLikes },
+      };
+    }
+  } catch (error) {
+    console.log("Auto-detection failed, using defaults:", error.message);
+  }
+
+  const defaultViewsId = 8851;
+  const defaultLikesId = 1781;
+
+  return {
+    views: { id: defaultViewsId, service: null },
+    likes: { id: defaultLikesId, service: null },
+  };
+}
+
+bot.command("panelservices", async (ctx) => {
+  const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
+
+  if (user.role !== "OWNER") {
+    await ctx.reply(`⛔️ Owner only.`);
+    return;
+  }
+
+  const args = ctx.message.text.split(" ").slice(1);
+  const mode = (args[0] || "").toLowerCase();
+
+  try {
+    const services = await fetchPanelServices();
+
+    if (mode === "reel") {
+      const best = await resolveReelServiceIds();
+      const viewsMeta = best.views.service;
+      const likesMeta = best.likes.service;
+
+      const viewsLine = viewsMeta
+        ? `${best.views.id} - ${viewsMeta.name} (type ${viewsMeta.type}, min ${viewsMeta.min}, max ${viewsMeta.max})`
+        : `${best.views.id} - (set via env JAP_REEL_VIEWS_SERVICE_ID)`;
+
+      const likesLine = likesMeta
+        ? `${best.likes.id} - ${likesMeta.name} (type ${likesMeta.type}, min ${likesMeta.min}, max ${likesMeta.max})`
+        : `${best.likes.id} - (set via env JAP_REEL_LIKES_SERVICE_ID)`;
+
+      await ctx.reply(
+        `🎛️ <b>Reel Services</b>\n\n` +
+          `<b>Views</b>\n${viewsLine}\n\n` +
+          `<b>Likes</b>\n${likesLine}\n\n` +
+          `Set overrides with:\n` +
+          `JAP_REEL_VIEWS_SERVICE_ID and JAP_REEL_LIKES_SERVICE_ID`,
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
+
+    const query = args.join(" ").trim().toLowerCase();
+    if (!query) {
+      await ctx.reply(
+        `❌ Usage: /panelservices reel OR /panelservices <search text>`
+      );
+      return;
+    }
+
+    const matches = services
+      .filter((s) => {
+        const haystack =
+          normalizeServiceField(s.service) +
+          " " +
+          normalizeServiceField(s.name) +
+          " " +
+          normalizeServiceField(s.category) +
+          " " +
+          normalizeServiceField(s.type);
+        return haystack.includes(query);
+      })
+      .slice(0, 20);
+
+    if (matches.length === 0) {
+      await ctx.reply(`No services matched: ${query}`);
+      return;
+    }
+
+    const lines = matches.map((s) => {
+      const id = s.service;
+      const name = s.name || "";
+      const type = s.type || "";
+      const min = s.min || "";
+      const max = s.max || "";
+      return `${id} - ${name} (type ${type}, min ${min}, max ${max})`;
+    });
+
+    await ctx.reply(lines.join("\n"));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    await ctx.reply(`❌ ${message}`);
+  }
+});
 
 bot.command("reel", async (ctx) => {
   const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
@@ -2084,27 +2339,36 @@ bot.command("reel", async (ctx) => {
   }
 
   try {
-    await ctx.reply(
-      `⏳ Placing orders for reel views (${viewsQty}) and likes (${likesQty})...`
-    );
+    const resolved = await resolveReelServiceIds();
+    const viewsIsPackage = resolved.views.service
+      ? isPackageService(resolved.views.service)
+      : false;
+    const likesIsPackage = resolved.likes.service
+      ? isPackageService(resolved.likes.service)
+      : false;
+
+    const viewsOrderQuantity = viewsIsPackage ? undefined : viewsQty;
+    const likesOrderQuantity = likesIsPackage ? undefined : likesQty;
+
+    await ctx.reply(`⏳ Placing orders...`);
 
     const [viewsResult, likesResult] = await Promise.all([
-      placeJapOrder(5993, reelUrl, viewsQty),
-      placeJapOrder(8851, reelUrl, likesQty),
+      placeJapOrder(resolved.views.id, reelUrl, viewsOrderQuantity),
+      placeJapOrder(resolved.likes.id, reelUrl, likesOrderQuantity),
     ]);
 
     let responseText = `📱 <b>Reel Order Results:</b>\n\n`;
 
     if (viewsResult.success) {
-      responseText += `✅ Views (Service 5993): Order #${viewsResult.orderId}\n`;
+      responseText += `✅ Views (Service ${resolved.views.id}): Order #${viewsResult.orderId}\n`;
     } else {
-      responseText += `❌ Views (Service 5993): ${viewsResult.error}\n`;
+      responseText += `❌ Views (Service ${resolved.views.id}): ${viewsResult.error}\n`;
     }
 
     if (likesResult.success) {
-      responseText += `✅ Likes (Service 8851): Order #${likesResult.orderId}\n`;
+      responseText += `✅ Likes (Service ${resolved.likes.id}): Order #${likesResult.orderId}\n`;
     } else {
-      responseText += `❌ Likes (Service 8851): ${likesResult.error}\n`;
+      responseText += `❌ Likes (Service ${resolved.likes.id}): ${likesResult.error}\n`;
     }
 
     if (viewsResult.success && likesResult.success) {
