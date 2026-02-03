@@ -2902,7 +2902,7 @@ async function sendLiveAnnouncement() {
 
 💵Earn by watching through linking your Kick here (https://www.kickdashboard.com/login)
 
-Join us on Razed (https://www.razed.com/signup/?raf=SweetFlips) & LuxDrop (https://luxdrop.com/r/sweetflips) 🔥`;
+Join us on Spartans (https://go.aff.spartans.com/fqf5mmbm) & LuxDrop (https://luxdrop.com/r/sweetflips) 🔥`;
 
   return await broadcastHtmlToAllGroups(liveMessage, "Live Announcement");
 }
