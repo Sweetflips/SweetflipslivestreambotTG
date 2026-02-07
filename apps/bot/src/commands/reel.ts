@@ -234,7 +234,7 @@ async function resolveReelServiceIds() {
     );
   }
 
-  const defaultViewsId = 8851;
+  const defaultViewsId = 3222;
   const defaultLikesId = 1781;
 
   return {
@@ -246,6 +246,11 @@ async function resolveReelServiceIds() {
 export const createReelCommand =
   (): MiddlewareFn<BotContext> => async (ctx) => {
     if (!ctx.from) {
+      return;
+    }
+
+    if (ctx.chat?.type !== "private") {
+      await ctx.reply("This command only works in private chat.");
       return;
     }
 

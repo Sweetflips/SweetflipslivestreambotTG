@@ -2190,7 +2190,7 @@ async function resolveReelServiceIds() {
     console.log("Auto-detection failed, using defaults:", error.message);
   }
 
-  const defaultViewsId = 8851;
+  const defaultViewsId = 3222;
   const defaultLikesId = 1781;
 
   return {
@@ -2281,6 +2281,11 @@ bot.command("panelservices", async (ctx) => {
 });
 
 bot.command("reel", async (ctx) => {
+  if (ctx.chat?.type !== "private") {
+    await ctx.reply("This command only works in private chat.");
+    return;
+  }
+
   const user = await getUserOrCreate(ctx.from.id, ctx.from.username);
 
   if (!isAdmin(user)) {
