@@ -51,6 +51,8 @@ POST_MAX_ATTEMPTS = 5
 BACKOFF_CAP_S = 30.0
 # WebSocket transcript JSON: bump when adding/removing top-level fields listeners rely on.
 WS_TRANSCRIPT_PROTO = 2
+# relay_server.py drops frames over STT_MAX_WS_MESSAGE_BYTES (default 65536); stay under with margin.
+_FIT_WS_MAX_BYTES = int(os.environ.get("STT_WS_SEND_MAX_BYTES", "62000"))
 RMS_THRESHOLD = 0.018
 END_SILENCE_S = 0.35
 MIN_SPEECH_S = 0.35
@@ -245,6 +247,48 @@ def _ws_url_for_log(url: str) -> str:
     return f"{base}?token=***"
 
 
+def _fit_ws_payload(body: dict[str, Any], max_bytes: int = _FIT_WS_MAX_BYTES) -> dict[str, Any]:
+    """Drop segments/metrics or fall back to minimal fields so relay_server does not drop the frame."""
+    b = dict(body)
+    for _ in range(3):
+        raw = json.dumps(b, ensure_ascii=False).encode("utf-8")
+        if len(raw) <= max_bytes:
+            return b
+        if b.pop("segments", None) is not None:
+            log.warning(
+                "WS payload %d bytes — omitting segments (limit %d)",
+                len(raw),
+                max_bytes,
+            )
+            continue
+        if b.pop("metrics", None) is not None:
+            log.warning(
+                "WS payload %d bytes — omitting metrics (limit %d)",
+                len(raw),
+                max_bytes,
+            )
+            continue
+        break
+    raw = json.dumps(b, ensure_ascii=False).encode("utf-8")
+    if len(raw) <= max_bytes:
+        return b
+    sid = str(b.get("stream_id") or b.get("source") or "streamer")
+    log.error(
+        "WS payload still %d bytes after shrink — sending minimal transcript only",
+        len(raw),
+    )
+    return {
+        "type": "transcript",
+        "proto": int(b.get("proto", WS_TRANSCRIPT_PROTO)),
+        "text": str(b.get("text", ""))[:8000],
+        "is_final": True,
+        "timestamp": b.get("timestamp"),
+        "stream_id": sid,
+        "source": sid,
+        "truncated": True,
+    }
+
+
 class RelayClient:
     """Transcripts over WebSocket (relay_server.py). GET /health uses HTTP same host as relay.base_url."""
 
@@ -377,6 +421,7 @@ class RelayClient:
         """Send a full transcript JSON object (see ``build_ws_transcript_body``)."""
         if utterance_id is not None and utterance_id == self._last_utterance_id:
             return True
+        body = _fit_ws_payload(dict(body))
         payload = json.dumps(body, ensure_ascii=False)
         async with self._ws_lock:
             ws = self._ws
@@ -1268,7 +1313,13 @@ async def run_agent(cfg: dict[str, Any], stop: asyncio.Event) -> None:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="SweetFlips OBS + Whisper streamer agent")
-    p.add_argument("--config", type=Path, help="Path to streamer_agent.json")
+    p.add_argument(
+        "--config",
+        type=Path,
+        nargs="?",
+        default=None,
+        help="Path to streamer_agent.json (default: config/streamer_agent.json if it exists)",
+    )
     p.add_argument(
         "--list-devices",
         action="store_true",
@@ -1277,16 +1328,30 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def _resolve_config_path(explicit: Path | None) -> Path:
+    if explicit is not None:
+        return explicit
+    guess = _PROJECT_ROOT / "config" / "streamer_agent.json"
+    if guess.is_file():
+        return guess
+    print(
+        "No config: pass --config path/to/streamer_agent.json "
+        f"or create {guess}",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+
+
 def main() -> None:
     args = parse_args()
     if args.list_devices:
         print_input_devices()
         raise SystemExit(0)
-    if not args.config:
-        print("--config is required (unless --list-devices)", file=sys.stderr)
-        raise SystemExit(2)
+    cfg_path = _resolve_config_path(args.config)
+    if args.config is None:
+        print(f"Using config: {cfg_path}", file=sys.stderr)
     load_dotenv_for_project()
-    cfg = load_config(args.config)
+    cfg = load_config(cfg_path)
     setup_logging(cfg)
     try:
 

@@ -1,0 +1,28 @@
+name: STT Python
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Byte-compile STT modules
+        run: |
+          python -m py_compile \
+            scripts/streamer_obs_whisper_agent.py \
+            relay_server.py \
+            listen_stt_ws.py \
+            ws_config.py \
+            streamer_agent.py \
+            stt_single_instance.py \
+            stt_audio_devices.py \
+            transcript_normalization.py \
+            emotion_laughter.py

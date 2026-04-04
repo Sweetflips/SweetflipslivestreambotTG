@@ -27,11 +27,13 @@ Streamer PC: **microphone** → **faster-whisper** (CUDA) → **WebSocket** to [
 
 3. Copy `config/streamer_agent.example.json` → `config/streamer_agent.json` (gitignored) and tune `relay`, `audio`, `whisper`, `obs`.
 
-4. Run:
+4. Run (optional `--config` if `config\streamer_agent.json` exists):
 
    ```powershell
    .\.venv\Scripts\python scripts\streamer_obs_whisper_agent.py --config config\streamer_agent.json
    ```
+
+   Same as above without `--config` when that file is present.
 
 List mics: `python scripts\streamer_obs_whisper_agent.py --list-devices`
 
