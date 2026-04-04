@@ -5,6 +5,11 @@
 .env.test.local
 .env.production.local
 config/streamer_agent.json
+# Railway / env dumps (never commit)
+config/railway-*.txt
+config/env-config.txt
+config/env-production.env
+config/google-sheets-config.env
 
 # Python
 .venv/
