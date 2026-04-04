@@ -4,7 +4,9 @@
     "source_name": "streamer-pc",
     "timeout_secs": 5.0,
     "retry_backoff_secs": 3.0,
-    "health_check_on_start": true
+    "health_check_on_start": true,
+    "include_ws_metrics": true,
+    "include_ws_segments": true
   },
   "audio": {
     "device": null,
@@ -29,7 +31,8 @@
     "min_silence_duration_ms": 250,
     "speech_pad_ms": 80,
     "condition_on_previous_text": false,
-    "language": "en"
+    "language": "en",
+    "word_timestamps": false
   },
   "obs": {
     "enabled": true,

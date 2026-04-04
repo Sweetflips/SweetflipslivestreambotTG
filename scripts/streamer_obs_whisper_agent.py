@@ -49,6 +49,8 @@ for _k, _v in (("OMP_NUM_THREADS", "4"), ("MKL_NUM_THREADS", "4"), ("OPENBLAS_NU
 
 POST_MAX_ATTEMPTS = 5
 BACKOFF_CAP_S = 30.0
+# WebSocket transcript JSON: bump when adding/removing top-level fields listeners rely on.
+WS_TRANSCRIPT_PROTO = 2
 RMS_THRESHOLD = 0.018
 END_SILENCE_S = 0.35
 MIN_SPEECH_S = 0.35
@@ -371,17 +373,10 @@ class RelayClient:
         log.debug("STT WebSocket disconnected")
         return True
 
-    async def ingest(self, text: str, ts: float, utterance_id: int | None) -> bool:
+    async def ingest(self, body: dict[str, Any], utterance_id: int | None) -> bool:
+        """Send a full transcript JSON object (see ``build_ws_transcript_body``)."""
         if utterance_id is not None and utterance_id == self._last_utterance_id:
             return True
-        body: dict[str, Any] = {
-            "type": "transcript",
-            "text": text,
-            "is_final": True,
-            "timestamp": ts,
-            "source": self._source_name,
-            "stream_id": self._source_name,
-        }
         payload = json.dumps(body, ensure_ascii=False)
         async with self._ws_lock:
             ws = self._ws
@@ -993,8 +988,9 @@ def transcribe_sync(
     tc_extra: dict[str, Any] = {}
     if w.get("temperature") is not None:
         tc_extra["temperature"] = w["temperature"]
+    word_timestamps = bool(w.get("word_timestamps", False))
     try:
-        segments, _info = model.transcribe(
+        segments, info = model.transcribe(
             audio,
             language=lang_code,
             task="transcribe",
@@ -1011,11 +1007,12 @@ def transcribe_sync(
             compression_ratio_threshold=cr_th,
             initial_prompt=initial_prompt,
             hotwords=hotwords,
+            word_timestamps=word_timestamps,
             **tc_extra,
         )
     except Exception as e:
         log.exception("transcribe failed: %s", e)
-        return "", []
+        return "", [], None
     segs = list(segments)
     parts: list[str] = []
     prev_norm: str | None = None
@@ -1030,7 +1027,125 @@ def transcribe_sync(
         prev_norm = n
     text = "".join(parts).strip()
     text = _strip_duplicate_full_utterance(text)
-    return text, segs
+    return text, segs, info
+
+
+def _metrics_from_whisper_segments(segs: list) -> dict[str, float | int]:
+    if not segs:
+        return {"segment_count": 0}
+    n = len(segs)
+    return {
+        "segment_count": n,
+        "avg_logprob": float(sum(s.avg_logprob for s in segs) / n),
+        "avg_no_speech_prob": float(sum(s.no_speech_prob for s in segs) / n),
+        "max_no_speech_prob": float(max(s.no_speech_prob for s in segs)),
+        "max_compression_ratio": float(max(s.compression_ratio for s in segs)),
+    }
+
+
+def _segments_for_ws(segs: list, *, include_words: bool) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for s in segs:
+        raw = (getattr(s, "text", "") or "").strip()
+        if not raw:
+            continue
+        t = _normalize_vocab(raw)
+        if not t.strip():
+            continue
+        item: dict[str, Any] = {
+            "start": round(float(s.start), 3),
+            "end": round(float(s.end), 3),
+            "text": t.strip(),
+        }
+        words = getattr(s, "words", None)
+        if include_words and words:
+            item["words"] = [
+                {
+                    "word": w.word,
+                    "start": round(float(w.start), 3),
+                    "end": round(float(w.end), 3),
+                    "probability": round(float(w.probability), 4),
+                }
+                for w in words
+            ]
+        out.append(item)
+    return out
+
+
+def _info_for_ws(info: Any) -> dict[str, Any]:
+    if info is None:
+        return {}
+    lang = getattr(info, "language", None)
+    lp = getattr(info, "language_probability", None)
+    dur = getattr(info, "duration", None)
+    dvad = getattr(info, "duration_after_vad", None)
+    d: dict[str, Any] = {}
+    if isinstance(lang, str) and lang:
+        d["language"] = lang
+    if lp is not None:
+        try:
+            d["language_probability"] = round(float(lp), 4)
+        except (TypeError, ValueError):
+            pass
+    if dur is not None:
+        try:
+            d["duration_model_s"] = round(float(dur), 3)
+        except (TypeError, ValueError):
+            pass
+    if dvad is not None:
+        try:
+            d["duration_after_vad_s"] = round(float(dvad), 3)
+        except (TypeError, ValueError):
+            pass
+    return d
+
+
+def build_ws_transcript_body(
+    cfg: dict[str, Any],
+    *,
+    text: str,
+    ts: float,
+    utterance_id: int | None,
+    whisper_segs: list,
+    info: Any,
+    audio_duration_s: float,
+    sample_rate: int,
+    buffer_rms: float,
+) -> dict[str, Any]:
+    """Rich JSON for listeners (overlay, logging, quality UI)."""
+    r = cfg.get("relay") or {}
+    include_metrics = bool(r.get("include_ws_metrics", True))
+    include_segments = bool(r.get("include_ws_segments", True))
+    wcfg = cfg.get("whisper") or {}
+    include_words = bool(wcfg.get("word_timestamps", False))
+
+    sid = stream_id_from_cfg(cfg)
+    body: dict[str, Any] = {
+        "type": "transcript",
+        "proto": WS_TRANSCRIPT_PROTO,
+        "text": text,
+        "is_final": True,
+        "timestamp": ts,
+        "source": sid,
+        "stream_id": sid,
+    }
+    if utterance_id is not None:
+        body["utterance_id"] = utterance_id
+    body["audio_duration_s"] = round(float(audio_duration_s), 3)
+    body["sample_rate"] = int(sample_rate)
+    body["buffer_rms"] = round(float(buffer_rms), 5)
+
+    info_extra = _info_for_ws(info)
+    if info_extra:
+        body.update(info_extra)
+
+    if include_metrics and whisper_segs:
+        body["metrics"] = _metrics_from_whisper_segments(whisper_segs)
+
+    if include_segments and whisper_segs:
+        body["segments"] = _segments_for_ws(whisper_segs, include_words=include_words)
+
+    return body
 
 
 async def run_agent(cfg: dict[str, Any], stop: asyncio.Event) -> None:
@@ -1108,7 +1223,9 @@ async def run_agent(cfg: dict[str, Any], stop: asyncio.Event) -> None:
                 if buf_rms < min_transcribe_rms:
                     continue
                 dur = float(final.size) / sr
-                text, whisper_segs = await asyncio.to_thread(transcribe_sync, model, final, cfg)
+                text, whisper_segs, whisper_info = await asyncio.to_thread(
+                    transcribe_sync, model, final, cfg
+                )
                 if not text or len(text.strip()) < min_chars:
                     continue
                 text = _normalize_vocab(text)
@@ -1129,7 +1246,18 @@ async def run_agent(cfg: dict[str, Any], stop: asyncio.Event) -> None:
                     log.debug("[SKIP dedup] %r", text[:80])
                     continue
                 log.info("[transcript] %s", text)
-                await relay.ingest(text, ts, seg.utterance_id)
+                ws_body = build_ws_transcript_body(
+                    cfg,
+                    text=text,
+                    ts=ts,
+                    utterance_id=seg.utterance_id,
+                    whisper_segs=whisper_segs,
+                    info=whisper_info,
+                    audio_duration_s=dur,
+                    sample_rate=sr,
+                    buffer_rms=buf_rms,
+                )
+                await relay.ingest(ws_body, seg.utterance_id)
     finally:
         obs_task.cancel()
         with suppress(asyncio.CancelledError):
