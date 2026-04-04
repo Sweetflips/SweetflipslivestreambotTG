@@ -1,0 +1,82 @@
+version: "3.8"
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    environment:
+      - NODE_ENV=production
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - DATABASE_URL=${DATABASE_URL}
+      - LIVE_BALANCE_BEARER_TOKEN=${LIVE_BALANCE_BEARER_TOKEN}
+      - GOOGLE_SPREADSHEET_ID=${GOOGLE_SPREADSHEET_ID}
+      - GOOGLE_SERVICE_ACCOUNT_KEY=${GOOGLE_SERVICE_ACCOUNT_KEY}
+      - PANEL_API_KEY=${PANEL_API_KEY}
+      - PANEL_DEFAULT_REEL_VIEWS=${PANEL_DEFAULT_REEL_VIEWS:-500}
+      - PANEL_DEFAULT_REEL_LIKES=${PANEL_DEFAULT_REEL_LIKES:-50}
+      - PANEL_API_URL=${PANEL_API_URL:-https://thelordofthepanels.com/api/v2}
+      - PANEL_REEL_VIEWS_SERVICE_ID=${PANEL_REEL_VIEWS_SERVICE_ID}
+      - PANEL_REEL_LIKES_SERVICE_ID=${PANEL_REEL_LIKES_SERVICE_ID}
+      - AUTO_RESTART_ENABLED=true
+      - HEALTH_CHECK_INTERVAL=30000
+      - MAX_RESTART_ATTEMPTS=10
+      - RESTART_DELAY=5000
+      - BACKOFF_MULTIPLIER=1.5
+      - MAX_DELAY=60000
+    restart: always
+    volumes:
+      - ./logs:/app/logs
+      - ./credentials:/app/credentials:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Health check: OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    stop_grace_period: 30s
+    networks:
+      - bot-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: sweetflips_bot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - bot-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  bot-network:
+    driver: bridge

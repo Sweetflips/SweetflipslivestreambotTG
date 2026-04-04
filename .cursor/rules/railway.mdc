@@ -1,0 +1,8 @@
+---
+description: Railway deployment and git automation rules
+globs:
+alwaysApply: true
+---
+
+- push to git after every change
+- always build a logical project structure with according folders

@@ -1,0 +1,178 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  telegramId  String   @unique @map("telegram_id")
+  telegramUser String? @map("telegram_user")
+  kickName    String?  @unique @map("kick_name")
+  role        String   @default("VIEWER")
+  linkedAt    DateTime? @map("linked_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  guesses   Guess[]
+  auditLogs AuditLog[]
+  callEntries CallEntry[]
+
+  @@map("users")
+}
+
+model GameRound {
+  id          String   @id @default(cuid())
+  type        String   // "BONUS", "TRIVIA", "GUESS_BALANCE", "GUESS_BONUS"
+  phase       String   @default("IDLE") // "IDLE", "OPEN", "CLOSED", "REVEALED"
+  finalValue  Int?     @map("final_value")
+  graceWindow Int      @default(30) @map("grace_window") // seconds
+  windowMin   Int      @default(0) @map("window_min")  // minutes, 0 = manual close only
+  minRange    Int      @default(1) @map("min_range")
+  maxRange    Int      @default(1000000) @map("max_range")
+  createdAt   DateTime @default(now()) @map("created_at")
+  closedAt    DateTime? @map("closed_at")
+  revealedAt  DateTime? @map("revealed_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  guesses   Guess[]
+  bonusItems BonusItem[]
+  auditLogs AuditLog[]
+
+  @@map("game_rounds")
+}
+
+model Guess {
+  id        String   @id @default(cuid())
+  gameRoundId String @map("game_round_id")
+  userId    String   @map("user_id")
+  value     Int
+  createdAt DateTime @default(now()) @map("created_at")
+  editedAt  DateTime? @map("edited_at")
+  isArchived Boolean @default(false) @map("is_archived") // Whether this guess has been archived with a completed game
+
+  // Relations
+  gameRound GameRound @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gameRoundId, userId])
+  @@unique([gameRoundId, value])
+  @@map("guesses")
+}
+
+model BonusItem {
+  id        String   @id @default(cuid())
+  gameRoundId String @map("game_round_id")
+  name      String
+  payoutX   Int?     @map("payout_x") // multiplier, null if not yet paid out
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  gameRound GameRound @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
+
+  @@map("bonus_items")
+}
+
+// Archive functionality removed for simplicity - using basic database storage
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  gameRoundId String? @map("game_round_id")
+  callSessionId String? @map("call_session_id")
+  userId    String   @map("user_id")
+  command   String
+  params    String?  // JSON as string instead of Json type
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  gameRound GameRound? @relation(fields: [gameRoundId], references: [id], onDelete: Cascade)
+  callSession CallSession? @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
+
+model TelegramGroup {
+  id          String   @id @default(cuid())
+  groupId     String   @unique @map("group_id") // Telegram group ID (e.g., "-1001234567890")
+  title       String?  // Group title
+  type        String?  // "group" or "supergroup"
+  memberCount Int?     @map("member_count") // Number of members
+  isActive    Boolean  @default(true) @map("is_active") // Whether bot is still a member
+  source      String?  // How the group was discovered: "manual", "auto", "environment"
+  lastSeen    DateTime @default(now()) @map("last_seen") // Last time we confirmed bot membership
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("telegram_groups")
+}
+
+model Schedule {
+  id           String   @id @default(cuid())
+  dayOfWeek    Int      @map("day_of_week") // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  streamNumber Int      @map("stream_number") // 1 or 2 (for different stream times)
+  eventTitle   String   @map("event_title") // Title of the stream event
+  isActive     Boolean  @default(true) @map("is_active") // Whether this schedule entry is active
+  createdBy    String?  @map("created_by") // User ID who created this entry
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([dayOfWeek, streamNumber])
+  @@map("schedules")
+}
+
+model StreamNotification {
+  id           String   @id @default(cuid())
+  dayOfWeek    Int      @map("day_of_week") // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  streamNumber Int      @map("stream_number") // 1 or 2 (for different stream times)
+  notificationType String @map("notification_type") // "2hour_reminder", "schedule_broadcast", etc.
+  sentAt       DateTime @default(now()) @map("sent_at")
+  eventDate    DateTime @map("event_date") // The actual date of the stream event
+  successCount Int      @default(0) @map("success_count") // Number of groups successfully notified
+  failedCount  Int      @default(0) @map("failed_count") // Number of groups that failed
+
+  @@unique([dayOfWeek, streamNumber, notificationType, eventDate])
+  @@map("stream_notifications")
+}
+
+model CallSession {
+  id          String   @id @default(cuid())
+  sessionName String   @map("session_name") // "IDLE", "OPEN", "CLOSED", "REVEALED"
+  status      String   @default("IDLE") // "IDLE", "OPEN", "CLOSED", "REVEALED"
+  createdAt   DateTime @default(now()) @map("created_at")
+  closedAt    DateTime? @map("closed_at")
+  revealedAt  DateTime? @map("revealed_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  callEntries CallEntry[]
+  auditLogs   AuditLog[]
+
+  @@map("call_sessions")
+}
+
+model CallEntry {
+  id        String   @id @default(cuid())
+  sessionId String   @map("session_id")
+  userId    String   @map("user_id")
+  slotName  String   @map("slot_name")
+  multiplier Int?    // Outcome multiplier for this slot (set by MOD/Owner)
+  createdAt DateTime @default(now()) @map("created_at")
+  isArchived Boolean @default(false) @map("is_archived") // Whether this call has been archived with a completed session
+
+  // Relations
+  session   CallSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId]) // Each user can only call once per session
+  @@unique([sessionId, slotName]) // Each slot can only be called once per session
+  @@map("call_entries")
+}

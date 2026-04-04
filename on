@@ -1,0 +1,5 @@
+[33m5eb175c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Code formatting improvements in bot.js
+[33mefe1bd2[m Update Stream 1 timing from 9AM to 7AM UTC
+[33m3bd9d49[m Fix automated schedule message to match /schedule command format exactly
+[33mb1b2a9e[m Add automated schedule messaging system - bot now sends schedule to all groups twice daily at 7AM and 3PM UTC
+[33mea78c36[m Add database setup script and npm command for easy database initialization
