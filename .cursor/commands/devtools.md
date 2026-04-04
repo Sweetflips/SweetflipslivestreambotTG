@@ -1,12 +1,6 @@
-## Prohibited Practices
+## Local dev (this repo)
 
-- Do not use `tsx` in production environments; restrict its usage to development only.
-- Avoid running multiple instances of `nodemon` for the same project concurrently.
-- Do not use `nodemon` for production process management; use a dedicated process manager.
-- Never bypass TypeScript compilation errors by running code directly with `tsx`.
-- Avoid using outdated or unsupported versions of `tsx`, `nodemon`, or `tsc-alias`.
-- Do not modify TypeScript path aliases without updating `tsc-alias` configuration accordingly.
-- Never commit auto-generated or temporary files created by `nodemon`, `tsx`, or `tsc-alias` to version control.
-- Avoid using custom scripts that override the default behavior of `tsx`, `nodemon`, or `tsc-alias` without clear documentation.
-- Do not ignore warnings or errors emitted by `tsc-alias` during the build process.
-- Never use hardcoded paths in place of TypeScript path aliases.
+- **Relay**: `uvicorn relay_server:app --host 127.0.0.1 --port 8000` with `STT_WS_TOKEN` (or `STT_ALLOW_OPEN_WS=1` for local only).
+- **Streamer agent (recommended)**: `python scripts/streamer_obs_whisper_agent.py --config config/streamer_agent.json`
+- **Legacy HTTP agent**: `python streamer_agent.py` (uses HTTP ingest; WebSocket JSON agent is preferred).
+- Use a virtualenv (`.venv`) and install deps from `requirements.txt` / project docs.

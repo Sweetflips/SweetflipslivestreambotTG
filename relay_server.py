@@ -41,6 +41,7 @@ logger.setLevel(_log_level)
 
 HEARTBEAT_INTERVAL_S = int(os.environ.get("STT_WS_HEARTBEAT_S", "30"))
 PROTO_VERSION = 2
+_RELAY_PROCESS_START = time.time()
 
 
 def _env_flag(name: str) -> bool:
@@ -91,6 +92,22 @@ def _message_log_summary(message: str) -> str:
 
 def _iso_ts(ts: float) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+
+def _peer_tag(ws: WebSocket) -> str:
+    scope = ws.scope
+    client = scope.get("client")
+    parts: list[str] = []
+    if client and len(client) >= 2:
+        parts.append(f"{client[0]}:{client[1]}")
+    hdrs = {
+        k.decode("latin-1", "ignore").lower(): v.decode("latin-1", "replace")
+        for k, v in scope.get("headers", [])
+    }
+    ua = (hdrs.get("user-agent") or "").strip()
+    if ua:
+        parts.append(f"ua={ua[:160]}")
+    return " ".join(parts) if parts else "unknown"
 
 
 @asynccontextmanager
@@ -208,10 +225,13 @@ async def health():
         if not sid:
             continue
         streamer_list.append({"stream_id": sid})
+    now = time.time()
     return {
         "status": "ok",
         "service": "stt-relay",
         "proto": PROTO_VERSION,
+        "process_started_unix": _RELAY_PROCESS_START,
+        "uptime_seconds": round(now - _RELAY_PROCESS_START, 3),
         "connected_clients": len(_clients),
         "listeners": len(_listeners),
         "streamers_connected": len(_streamers),
@@ -247,7 +267,12 @@ async def stt_socket(websocket: WebSocket):
     else:
         _listeners.add(websocket)
 
-    logger.info("client connected role=%s (%d total)", role, len(_clients))
+    logger.info(
+        "client connected role=%s peer=%s (%d total)",
+        role,
+        _peer_tag(websocket),
+        len(_clients),
+    )
 
     welcome = json.dumps(
         {
@@ -308,7 +333,7 @@ async def stt_socket(websocket: WebSocket):
         except WebSocketDisconnect:
             pass
         except Exception:
-            pass
+            logger.exception("websocket receive loop error peer=%s", _peer_tag(websocket))
         finally:
             stop.set()
 
@@ -325,6 +350,7 @@ async def stt_socket(websocket: WebSocket):
 
         was_streamer = websocket in _streamers
         sid = _ws_stream_id.get(websocket) or _primary_stream_id()
+        peer = _peer_tag(websocket)
         _unregister(websocket)
 
         if was_streamer and not streamer_online():
@@ -339,7 +365,11 @@ async def stt_socket(websocket: WebSocket):
                 )
             )
 
-        logger.info("client disconnected (%d remaining)", len(_clients))
+        logger.info(
+            "client disconnected peer=%s (%d remaining)",
+            peer,
+            len(_clients),
+        )
 
 
 if __name__ == "__main__":
