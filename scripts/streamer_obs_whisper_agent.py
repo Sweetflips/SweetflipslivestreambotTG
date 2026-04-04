@@ -1,6 +1,8 @@
 """
-SweetFlips streamer PC: mic → faster-whisper (CUDA) → POST /ingest on relay.
-JSON config, OBS stream on/off, 24/7 process, outbound HTTPS only.
+SweetFlips streamer PC: mic → faster-whisper (CUDA) → WebSocket STT relay
+(role=streamer on /ws/stt, same protocol as relay_server.py).
+
+OBS WebSocket gates transcription when the stream is live (optional).
 
 Usage:
   python streamer_obs_whisper_agent.py --config path/to/streamer_agent.json
@@ -27,9 +29,11 @@ from pathlib import Path
 from typing import Any
 
 import re
+from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit, urlunparse
 
 import httpx
 import numpy as np
+import websockets
 import sounddevice as sd
 from dotenv import load_dotenv
 from faster_whisper import WhisperModel
@@ -147,6 +151,7 @@ def setup_logging(cfg: dict[str, Any]) -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("faster_whisper").setLevel(logging.WARNING)
     logging.getLogger("obsws_python").setLevel(logging.CRITICAL)
+    logging.getLogger("websockets").setLevel(logging.WARNING)
 
 
 def print_input_devices() -> None:
@@ -192,22 +197,75 @@ def resolve_input_device(cfg: dict[str, Any]) -> int:
     raise SystemExit(f"audio.device must be null, int, or string, got {type(raw)}")
 
 
+def stream_id_from_cfg(cfg: dict[str, Any]) -> str:
+    """`STT_STREAM_ID` in .env overrides JSON `relay.source_name` (WebSocket stream_id)."""
+    load_dotenv_for_project()
+    env = (os.environ.get("STT_STREAM_ID") or "").strip()
+    if env:
+        return env
+    r = cfg.get("relay") or {}
+    return str(r.get("source_name") or "streamer-pc").strip() or "streamer-pc"
+
+
+def relay_websocket_url(cfg: dict[str, Any]) -> str:
+    """WS URL for `relay_server.py` /ws/stt with token + role=streamer.
+
+    - `STT_WS_URL` (ws:// or wss://) overrides JSON `relay.base_url` mapping.
+    - Else: same host/port as `relay.base_url` / `STT_RELAY_URL`, path `/ws/stt`.
+    """
+    load_dotenv_for_project()
+    token = (os.environ.get("STT_WS_TOKEN") or "").strip()
+    override = (os.environ.get("STT_WS_URL") or "").strip()
+    if override:
+        u = override
+    else:
+        http_base = relay_base_url(cfg)
+        p = urlparse(http_base)
+        scheme = "wss" if p.scheme == "https" else "ws"
+        netloc = p.netloc
+        if not netloc:
+            netloc = "127.0.0.1:8000"
+        path = "/ws/stt"
+        u = urlunparse((scheme, netloc, path, "", "", ""))
+    parts = urlsplit(u)
+    q = dict(parse_qsl(parts.query, keep_blank_values=True))
+    if token and "token" not in q:
+        q["token"] = token
+    if "role" not in q:
+        q["role"] = "streamer"
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(q), parts.fragment))
+
+
+def _ws_url_for_log(url: str) -> str:
+    if "token=" not in url:
+        return url
+    base, _, _ = url.partition("?")
+    return f"{base}?token=***"
+
+
 class RelayClient:
+    """Transcripts over WebSocket (relay_server.py). GET /health uses HTTP same host as relay.base_url."""
+
     def __init__(self, cfg: dict[str, Any]) -> None:
         r = cfg["relay"]
+        self._cfg = cfg
         self._base = relay_base_url(cfg)
-        self._source_name = str(r["source_name"]).strip() or "streamer-pc"
+        self._source_name = stream_id_from_cfg(cfg)
         self._timeout = float(r.get("timeout_secs") or 5.0)
         self._backoff_base = float(r.get("retry_backoff_secs") or 3.0)
         self._client = httpx.AsyncClient(timeout=self._timeout)
+        self._ws: Any = None
+        self._ws_lock = asyncio.Lock()
+        self._reader_task: asyncio.Task[None] | None = None
         self._last_utterance_id: int | None = None
+        self._ws_url = relay_websocket_url(cfg)
 
     @property
     def base_url(self) -> str:
         return self._base
 
     async def check_health(self) -> bool:
-        """GET /health on the relay host (stream-stt-relay)."""
+        """GET /health on the relay host (FastAPI next to /ws/stt)."""
         url = f"{self._base}/health"
         try:
             r = await self._client.get(url)
@@ -218,10 +276,10 @@ class RelayClient:
                 data = r.json()
                 if isinstance(data, dict):
                     log.info(
-                        "Connected to relay host %s (service=%s ok=%s)",
+                        "Relay %s /health service=%s streamers=%s",
                         self._base,
                         data.get("service", "?"),
-                        data.get("ok"),
+                        data.get("streamers_connected", "?"),
                     )
                 else:
                     log.info("Connected to relay host %s", self._base)
@@ -232,33 +290,86 @@ class RelayClient:
             log.warning("Cannot reach relay host at %s: %s", self._base, e)
             return False
 
-    async def post(self, path: str, payload: dict) -> bool:
-        url = f"{self._base}{path}"
-        attempt = 0
+    async def _reader_loop(self) -> None:
+        """Drain server messages (welcome, ping) so the connection stays healthy."""
+        try:
+            while True:
+                async with self._ws_lock:
+                    ws = self._ws
+                if ws is None:
+                    break
+                await ws.recv()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+
+    async def _connect_ws(self) -> bool:
         backoff = self._backoff_base
-        while attempt < POST_MAX_ATTEMPTS:
+        for attempt in range(POST_MAX_ATTEMPTS):
+            ws: Any = None
             try:
-                r = await self._client.post(url, json=payload)
-                if r.status_code < 300:
-                    return True
-                log.warning("relay %s -> %s", path, r.status_code)
-            except httpx.HTTPError as e:
-                log.warning("relay %s failed: %s (attempt %s)", path, e, attempt + 1)
-            attempt += 1
+                ws = await websockets.connect(
+                    self._ws_url,
+                    ping_interval=20,
+                    ping_timeout=60,
+                    open_timeout=min(30.0, self._timeout),
+                )
+                hello = json.dumps(
+                    {
+                        "type": "client_hello",
+                        "stream_id": self._source_name,
+                        "role": "streamer",
+                    },
+                    ensure_ascii=False,
+                )
+                await ws.send(hello)
+                async with self._ws_lock:
+                    if self._ws is not None:
+                        await ws.close()
+                        return True
+                    self._ws = ws
+                    self._reader_task = asyncio.create_task(self._reader_loop())
+                log.info("STT WebSocket connected %s", _ws_url_for_log(self._ws_url))
+                return True
+            except Exception as e:
+                if ws is not None:
+                    with suppress(Exception):
+                        await ws.close()
+                log.warning(
+                    "WebSocket connect failed (attempt %s): %s — %s",
+                    attempt + 1,
+                    _ws_url_for_log(self._ws_url),
+                    e,
+                )
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, BACKOFF_CAP_S)
-        log.error("relay %s: gave up after %s attempts", path, attempt)
+        log.error("WebSocket: gave up after %s attempts", POST_MAX_ATTEMPTS)
         return False
 
     async def source_online(self) -> bool:
-        return await self.post(
-            "/source/online", {"source_name": self._source_name}
-        )
+        """Connect as streamer; relay notifies listeners (streamer_online)."""
+        async with self._ws_lock:
+            if self._ws is not None:
+                return True
+        return await self._connect_ws()
 
     async def source_offline(self) -> bool:
-        return await self.post(
-            "/source/offline", {"source_name": self._source_name}
-        )
+        """Disconnect; relay broadcasts streamer_offline when last streamer leaves."""
+        async with self._ws_lock:
+            t = self._reader_task
+            self._reader_task = None
+            w = self._ws
+            self._ws = None
+        if t is not None:
+            t.cancel()
+            with suppress(asyncio.CancelledError):
+                await t
+        if w is not None:
+            with suppress(Exception):
+                await w.close()
+        log.debug("STT WebSocket disconnected")
+        return True
 
     async def ingest(self, text: str, ts: float, utterance_id: int | None) -> bool:
         if utterance_id is not None and utterance_id == self._last_utterance_id:
@@ -269,13 +380,32 @@ class RelayClient:
             "is_final": True,
             "timestamp": ts,
             "source": self._source_name,
+            "stream_id": self._source_name,
         }
-        ok = await self.post("/ingest", body)
-        if ok and utterance_id is not None:
+        payload = json.dumps(body, ensure_ascii=False)
+        async with self._ws_lock:
+            ws = self._ws
+        if ws is None:
+            log.warning("ingest skipped: WebSocket not connected")
+            return False
+        try:
+            await ws.send(payload)
+        except Exception as e:
+            log.warning("WebSocket send failed: %s", e)
+            async with self._ws_lock:
+                if self._reader_task is not None:
+                    self._reader_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await self._reader_task
+                    self._reader_task = None
+                self._ws = None
+            return False
+        if utterance_id is not None:
             self._last_utterance_id = utterance_id
-        return ok
+        return True
 
     async def close(self) -> None:
+        await self.source_offline()
         await self._client.aclose()
 
 
@@ -943,9 +1073,9 @@ async def run_agent(cfg: dict[str, Any], stop: asyncio.Event) -> None:
 
     relay = RelayClient(cfg)
     log.info(
-        "Model ready. Relay host %s source=%s",
+        "Model ready. Relay HTTP %s stream_id=%s (transcripts via WebSocket)",
         relay.base_url,
-        cfg["relay"]["source_name"],
+        stream_id_from_cfg(cfg),
     )
     if bool((cfg.get("relay") or {}).get("health_check_on_start", True)):
         await relay.check_health()
