@@ -1,0 +1,16 @@
+2026-04-03 01:15:54 INFO [sweetflips.streamer] Using default input device [1] Microfoon (RODECaster Duo Main 
+2026-04-03 01:15:54 INFO [sweetflips.streamer] Loading Whisper large-v3 (cuda, float16)...
+2026-04-03 01:15:54 INFO [httpx] HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-large-v3/revision/main "HTTP/1.1 200 OK"
+2026-04-03 01:16:00 INFO [sweetflips.streamer] Model ready. Relay http://62.45.124.91:8766 source=streamer-pc
+2026-04-03 01:16:01 INFO [sweetflips.streamer] Listening (final transcripts only). Ctrl+C to stop.
+2026-04-03 01:16:01 INFO [obsws_python.baseclient.ObsClient] Connecting with parameters: host='127.0.0.1' port=4455 password='REPLACE_WITH_OBS_WEBSOCKET_PASSWORD' subs=0 timeout=5
+2026-04-03 01:16:01 ERROR [obsws_python.reqs.ReqClient] OBSSDKError: failed to identify client with the server, please check connection settings
+2026-04-03 01:16:06 WARNING [sweetflips.streamer] relay /source/online failed:  (attempt 1)
+2026-04-03 01:16:07 INFO [faster_whisper] Processing audio with duration 00:01.000
+2026-04-03 01:16:07 INFO [faster_whisper] VAD filter removed 00:01.000 of audio
+2026-04-03 01:16:10 INFO [faster_whisper] Processing audio with duration 00:01.250
+2026-04-03 01:16:10 INFO [faster_whisper] VAD filter removed 00:00.578 of audio
+2026-04-03 01:16:13 INFO [sweetflips.streamer] [transcript] That's this.
+2026-04-03 01:16:14 WARNING [sweetflips.streamer] relay /source/online failed:  (attempt 2)
+2026-04-03 01:16:18 WARNING [sweetflips.streamer] relay /ingest failed:  (attempt 1)
+2026-04-03 01:16:25 WARNING [sweetflips.streamer] relay /source/online failed:  (attempt 3)

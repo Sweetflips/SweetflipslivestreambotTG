@@ -1,0 +1,13 @@
+# Secrets and local overrides (never commit real passwords)
+.env
+.env.local
+config/streamer_agent.json
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+*.log
+pretrained_models/

@@ -1,0 +1,11 @@
+# PyTorch with CUDA: install CUDA build from https://pytorch.org/ on the streamer PC
+numpy>=1.24
+sounddevice>=0.4.6
+httpx>=0.27
+faster-whisper>=1.0.0
+obsws-python>=1.6.0
+
+# Relay (VPS / local)
+fastapi>=0.109
+uvicorn[standard]>=0.27
+python-dotenv>=1.0.0

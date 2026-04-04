@@ -1,0 +1,9 @@
+2026-04-03 01:10:05 INFO [sweetflips.streamer] Using default input device [1] Microfoon (RODECaster Duo Main 
+2026-04-03 01:10:05 INFO [sweetflips.streamer] Loading Whisper large-v3 (cuda, float16)...
+2026-04-03 01:10:06 INFO [httpx] HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-large-v3/revision/main "HTTP/1.1 200 OK"
+2026-04-03 01:10:10 INFO [sweetflips.streamer] Model ready. Relay http://62.45.124.91:8766 source=streamer-pc
+2026-04-03 01:10:10 INFO [sweetflips.streamer] Listening (final transcripts only). Ctrl+C to stop.
+2026-04-03 01:10:10 INFO [obsws_python.baseclient.ObsClient] Connecting with parameters: host='127.0.0.1' port=4455 password='' subs=0 timeout=5
+2026-04-03 01:10:10 ERROR [obsws_python.reqs.ReqClient] OBSSDKError: authentication enabled but no password provided
+2026-04-03 01:10:15 WARNING [sweetflips.streamer] relay /source/online failed:  (attempt 1)
+2026-04-03 01:10:23 WARNING [sweetflips.streamer] relay /source/online failed:  (attempt 2)
