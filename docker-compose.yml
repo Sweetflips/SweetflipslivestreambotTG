@@ -8,6 +8,7 @@ services:
     env_file:
       - .env
     environment:
-      STT_WS_TOKEN: ${STT_WS_TOKEN:-}
+      # If .env omits STT_WS_TOKEN, relay would exit; default only for local dev — set in .env for prod.
+      STT_WS_TOKEN: ${STT_WS_TOKEN:-changeme}
       STT_ALLOW_OPEN_WS: ${STT_ALLOW_OPEN_WS:-0}
       STT_LOG_LEVEL: ${STT_LOG_LEVEL:-INFO}

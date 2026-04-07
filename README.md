@@ -54,7 +54,7 @@ In JSON `whisper`: default **`compute_type`** **`int8`** keeps VRAM low; **`int8
 
 ### Docker (relay)
 
-Copy `.env.example` to `.env` and set **`STT_WS_TOKEN`**. With [Docker Desktop](https://www.docker.com/products/docker-desktop/) running:
+Copy `.env.example` to `.env` and set **`STT_WS_TOKEN`** (shared with streamers). If you omit it, `docker-compose.yml` uses a **dev default** (`changeme`) so the container starts — **change this for any shared or public deployment**. With [Docker Desktop](https://www.docker.com/products/docker-desktop/) running:
 
 ```powershell
 docker compose build
