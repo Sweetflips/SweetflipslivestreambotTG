@@ -52,6 +52,21 @@ In JSON `whisper`: default **`compute_type`** **`int8`** keeps VRAM low; **`int8
 2. Set **`STT_WS_TOKEN`** on both relay and streamer (or `STT_ALLOW_OPEN_WS=1` for local dev only).
 3. TLS: `deploy/nginx/stt.sweetflips.ai.conf` as a starting point.
 
+### Docker (relay)
+
+Copy `.env.example` to `.env` and set **`STT_WS_TOKEN`**. With [Docker Desktop](https://www.docker.com/products/docker-desktop/) running:
+
+```powershell
+docker compose build
+docker compose up -d
+```
+
+To join this host as a **Swarm worker** (after the manager issues a join token):
+
+```powershell
+.\scripts\Join-DockerSwarm.ps1 -Token '<worker-token>'
+```
+
 Streamers connect with **`STT_WS_URL`** or derive **`ws://` / `wss://`** from **`STT_RELAY_URL`** + path `/ws/stt`.
 
 ## OBS

@@ -1,0 +1,13 @@
+services:
+  relay:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "${STT_RELAY_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      STT_WS_TOKEN: ${STT_WS_TOKEN:-}
+      STT_ALLOW_OPEN_WS: ${STT_ALLOW_OPEN_WS:-0}
+      STT_LOG_LEVEL: ${STT_LOG_LEVEL:-INFO}

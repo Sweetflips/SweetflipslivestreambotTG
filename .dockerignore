@@ -1,0 +1,16 @@
+.git
+.venv
+venv
+__pycache__
+*.py[cod]
+.env
+.env.*
+logs
+*.log
+config/streamer_agent.json
+.cursor
+.github
+pretrained_models
+tmp
+temp
+*.db
