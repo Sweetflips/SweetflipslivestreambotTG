@@ -78,6 +78,10 @@ If a join fails or `docker info` shows **Swarm: error**, clear local state and f
 
 **Swarm troubleshooting:** The worker must reach the manager on **TCP 2377** (often same VPN or LAN as the manager). Ping can fail even when TCP works (ICMP blocked). **Docker Desktop** can join a remote swarm but networking must allow the Linux engine to route to the manager. Do not use Linux-only install lines such as `curl https://get.docker.com | sh` in PowerShell; use Docker Desktop on Windows.
 
+### Dokploy (hosted panel)
+
+To run the relay on **[Dokploy](https://docs.dokploy.com/docs/core/docker-compose)**, use **`deploy/dokploy/docker-compose.yml`** as the compose path and follow **`deploy/dokploy/README.md`**.
+
 Streamers connect with **`STT_WS_URL`** or derive **`ws://` / `wss://`** from **`STT_RELAY_URL`** + path `/ws/stt`.
 
 ## OBS

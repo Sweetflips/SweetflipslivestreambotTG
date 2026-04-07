@@ -1,0 +1,29 @@
+# Dokploy: Docker Compose (not Stack). In Dokploy, set "Compose file path" to:
+# deploy/dokploy/docker-compose.yml
+#
+# Build context is the repo root so docker/Dockerfile and relay_server.py resolve.
+# Use the Domains tab in Dokploy for HTTPS + Traefik (recommended). Set STT_* in Environment.
+
+version: "3.8"
+
+services:
+  relay:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    # Traefik (Dokploy Domains) routes to this port; avoid publishing host ports on the server.
+    expose:
+      - "8000"
+    env_file:
+      - .env
+    environment:
+      STT_WS_TOKEN: ${STT_WS_TOKEN:-changeme}
+      STT_ALLOW_OPEN_WS: ${STT_ALLOW_OPEN_WS:-0}
+      STT_LOG_LEVEL: ${STT_LOG_LEVEL:-INFO}
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: true
