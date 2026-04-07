@@ -64,8 +64,19 @@ docker compose up -d
 To join this host as a **Swarm worker** (after the manager issues a join token):
 
 ```powershell
-.\scripts\Join-DockerSwarm.ps1 -Token '<worker-token>'
+.\scripts\Test-SwarmConnectivity.ps1 -Manager 'YOUR_MANAGER_IP:2377'
+.\scripts\Join-DockerSwarm.ps1 -Token '<worker-token>' -Manager 'YOUR_MANAGER_IP:2377'
 ```
+
+You can set **`SWARM_MANAGER`** instead of passing **`-Manager`** each time. Optional: **`-AdvertiseAddr`** if the manager must see a specific interface IP (multi-homed / VPN).
+
+If a join fails or `docker info` shows **Swarm: error**, clear local state and fix reachability first:
+
+```powershell
+.\scripts\Leave-DockerSwarm.ps1 -Force
+```
+
+**Swarm troubleshooting:** The worker must reach the manager on **TCP 2377** (often same VPN or LAN as the manager). Ping can fail even when TCP works (ICMP blocked). **Docker Desktop** can join a remote swarm but networking must allow the Linux engine to route to the manager. Do not use Linux-only install lines such as `curl https://get.docker.com | sh` in PowerShell; use Docker Desktop on Windows.
 
 Streamers connect with **`STT_WS_URL`** or derive **`ws://` / `wss://`** from **`STT_RELAY_URL`** + path `/ws/stt`.
 

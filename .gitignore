@@ -58,3 +58,10 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Local Docker CLI captures (not source)
+docker_run_log.txt
+compose_ps.txt
+compose_build.txt
+docker_images.txt
+v.txt
